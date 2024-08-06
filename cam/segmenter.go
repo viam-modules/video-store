@@ -12,7 +12,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"math"
 	"unsafe"
 
 	"go.viam.com/rdk/logging"
@@ -20,7 +19,7 @@ import (
 
 const (
 	outputDirectory = "/.viam/segments/"
-	outputPattern   = outputDirectory + "seg_%01d.mp4"
+	outputPattern   = outputDirectory + "segment_%Y-%m-%d_%H-%M-%S.mp4"
 	segmentListFile = outputDirectory + "seglist.csv"
 )
 
@@ -35,8 +34,8 @@ type segmenter struct {
 func newSegmenter(
 	logger logging.Logger,
 	enc *encoder,
-	cacheLength int,
-	segmentCount int,
+	storageSize int,
+	clipLength int,
 ) (*segmenter, error) {
 	s := &segmenter{
 		logger:  logger,
@@ -72,31 +71,26 @@ func newSegmenter(
 		return nil, fmt.Errorf("failed to copy codec parameters %s", ffmpegError(ret))
 	}
 
-	segmentLength := int(math.Ceil(float64(cacheLength) / float64(segmentCount)))
-	segmentLengthCStr := C.CString(fmt.Sprintf("%d", segmentLength))
-	segmentCountCStr := C.CString(fmt.Sprintf("%d", segmentCount))
+	segmentLengthCStr := C.CString(fmt.Sprintf("%d", clipLength))
 	segmentListFileCStr := C.CString(homeDir + segmentListFile)
 	segmentFormatCStr := C.CString("mp4")
 	resetTimestampsCStr := C.CString("1")
 	segmentListTypeCStr := C.CString("csv")
 	breakNonKeyFramesCStr := C.CString("1")
+	strftimeCStr := C.CString("1")
 	defer C.free(unsafe.Pointer(segmentLengthCStr))
-	defer C.free(unsafe.Pointer(segmentCountCStr))
 	defer C.free(unsafe.Pointer(segmentFormatCStr))
 	defer C.free(unsafe.Pointer(segmentListFileCStr))
 	defer C.free(unsafe.Pointer(resetTimestampsCStr))
 	defer C.free(unsafe.Pointer(segmentListTypeCStr))
 	defer C.free(unsafe.Pointer(breakNonKeyFramesCStr))
+	defer C.free(unsafe.Pointer(strftimeCStr))
 
 	var opts *C.AVDictionary = nil
 	defer C.av_dict_free(&opts)
 	ret = C.av_dict_set(&opts, C.CString("segment_time"), segmentLengthCStr, 0)
 	if ret < 0 {
 		return nil, fmt.Errorf("failed to set segment_time: %s", ffmpegError(ret))
-	}
-	ret = C.av_dict_set(&opts, C.CString("segment_wrap"), segmentCountCStr, 0)
-	if ret < 0 {
-		return nil, fmt.Errorf("failed to set segment_wrap: %s", ffmpegError(ret))
 	}
 	ret = C.av_dict_set(&opts, C.CString("segment_format"), segmentFormatCStr, 0)
 	if ret < 0 {
@@ -119,6 +113,10 @@ func newSegmenter(
 	ret = C.av_dict_set(&opts, C.CString("break_non_keyframes"), breakNonKeyFramesCStr, 0)
 	if ret < 0 {
 		return nil, fmt.Errorf("failed to set break_non_keyframes: %s", ffmpegError(ret))
+	}
+	ret = C.av_dict_set(&opts, C.CString("strftime"), strftimeCStr, 0)
+	if ret < 0 {
+		return nil, fmt.Errorf("failed to set strftime: %s", ffmpegError(ret))
 	}
 
 	// segment options must be packed in the initial header write

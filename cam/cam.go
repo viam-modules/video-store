@@ -19,8 +19,8 @@ import (
 var Model = resource.ModelNamespace("seanavery").WithFamily("camera").WithModel("filtered-video")
 
 const (
-	defaultCacheLength  = 10
-	defaultSegmentCount = 5
+	defaultClipLength   = 30
+	defaultStorageSize  = 10
 	defaultVideoCodec   = "h264"
 	defaultVideoBitrate = 1000000
 	defaultVideoPreset  = "medium"
@@ -58,9 +58,9 @@ type filteredVideo struct {
 	clips   []triggerWindow
 }
 
-type cache struct {
-	Length   int `json:"length"`
-	Segments int `json:"segments"`
+type storage struct {
+	ClipLength int `json:"clip_length"`
+	Size       int `json:"size"`
 }
 
 type video struct {
@@ -79,11 +79,11 @@ type detect struct {
 }
 
 type Config struct {
-	Camera string `json:"camera"`
-	Vision string `json:"vision"`
-	Cache  cache  `json:"cache"`
-	Detect detect `json:"detect"`
-	Video  video  `json:"video"`
+	Camera  string  `json:"camera"`
+	Vision  string  `json:"vision"`
+	Storage storage `json:"storage"`
+	Detect  detect  `json:"detect"`
+	Video   video   `json:"video"`
 }
 
 func init() {
@@ -153,13 +153,13 @@ func newFilteredVideo(
 		return nil, err
 	}
 
-	if newConf.Cache.Length == 0 {
-		newConf.Cache.Length = defaultCacheLength
+	if newConf.Storage.ClipLength == 0 {
+		newConf.Storage.ClipLength = defaultClipLength
 	}
-	if newConf.Cache.Segments == 0 {
-		newConf.Cache.Segments = defaultSegmentCount
+	if newConf.Storage.Size == 0 {
+		newConf.Storage.Size = defaultStorageSize
 	}
-	fv.seg, err = newSegmenter(logger, fv.enc, newConf.Cache.Length, newConf.Cache.Segments)
+	fv.seg, err = newSegmenter(logger, fv.enc, newConf.Storage.Size, newConf.Storage.ClipLength)
 	if err != nil {
 		return nil, err
 	}
