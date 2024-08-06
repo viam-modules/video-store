@@ -31,6 +31,7 @@ type segmenter struct {
 	encoder        *encoder
 	frameCount     int64
 	maxStorageSize int64
+	storagePath    string
 }
 
 func newSegmenter(
@@ -43,15 +44,16 @@ func newSegmenter(
 		logger:  logger,
 		encoder: enc,
 	}
-	// s.maxStorageSize = int64(storageSize) * 1024 * 1024 * 1024
+	// TOOD(seanp): MB for testing, should be GB in prod.
 	s.maxStorageSize = int64(storageSize) * 1024 * 1024
 
 	homeDir := getHomeDir()
-	output := C.CString(homeDir + outputPattern)
-	defer C.free(unsafe.Pointer(output))
+	s.storagePath = homeDir + outputDirectory
+	outputPatternCStr := C.CString(homeDir + outputPattern)
+	defer C.free(unsafe.Pointer(outputPatternCStr))
 
 	var fmt_ctx *C.AVFormatContext = nil
-	ret := C.avformat_alloc_output_context2(&fmt_ctx, nil, C.CString("segment"), output)
+	ret := C.avformat_alloc_output_context2(&fmt_ctx, nil, C.CString("segment"), outputPatternCStr)
 	if ret < 0 {
 		return nil, fmt.Errorf("failed to allocate output context: %s", ffmpegError(ret))
 	}
@@ -101,7 +103,7 @@ func newSegmenter(
 		return nil, fmt.Errorf("failed to set reset_timestamps: %s", ffmpegError(ret))
 	}
 	// TODO(seanp): Allowing this could cause flakey playback. Remove if not needed.
-	// Or fix by adding keyframe forces on the encoder side
+	// Or, fix by adding keyframe forces on the encoder side
 	ret = C.av_dict_set(&opts, C.CString("break_non_keyframes"), breakNonKeyFramesCStr, 0)
 	if ret < 0 {
 		return nil, fmt.Errorf("failed to set break_non_keyframes: %s", ffmpegError(ret))
@@ -151,8 +153,7 @@ func (s *segmenter) writeEncodedFrame(encodedData []byte, pts int64, dts int64) 
 // cleanupStorage cleans up the storage directory.
 func (s *segmenter) cleanupStorage() error {
 	// check size of storage directory
-	dirPath := "/home/viam" + outputDirectory
-	currStorageSize, err := getDirectorySize(dirPath)
+	currStorageSize, err := getDirectorySize(s.storagePath)
 	if err != nil {
 		return err
 	}
@@ -161,7 +162,7 @@ func (s *segmenter) cleanupStorage() error {
 		return nil
 	}
 
-	files, err := getSortedFiles(dirPath)
+	files, err := getSortedFiles(s.storagePath)
 	if err != nil {
 		return err
 	}
@@ -176,7 +177,7 @@ func (s *segmenter) cleanupStorage() error {
 			return err
 		}
 
-		currStorageSize, err = getDirectorySize(dirPath)
+		currStorageSize, err = getDirectorySize(s.storagePath)
 		if err != nil {
 			return err
 		}
