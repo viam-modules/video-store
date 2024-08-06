@@ -12,6 +12,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"os"
 	"unsafe"
 
 	"go.viam.com/rdk/logging"
@@ -24,11 +25,12 @@ const (
 )
 
 type segmenter struct {
-	logger     logging.Logger
-	outCtx     *C.AVFormatContext
-	stream     *C.AVStream
-	encoder    *encoder
-	frameCount int64
+	logger         logging.Logger
+	outCtx         *C.AVFormatContext
+	stream         *C.AVStream
+	encoder        *encoder
+	frameCount     int64
+	maxStorageSize int64
 }
 
 func newSegmenter(
@@ -41,6 +43,8 @@ func newSegmenter(
 		logger:  logger,
 		encoder: enc,
 	}
+	// s.maxStorageSize = int64(storageSize) * 1024 * 1024 * 1024
+	s.maxStorageSize = int64(storageSize) * 1024 * 1024
 
 	homeDir := getHomeDir()
 	output := C.CString(homeDir + outputPattern)
@@ -72,17 +76,13 @@ func newSegmenter(
 	}
 
 	segmentLengthCStr := C.CString(fmt.Sprintf("%d", clipLength))
-	segmentListFileCStr := C.CString(homeDir + segmentListFile)
 	segmentFormatCStr := C.CString("mp4")
 	resetTimestampsCStr := C.CString("1")
-	segmentListTypeCStr := C.CString("csv")
 	breakNonKeyFramesCStr := C.CString("1")
 	strftimeCStr := C.CString("1")
 	defer C.free(unsafe.Pointer(segmentLengthCStr))
 	defer C.free(unsafe.Pointer(segmentFormatCStr))
-	defer C.free(unsafe.Pointer(segmentListFileCStr))
 	defer C.free(unsafe.Pointer(resetTimestampsCStr))
-	defer C.free(unsafe.Pointer(segmentListTypeCStr))
 	defer C.free(unsafe.Pointer(breakNonKeyFramesCStr))
 	defer C.free(unsafe.Pointer(strftimeCStr))
 
@@ -99,14 +99,6 @@ func newSegmenter(
 	ret = C.av_dict_set(&opts, C.CString("reset_timestamps"), resetTimestampsCStr, 0)
 	if ret < 0 {
 		return nil, fmt.Errorf("failed to set reset_timestamps: %s", ffmpegError(ret))
-	}
-	ret = C.av_dict_set(&opts, C.CString("segment_list"), segmentListFileCStr, 0)
-	if ret < 0 {
-		return nil, fmt.Errorf("failed to set segment_list: %s", ffmpegError(ret))
-	}
-	ret = C.av_dict_set(&opts, C.CString("segment_list_type"), segmentListTypeCStr, 0)
-	if ret < 0 {
-		return nil, fmt.Errorf("failed to set segment_list_type: %s", ffmpegError(ret))
 	}
 	// TODO(seanp): Allowing this could cause flakey playback. Remove if not needed.
 	// Or fix by adding keyframe forces on the encoder side
@@ -152,6 +144,43 @@ func (s *segmenter) writeEncodedFrame(encodedData []byte, pts int64, dts int64) 
 	}
 
 	s.frameCount++
+
+	return nil
+}
+
+// cleanupStorage cleans up the storage directory.
+func (s *segmenter) cleanupStorage() error {
+	// check size of storage directory
+	dirPath := "/home/viam" + outputDirectory
+	currStorageSize, err := getDirectorySize(dirPath)
+	if err != nil {
+		return err
+	}
+
+	if currStorageSize < s.maxStorageSize {
+		return nil
+	}
+
+	files, err := getSortedFiles(dirPath)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		if currStorageSize < s.maxStorageSize {
+			break
+		}
+
+		err := os.Remove(file)
+		if err != nil {
+			return err
+		}
+
+		currStorageSize, err = getDirectorySize(dirPath)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

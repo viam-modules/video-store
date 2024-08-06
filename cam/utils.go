@@ -8,7 +8,11 @@ package filtered_video
 import "C"
 import (
 	"encoding/csv"
+	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -91,4 +95,58 @@ func readVideoFile(path string) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+// getDirectorySize returns the size of a directory in bytes.
+func getDirectorySize(path string) (int64, error) {
+	var size int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+	return size, err
+}
+
+func getSortedFiles(path string) ([]string, error) {
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var filePaths []string
+	for _, file := range files {
+		filePaths = append(filePaths, filepath.Join(path, file.Name()))
+	}
+
+	sort.Slice(filePaths, func(i, j int) bool {
+		timeI, errI := extractDateTime(filePaths[i])
+		timeJ, errJ := extractDateTime(filePaths[j])
+		if errI != nil || errJ != nil {
+			return false
+		}
+		return timeI.Before(timeJ)
+	})
+
+	return filePaths, nil
+}
+
+func extractDateTime(filePath string) (time.Time, error) {
+	baseName := filepath.Base(filePath)
+	parts := strings.Split(baseName, "_")
+	if len(parts) < 3 {
+		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
+	}
+	datePart := parts[1]
+	timePart := strings.TrimSuffix(parts[2], filepath.Ext(baseName))
+	dateTimeStr := datePart + "_" + timePart
+	dateTime, err := time.Parse("2006-01-02_15-04-05", dateTimeStr)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return dateTime, nil
 }

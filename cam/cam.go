@@ -3,6 +3,7 @@ package filtered_video
 import (
 	"context"
 	"errors"
+	"time"
 
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/gostream"
@@ -164,7 +165,7 @@ func newFilteredVideo(
 		return nil, err
 	}
 
-	fv.workers = rdkutils.NewStoppableWorkers(fv.processFrames, fv.processDetections)
+	fv.workers = rdkutils.NewStoppableWorkers(fv.processFrames, fv.processDetections, fv.deleter)
 
 	return fv, nil
 }
@@ -327,6 +328,27 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 
 		// smooth out detections
 		// cache detections
+	}
+}
+
+// deleter Cleans up old clips if storage is full
+func (fv *filteredVideo) deleter(ctx context.Context) {
+	// ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			// Perform the deletion of the oldest clip
+			err := fv.seg.cleanupStorage()
+			if err != nil {
+				fv.logger.Error("failed to clean up storage", err)
+				continue
+			}
+		}
 	}
 }
 
