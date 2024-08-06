@@ -7,7 +7,6 @@ package filtered_video
 */
 import "C"
 import (
-	"encoding/csv"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -64,23 +63,6 @@ func getHomeDir() string {
 
 func now() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
-}
-
-// parseCSV reads a CSV file from the provided path and returns a list of a list of strings.
-func parseCSV(path string) ([][]string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	reader := csv.NewReader(file)
-	lines, err := reader.ReadAll()
-	if err != nil {
-		return nil, err
-	}
-
-	return lines, nil
 }
 
 // combineClips reads mp4 files from the provided list of files and combines them into a single mp4 file.

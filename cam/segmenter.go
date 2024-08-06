@@ -21,7 +21,6 @@ import (
 const (
 	outputDirectory = "/.viam/segments/"
 	outputPattern   = outputDirectory + "segment_%Y-%m-%d_%H-%M-%S.mp4"
-	segmentListFile = outputDirectory + "seglist.csv"
 )
 
 type segmenter struct {

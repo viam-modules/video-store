@@ -188,34 +188,6 @@ func (fv *filteredVideo) Name() resource.Name {
 }
 
 func (fv *filteredVideo) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
-	// TODO(seanp): Prototype GetVideo command here.
-	fv.logger.Info("DoCommand")
-	// check if fv.clips is not empty
-	if len(fv.clips) > 0 {
-		csvData, err := parseCSV("/home/viam/.viam/segments/seglist.csv")
-		if err != nil {
-			return nil, err
-		}
-		// inputList be the a list of the first element of the last two lines of csvData
-		inputList := []string{csvData[len(csvData)-2][0], csvData[len(csvData)-1][0]}
-
-		// TODO(seanp): Test sending video file. This is a placeholder for now.
-		// We will want to concat relevant segments here.
-		bytes, err := readVideoFile("/home/viam/.viam/segments/" + inputList[1])
-		if err != nil {
-			return nil, err
-		}
-
-		fv.logger.Infof("length of bytes: %d", len(bytes))
-
-		fv.clips = nil
-
-		return map[string]interface{}{
-			"video": bytes,
-		}, nil
-	}
-	// if not, get the latest clip
-	// return the clip
 	return nil, resource.ErrDoUnimplemented
 }
 
