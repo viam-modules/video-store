@@ -72,20 +72,14 @@ type video struct {
 	Format  string `json:"format"`
 }
 
-type detect struct {
-	Type      string  `json:"type"`
-	Label     string  `json:"label"`
-	Threshold float64 `json:"threshold"`
-	Alpha     float64 `json:"alpha"`
-	Timeout   int     `json:"timeout"`
-}
-
 type Config struct {
 	Camera  string  `json:"camera"`
 	Vision  string  `json:"vision"`
 	Storage storage `json:"storage"`
-	Detect  detect  `json:"detect"`
 	Video   video   `json:"video"`
+
+	Classifications map[string]float64 `json:"classifications"`
+	Objects         map[string]float64 `json:"objects"`
 }
 
 func init() {
@@ -284,21 +278,19 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 			return
 		}
 
-		// get detections from vision service
-		labels := map[string]interface{}{
-			"label": fv.conf.Detect.Label,
-		}
-		res, err := fv.vis.Detections(ctx, frame, labels)
+		res, err := fv.vis.Detections(ctx, frame, nil)
 		if err != nil {
 			fv.logger.Error("failed to get detections from vision service", err)
 			return
 		}
 
 		for _, detection := range res {
-			if detection.Score() > fv.conf.Detect.Threshold {
+			label := detection.Label()
+			score := detection.Score()
+
+			if threshold, exists := fv.conf.Objects[label]; exists && score > threshold {
 				fv.mu.Lock()
-				fv.logger.Infof("detected %s with score %f", detection.Label(), detection.Score())
-				label := detection.Label()
+				fv.logger.Infof("detected %s with score %f", label, score)
 				fv.triggers[label] = true
 				fv.mu.Unlock()
 			}
@@ -370,5 +362,9 @@ func (fv *filteredVideo) Close(ctx context.Context) error {
 	fv.workers.Stop()
 	fv.enc.Close()
 	fv.seg.Close()
+	err := fv.watcher.Close()
+	if err != nil {
+		return err
+	}
 	return nil
 }
