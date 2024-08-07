@@ -52,6 +52,6 @@ tool-install:
 		github.com/golangci/golangci-lint/cmd/golangci-lint \
 		github.com/rhysd/actionlint/cmd/actionlint
 
-lint: tool-install
+lint: tool-install $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_CFLAGS=$(CGO_CFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml

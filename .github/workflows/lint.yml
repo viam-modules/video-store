@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - '**/**.go'
+      - 'Makefile'
+      - '.github/workflows/lint.yml'
   pull_request:
     paths:
       - '**/**.go'
