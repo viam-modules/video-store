@@ -31,6 +31,7 @@ const (
 	defaultVideoPreset  = "medium"
 	defaultVideoFormat  = "mp4"
 	defaultLogLevel     = "error"
+	uploadPath          = "/.viam/video-upload/"
 )
 
 type filteredVideo struct {
@@ -51,9 +52,9 @@ type filteredVideo struct {
 	enc *encoder
 	seg *segmenter
 
-	// triggers array of strings
-	triggers map[string]bool
-	watcher  *fsnotify.Watcher
+	uploadPath string
+	triggers   map[string]bool
+	watcher    *fsnotify.Watcher
 }
 
 type storage struct {
@@ -169,13 +170,14 @@ func newFilteredVideo(
 	fv.watcher = watcher
 
 	fv.triggers = make(map[string]bool)
+	fv.uploadPath = getHomeDir() + uploadPath
+
 	fv.workers = rdkutils.NewStoppableWorkers(fv.processFrames, fv.processDetections, fv.deleter, fv.copier)
 
 	err = watcher.Add(fv.seg.storagePath)
 	if err != nil {
 		return nil, err
 	}
-	fv.logger.Infof("watching %s", fv.seg.storagePath)
 
 	return fv, nil
 }
@@ -339,7 +341,7 @@ func (fv *filteredVideo) copier(ctx context.Context) {
 						triggerKeys = append(triggerKeys, key)
 					}
 					triggersStr := strings.Join(triggerKeys, "_")
-					copyName := fmt.Sprintf("%s_%s", triggersStr, filename)
+					copyName := fmt.Sprintf("%s%s_%s", fv.uploadPath, triggersStr, filename)
 					fv.logger.Infof("copying %s to %s", event.Name, copyName)
 					// copy to storage path
 				}

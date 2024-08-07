@@ -62,10 +62,6 @@ func getHomeDir() string {
 	return home
 }
 
-func now() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
-}
-
 // combineClips reads mp4 files from the provided list of files and combines them into a single mp4 file.
 func combineClips(files []string, output string) error {
 	return nil
@@ -100,12 +96,10 @@ func getSortedFiles(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	var filePaths []string
 	for _, file := range files {
 		filePaths = append(filePaths, filepath.Join(path, file.Name()))
 	}
-
 	sort.Slice(filePaths, func(i, j int) bool {
 		timeI, errI := extractDateTime(filePaths[i])
 		timeJ, errJ := extractDateTime(filePaths[j])
@@ -140,18 +134,15 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	defer sourceFile.Close()
-
 	destinationFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
 	defer destinationFile.Close()
-
 	_, err = io.Copy(destinationFile, sourceFile)
 	if err != nil {
 		return err
 	}
-
 	err = destinationFile.Sync()
 	if err != nil {
 		return err
