@@ -365,63 +365,6 @@ func (fv *filteredVideo) copier(ctx context.Context) {
 	}
 }
 
-// copier listens for detection events and copies clips to capture path
-// func (fv *filteredVideo) copier(ctx context.Context) {
-// 	ticker := time.NewTicker(10 * time.Second)
-// 	defer ticker.Stop()
-
-// 	for {
-// 		select {
-// 		case <-ctx.Done():
-// 			return
-// 		case <-ticker.C:
-// 			if len(fv.clips) == 0 {
-// 				fv.logger.Infof("no clips to copy")
-// 				continue
-// 			}
-
-// 			minStartTime := fv.clips[0].start
-
-// 			// Iterate through the clips to find the minimum start time
-// 			for _, clip := range fv.clips {
-// 				if clip.start.Before(minStartTime) {
-// 					minStartTime = clip.start
-// 				}
-// 			}
-
-// 			// get sorted list of video files
-// 			files, err := getSortedFiles(fv.seg.storagePath)
-// 			if err != nil {
-// 				fv.logger.Error("failed to get sorted files", err)
-// 				continue
-// 			}
-
-// 			// iterate through the end of the files to the beginning
-// 			for i := len(files) - 1; i >= 0; i-- {
-// 				// get the clip time from the file name
-// 				clipTime, err := extractDateTime(files[i])
-// 				if err != nil {
-// 					fv.logger.Error("failed to extract date time", err)
-// 					continue
-// 				}
-// 				// find clip time that is less than minStartTime
-// 				if clipTime.Before(minStartTime) {
-// 					fv.logger.Infof("copying %s", files[i])
-// 					// copy the file to the capture path
-// 					err := copyFile(files[i], "/home/viam/.viam/test.mp4")
-// 					if err != nil {
-// 						fv.logger.Error("failed to copy file", err)
-// 						continue
-// 					}
-// 				}
-// 			}
-
-// 			// Use minStartTime as needed
-// 			fv.logger.Infof("minimum start time: %v", minStartTime)
-// 		}
-// 	}
-// }
-
 func (fv *filteredVideo) Close(ctx context.Context) error {
 	fv.stream.Close(ctx)
 	fv.workers.Stop()
