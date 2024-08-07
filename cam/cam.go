@@ -170,6 +170,10 @@ func newFilteredVideo(
 
 	fv.triggers = make(map[string]bool)
 	fv.uploadPath = getHomeDir() + uploadPath
+	err = createDir(fv.uploadPath)
+	if err != nil {
+		return nil, err
+	}
 
 	fv.workers = rdkutils.NewStoppableWorkers(fv.processFrames, fv.processDetections, fv.deleter, fv.copier)
 

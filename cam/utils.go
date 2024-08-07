@@ -59,12 +59,24 @@ func lookupCodecID(codec string) C.enum_AVCodecID {
 	}
 }
 
+// getHomeDir returns the home directory of the user.
 func getHomeDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
 	return home
+}
+
+// createDir creates a directory at the provided path if it does not exist.
+func createDir(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		err := os.Mkdir(path, 0755)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // readVideoFile takes in a path to mp4 file and returns bytes of the file.

@@ -49,6 +49,10 @@ func newSegmenter(
 
 	homeDir := getHomeDir()
 	s.storagePath = homeDir + outputDirectory
+	err := createDir(s.storagePath)
+	if err != nil {
+		return nil, err
+	}
 	outputPatternCStr := C.CString(homeDir + outputPattern)
 	defer C.free(unsafe.Pointer(outputPatternCStr))
 
