@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/gostream"
 	"go.viam.com/rdk/logging"
@@ -20,20 +21,14 @@ import (
 var Model = resource.ModelNamespace("seanavery").WithFamily("camera").WithModel("filtered-video")
 
 const (
-	defaultClipLength   = 30
-	defaultStorageSize  = 10
+	defaultClipLength   = 30 // seconds
+	defaultStorageSize  = 10 // GB
 	defaultVideoCodec   = "h264"
 	defaultVideoBitrate = 1000000
 	defaultVideoPreset  = "medium"
 	defaultVideoFormat  = "mp4"
-	// defaultLogLevel     = "debug"
-	defaultLogLevel = "error"
+	defaultLogLevel     = "error"
 )
-
-type triggerWindow struct {
-	start int64
-	end   int64
-}
 
 type filteredVideo struct {
 	// TODO(seanp): what are these?
@@ -53,10 +48,9 @@ type filteredVideo struct {
 	enc *encoder
 	seg *segmenter
 
-	// TODO(seanp): put back in once state is required for vision service.
-	// mu  sync.Mutex
-	trigger triggerWindow
-	clips   []triggerWindow
+	// triggers array of strings
+	triggers []string
+	watcher  *fsnotify.Watcher
 }
 
 type storage struct {
@@ -165,7 +159,19 @@ func newFilteredVideo(
 		return nil, err
 	}
 
-	fv.workers = rdkutils.NewStoppableWorkers(fv.processFrames, fv.processDetections, fv.deleter)
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
+	fv.watcher = watcher
+
+	fv.workers = rdkutils.NewStoppableWorkers(fv.processFrames, fv.processDetections, fv.deleter, fv.copier)
+
+	err = watcher.Add(fv.seg.storagePath)
+	if err != nil {
+		return nil, err
+	}
+	fv.logger.Infof("watching %s", fv.seg.storagePath)
 
 	return fv, nil
 }
@@ -282,30 +288,16 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 		for _, detection := range res {
 			if detection.Score() > fv.conf.Detect.Threshold {
 				fv.logger.Infof("detected %s with score %f", detection.Label(), detection.Score())
-				if fv.trigger.start == 0 {
-					fv.logger.Info("start recording")
-					fv.trigger.start = now()
-				} else {
-					fv.trigger.end = now()
-				}
+				// add detection to triggers
+				fv.triggers = append(fv.triggers, detection.Label())
 			}
 		}
-
-		if fv.trigger.end != 0 && now()-fv.trigger.end > int64(fv.conf.Detect.Timeout*1000) {
-			fv.clips = append(fv.clips, fv.trigger)
-			fv.logger.Info("stop recording")
-			fv.trigger.start = 0
-			fv.trigger.end = 0
-		}
-
-		// smooth out detections
-		// cache detections
 	}
 }
 
 // deleter Cleans up old clips if storage is full
 func (fv *filteredVideo) deleter(ctx context.Context) {
-	// ticker := time.NewTicker(5 * time.Minute)
+	// TODO(seanp): Using seconds for now, but should be minutes in prod.
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -323,6 +315,90 @@ func (fv *filteredVideo) deleter(ctx context.Context) {
 		}
 	}
 }
+
+func (fv *filteredVideo) copier(ctx context.Context) {
+	for {
+		select {
+		case event, ok := <-fv.watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Op&fsnotify.Create == fsnotify.Create {
+				fv.logger.Infof("new file created: %s", event.Name)
+				if len(fv.triggers) > 0 {
+					// create file name
+					// copy to storage path
+				}
+				// clear out the triggers
+				fv.triggers = []string{}
+			}
+		case err, ok := <-fv.watcher.Errors:
+			if !ok {
+				return
+			}
+			fv.logger.Error("error:", err)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// copier listens for detection events and copies clips to capture path
+// func (fv *filteredVideo) copier(ctx context.Context) {
+// 	ticker := time.NewTicker(10 * time.Second)
+// 	defer ticker.Stop()
+
+// 	for {
+// 		select {
+// 		case <-ctx.Done():
+// 			return
+// 		case <-ticker.C:
+// 			if len(fv.clips) == 0 {
+// 				fv.logger.Infof("no clips to copy")
+// 				continue
+// 			}
+
+// 			minStartTime := fv.clips[0].start
+
+// 			// Iterate through the clips to find the minimum start time
+// 			for _, clip := range fv.clips {
+// 				if clip.start.Before(minStartTime) {
+// 					minStartTime = clip.start
+// 				}
+// 			}
+
+// 			// get sorted list of video files
+// 			files, err := getSortedFiles(fv.seg.storagePath)
+// 			if err != nil {
+// 				fv.logger.Error("failed to get sorted files", err)
+// 				continue
+// 			}
+
+// 			// iterate through the end of the files to the beginning
+// 			for i := len(files) - 1; i >= 0; i-- {
+// 				// get the clip time from the file name
+// 				clipTime, err := extractDateTime(files[i])
+// 				if err != nil {
+// 					fv.logger.Error("failed to extract date time", err)
+// 					continue
+// 				}
+// 				// find clip time that is less than minStartTime
+// 				if clipTime.Before(minStartTime) {
+// 					fv.logger.Infof("copying %s", files[i])
+// 					// copy the file to the capture path
+// 					err := copyFile(files[i], "/home/viam/.viam/test.mp4")
+// 					if err != nil {
+// 						fv.logger.Error("failed to copy file", err)
+// 						continue
+// 					}
+// 				}
+// 			}
+
+// 			// Use minStartTime as needed
+// 			fv.logger.Infof("minimum start time: %v", minStartTime)
+// 		}
+// 	}
+// }
 
 func (fv *filteredVideo) Close(ctx context.Context) error {
 	fv.stream.Close(ctx)
