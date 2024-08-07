@@ -115,11 +115,11 @@ func getSortedFiles(path string) ([]string, error) {
 func extractDateTime(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
 	parts := strings.Split(baseName, "_")
-	if len(parts) < 3 {
+	if len(parts) < 2 {
 		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
 	}
 	datePart := parts[1]
-	timePart := strings.TrimSuffix(parts[2], filepath.Ext(baseName))
+	timePart := strings.TrimSuffix(parts[1], filepath.Ext(baseName))
 	dateTimeStr := datePart + "_" + timePart
 	dateTime, err := time.Parse("2006-01-02_15-04-05", dateTimeStr)
 	if err != nil {

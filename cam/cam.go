@@ -301,7 +301,7 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 // deleter Cleans up old clips if storage is full
 func (fv *filteredVideo) deleter(ctx context.Context) {
 	// TODO(seanp): Using seconds for now, but should be minutes in prod.
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 
 	for {

@@ -151,31 +151,26 @@ func (s *segmenter) writeEncodedFrame(encodedData []byte, pts int64, dts int64) 
 
 // cleanupStorage cleans up the storage directory.
 func (s *segmenter) cleanupStorage() error {
-	// check size of storage directory
 	currStorageSize, err := getDirectorySize(s.storagePath)
 	if err != nil {
 		return err
 	}
-
 	if currStorageSize < s.maxStorageSize {
 		return nil
 	}
-
 	files, err := getSortedFiles(s.storagePath)
 	if err != nil {
 		return err
 	}
-
 	for _, file := range files {
 		if currStorageSize < s.maxStorageSize {
 			break
 		}
-
 		err := os.Remove(file)
 		if err != nil {
 			return err
 		}
-
+		s.logger.Infof("deleted file: %s", file)
 		currStorageSize, err = getDirectorySize(s.storagePath)
 		if err != nil {
 			return err
