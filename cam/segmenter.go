@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	outputDirectory = "/.viam/segments/"
-	outputPattern   = outputDirectory + "segment_%Y-%m-%d_%H-%M-%S.mp4"
+	outputDirectory = "/.viam/video-storage/"
+	outputPattern   = outputDirectory + "%Y-%m-%d_%H-%M-%S.mp4"
 )
 
 type segmenter struct {
