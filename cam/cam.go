@@ -24,6 +24,7 @@ import (
 )
 
 // Model is the model for the filtered video camera component.
+// TODO(seanp): Personal module for now, should be movied to viam module in prod.
 var Model = resource.ModelNamespace("seanavery").WithFamily("camera").WithModel("filtered-video")
 
 const (
@@ -80,8 +81,8 @@ type Config struct {
 	Storage storage `json:"storage"`
 	Video   video   `json:"video"`
 
-	Classifications map[string]float64 `json:"classifications"`
-	Objects         map[string]float64 `json:"objects"`
+	Classifications map[string]float64 `json:"classifications,omitempty"`
+	Objects         map[string]float64 `json:"objects,omitempty"`
 }
 
 func init() {
@@ -110,12 +111,13 @@ func newFilteredVideo(
 		logger: logger,
 	}
 
+	// Source camera that provides the frames to be processed.
 	fv.cam, err = camera.FromDependencies(deps, newConf.Camera)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO(seanp): Re-enable this when vision service is implemented.
+	// Vision service that provides the detections for the frames.
 	fv.vis, err = vision.FromDependencies(deps, newConf.Vision)
 	if err != nil {
 		return nil, err
@@ -232,7 +234,9 @@ func (fv *filteredVideo) Stream(_ context.Context, _ ...gostream.ErrorHandler) (
 }
 
 // processFrames reads frames from the camera, encodes, and writes to the segmenter
-// which chuncks video stream into clips in the storage directory.
+// which chuncks video stream into clip files inside the storage directory. This is
+// meant for long term storage of video clips that are not necessarily triggered by
+// detections.
 // TODO(seanp): Should thie be throttled to a certain FPS?
 func (fv *filteredVideo) processFrames(ctx context.Context) {
 	for {
@@ -302,12 +306,12 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 	}
 }
 
-// deleter cleans up old clips if storage is full.
+// deleter is a go routine that cleans up old clips if storage is full. It runs every
+// minute and deletes the oldest clip until the storage size is below the max.
 func (fv *filteredVideo) deleter(ctx context.Context) {
 	// TODO(seanp): Using seconds for now, but should be minutes in prod.
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -323,7 +327,10 @@ func (fv *filteredVideo) deleter(ctx context.Context) {
 	}
 }
 
-// copier copies the latest frame to the upload storage directory if a trigger is found.
+// copier is go routine that copies the latest frame to the upload storage directory.
+// It listens for files created in the storage path via fsnotify watcher which is
+// equivelant to inotify in linux. If detection triggers are found it copies the file
+// to the upload storage directory with the trigger keys in the filename.
 func (fv *filteredVideo) copier(ctx context.Context) {
 	for {
 		select {
@@ -362,6 +369,8 @@ func (fv *filteredVideo) copier(ctx context.Context) {
 	}
 }
 
+// Close closes the filtered video camera component.
+// It closes the stream, workers, encoder, segmenter, and watcher.
 func (fv *filteredVideo) Close(ctx context.Context) error {
 	err := fv.stream.Close(ctx)
 	if err != nil {

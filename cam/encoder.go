@@ -40,10 +40,12 @@ func newEncoder(
 	if codec == nil {
 		return nil, errors.New("codec not found")
 	}
+
 	enc.codecCtx = C.avcodec_alloc_context3(codec)
 	if enc.codecCtx == nil {
 		return nil, errors.New("failed to allocate codec context")
 	}
+
 	enc.codecCtx.bit_rate = C.long(bitrate)
 	enc.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV422P
 	// TODO(seanp): Remove hardcoded codec ctx params.
@@ -60,6 +62,7 @@ func newEncoder(
 	tuneCStr := C.CString("zerolatency")
 	defer C.free(unsafe.Pointer(presetCStr))
 	defer C.free(unsafe.Pointer(tuneCStr))
+
 	var opts *C.AVDictionary
 	defer C.av_dict_free(&opts)
 	ret := C.av_dict_set(&opts, C.CString("preset"), presetCStr, 0)
@@ -70,10 +73,12 @@ func newEncoder(
 	if ret < 0 {
 		return nil, fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
 	}
+
 	ret = C.avcodec_open2(enc.codecCtx, codec, &opts)
 	if ret < 0 {
 		return nil, fmt.Errorf("avcodec_open2: %s", ffmpegError(ret))
 	}
+
 	srcFrame := C.av_frame_alloc()
 	if srcFrame == nil {
 		C.avcodec_close(enc.codecCtx)
@@ -83,6 +88,7 @@ func newEncoder(
 	srcFrame.height = enc.codecCtx.height
 	srcFrame.format = C.int(enc.codecCtx.pix_fmt)
 	enc.srcFrame = srcFrame
+
 	return enc, nil
 }
 

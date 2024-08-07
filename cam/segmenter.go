@@ -56,6 +56,9 @@ func newSegmenter(
 	outputPatternCStr := C.CString(homeDir + outputPattern)
 	defer C.free(unsafe.Pointer(outputPatternCStr))
 
+	// Allocate output context for segmenter. The "segment" format is a special format
+	// that allows for segmenting output files. The output pattern is a strftime pattern
+	// that specifies the output file name. The pattern is set to the current time.
 	var fmtCtx *C.AVFormatContext
 	ret := C.avformat_alloc_output_context2(&fmtCtx, nil, C.CString("segment"), outputPatternCStr)
 	if ret < 0 {
@@ -69,7 +72,8 @@ func newSegmenter(
 	stream.id = C.int(fmtCtx.nb_streams) - 1
 	stream.time_base = C.AVRational{num: 1, den: 25} // for 25 FPS
 
-	// copy codec parameters from encoder to segment stream
+	// Copy codec parameters from encoder to segment stream. This is equivalent to
+	// -c:v copy in ffmpeg cli
 	codecpar := C.avcodec_parameters_alloc()
 	defer C.avcodec_parameters_free(&codecpar)
 	if ret := C.avcodec_parameters_from_context(codecpar, enc.codecCtx); ret < 0 {
@@ -91,6 +95,8 @@ func newSegmenter(
 	defer C.free(unsafe.Pointer(breakNonKeyFramesCStr))
 	defer C.free(unsafe.Pointer(strftimeCStr))
 
+	// Segment options are passed as opts to avformat_write_header. This only needs
+	// to be done once, and not for every segment file.
 	var opts *C.AVDictionary
 	defer C.av_dict_free(&opts)
 	ret = C.av_dict_set(&opts, C.CString("segment_time"), segmentLengthCStr, 0)
@@ -116,13 +122,13 @@ func newSegmenter(
 		return nil, fmt.Errorf("failed to set strftime: %s", ffmpegError(ret))
 	}
 
-	// segment options must be packed in the initial header write
 	ret = C.avformat_write_header(fmtCtx, &opts)
 	if ret < 0 {
 		return nil, fmt.Errorf("failed to write header: %s", ffmpegError(ret))
 	}
 
-	// Writing header overwrites the time_base, so we need to reset it
+	// Writing header overwrites the time_base, so we need to reset it.
+	// TODO(seanp): Figure out why this is necessary.
 	stream.time_base = C.AVRational{num: 1, den: 25}
 	stream.id = C.int(fmtCtx.nb_streams) - 1
 	s.stream = stream
@@ -150,8 +156,8 @@ func (s *segmenter) writeEncodedFrame(encodedData []byte, pts, dts int64) error 
 	return nil
 }
 
-// cleanupStorage cleans up the storage directory.
-// It deletes the oldest files until the storage size is below the max.
+// cleanupStorage cleans up the storage directory by deleting the oldest files
+// until the storage size is below the max.
 func (s *segmenter) cleanupStorage() error {
 	currStorageSize, err := getDirectorySize(s.storagePath)
 	if err != nil {
