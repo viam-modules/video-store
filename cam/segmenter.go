@@ -127,7 +127,7 @@ func newSegmenter(
 	return s, nil
 }
 
-// writeEncodedFrame writes an encoded frame to the output file.
+// writeEncodedFrame writes an encoded frame to the output segment file.
 func (s *segmenter) writeEncodedFrame(encodedData []byte, pts int64, dts int64) error {
 	pkt := C.AVPacket{
 		data:         (*C.uint8_t)(C.CBytes(encodedData)),
@@ -137,6 +137,7 @@ func (s *segmenter) writeEncodedFrame(encodedData []byte, pts int64, dts int64) 
 		dts:          C.int64_t(dts),
 	}
 	defer C.free(unsafe.Pointer(pkt.data))
+	// TODO(seanp): We probably do not need interleave here since we are only writing one stream.
 	ret := C.av_interleaved_write_frame(s.outCtx, &pkt)
 	if ret < 0 {
 		return fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
@@ -146,6 +147,7 @@ func (s *segmenter) writeEncodedFrame(encodedData []byte, pts int64, dts int64) 
 }
 
 // cleanupStorage cleans up the storage directory.
+// It deletes the oldest files until the storage size is below the max.
 func (s *segmenter) cleanupStorage() error {
 	currStorageSize, err := getDirectorySize(s.storagePath)
 	if err != nil {
@@ -175,7 +177,8 @@ func (s *segmenter) cleanupStorage() error {
 	return nil
 }
 
-// Close closes the segmenter and writes the trailer.
+// Close closes the segmenter and writes the trailer to prevent corruption
+// when exiting early in the middle of a segment.
 func (s *segmenter) Close() {
 	ret := C.av_write_trailer(s.outCtx)
 	if ret < 0 {

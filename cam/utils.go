@@ -16,6 +16,7 @@ import (
 	"time"
 )
 
+// ffmpegError returns a string representation of the ffmpeg error code.
 func ffmpegError(ret C.int) string {
 	var errbuf [256]C.char
 	C.av_strerror(ret, &errbuf[0], 256)
@@ -25,11 +26,13 @@ func ffmpegError(ret C.int) string {
 	return C.GoString(&errbuf[0])
 }
 
+// ffmppegLogLevel sets the log level for ffmpeg logger.
 func ffmppegLogLevel(loglevel C.int) {
 	// TODO(seanp): make sure log level is valid before setting
 	C.av_log_set_level(loglevel)
 }
 
+// lookupLogID returns the log ID for the provided log level.
 func lookupLogID(level string) C.int {
 	switch level {
 	case "error":
@@ -45,6 +48,7 @@ func lookupLogID(level string) C.int {
 	}
 }
 
+// lookupCodecID returns the codec ID for the provided codec.
 func lookupCodecID(codec string) C.enum_AVCodecID {
 	switch codec {
 	case "h264":
@@ -91,6 +95,7 @@ func getDirectorySize(path string) (int64, error) {
 	return size, err
 }
 
+// getSortedFiles returns a list of files in the provided directory sorted by creation time.
 func getSortedFiles(path string) ([]string, error) {
 	files, err := os.ReadDir(path)
 	if err != nil {
@@ -112,6 +117,7 @@ func getSortedFiles(path string) ([]string, error) {
 	return filePaths, nil
 }
 
+// extractDateTime extracts the date and time from the file name.
 func extractDateTime(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
 	parts := strings.Split(baseName, "_")
@@ -128,6 +134,7 @@ func extractDateTime(filePath string) (time.Time, error) {
 	return dateTime, nil
 }
 
+// copyFile copies a file from the source to the destination.
 func copyFile(src, dst string) error {
 	sourceFile, err := os.Open(src)
 	if err != nil {

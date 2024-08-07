@@ -40,12 +40,10 @@ func newEncoder(
 	if codec == nil {
 		return nil, errors.New("codec not found")
 	}
-
 	enc.codecCtx = C.avcodec_alloc_context3(codec)
 	if enc.codecCtx == nil {
 		return nil, errors.New("failed to allocate codec context")
 	}
-
 	enc.codecCtx.bit_rate = C.long(bitrate)
 	enc.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV422P
 	// TODO(seanp): Remove hardcoded codec ctx params.
@@ -58,12 +56,10 @@ func newEncoder(
 	enc.codecCtx.height = 480
 	// TODO(seanp): Do we want b frames? This could make it more complicated to split clips.
 	enc.codecCtx.max_b_frames = 0
-
 	presetCStr := C.CString(preset)
 	tuneCStr := C.CString("zerolatency")
 	defer C.free(unsafe.Pointer(presetCStr))
 	defer C.free(unsafe.Pointer(tuneCStr))
-
 	var opts *C.AVDictionary = nil
 	defer C.av_dict_free(&opts)
 	ret := C.av_dict_set(&opts, C.CString("preset"), presetCStr, 0)
@@ -74,12 +70,10 @@ func newEncoder(
 	if ret < 0 {
 		return nil, fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
 	}
-
 	ret = C.avcodec_open2(enc.codecCtx, codec, &opts)
 	if ret < 0 {
 		return nil, fmt.Errorf("avcodec_open2: %s", ffmpegError(ret))
 	}
-
 	srcFrame := C.av_frame_alloc()
 	if srcFrame == nil {
 		C.avcodec_close(enc.codecCtx)
@@ -89,12 +83,11 @@ func newEncoder(
 	srcFrame.height = enc.codecCtx.height
 	srcFrame.format = C.int(enc.codecCtx.pix_fmt)
 	enc.srcFrame = srcFrame
-
 	return enc, nil
 }
 
 // encode encodes the given frame and returns the encoded data
-// in bytes along with the pts and dts timestamps.
+// in bytes along with the PTS and DTS timestamps.
 // PTS is calculated based on the frame count and source framerate.
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
@@ -103,12 +96,10 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 	if yuv == nil {
 		return nil, 0, 0, errors.New("could not convert image to YUV420")
 	}
-
 	// TODO(seanp): make this calculated once instead of every frame
 	ySize := frame.Bounds().Dx() * frame.Bounds().Dy()
 	uSize := (frame.Bounds().Dx() / 2) * frame.Bounds().Dy()
 	vSize := (frame.Bounds().Dx() / 2) * frame.Bounds().Dy()
-
 	// TODO(seanp): directly copy into srcFrame
 	yPlane := C.CBytes(yuv[:ySize])
 	uPlane := C.CBytes(yuv[ySize : ySize+uSize])
@@ -126,31 +117,25 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 	// TODO(seanp): What happens to playback if frame is dropped?
 	e.srcFrame.pts = C.int64_t(e.frameCount)
 	e.srcFrame.pkt_dts = e.srcFrame.pts
-
 	ret := C.avcodec_send_frame(e.codecCtx, e.srcFrame)
 	if ret < 0 {
 		return nil, 0, 0, fmt.Errorf("avcodec_send_frame: %s", ffmpegError(ret))
 	}
-
 	pkt := C.av_packet_alloc()
 	if pkt == nil {
 		return nil, 0, 0, errors.New("could not allocate packet")
 	}
 	defer C.av_packet_free(&pkt)
-
 	// receive encoded data
 	ret = C.avcodec_receive_packet(e.codecCtx, pkt)
 	if ret < 0 {
 		return nil, 0, 0, fmt.Errorf("avcodec_receive_packet failed %s", ffmpegError(ret))
 	}
-
 	// convert the encoded data to a Go byte slice
 	encodedData := C.GoBytes(unsafe.Pointer(pkt.data), C.int(pkt.size))
 	pts := int64(pkt.pts)
 	dts := int64(pkt.dts)
-
 	e.frameCount++
-
 	// return encoded data
 	return encodedData, pts, dts, nil
 }
@@ -163,7 +148,7 @@ func (e *encoder) Close() {
 
 // imageToYUV422 extracts unpadded yuv4222 bytes from iamge.Image.
 // TODO(seanp): Only works on for yuv422 images. Add support for other formats.
-// TODO(seanp): Make this fast by findinging smarter way to remove padding
+// TODO(seanp): Make this fast by finding a smarter way to remove padding
 // without iterating over every pixel.
 func imageToYUV422(img image.Image) []byte {
 	ycbcrImg, ok := img.(*image.YCbCr)
@@ -171,22 +156,17 @@ func imageToYUV422(img image.Image) []byte {
 		fmt.Printf("Expected type *image.YCbCr, got %s\n", reflect.TypeOf(img))
 		return nil
 	}
-
 	ySize := ycbcrImg.Rect.Dx() * ycbcrImg.Rect.Dy()
 	uSize := ySize / 2
 	vSize := ySize / 2
-
 	rawYUV := make([]byte, ySize+uSize+vSize)
-
 	yIndex := 0
 	uIndex := ySize
 	vIndex := ySize + uSize
-
 	for y := 0; y < ycbcrImg.Rect.Dy(); y++ {
 		for x := 0; x < ycbcrImg.Rect.Dx(); x++ {
 			yOff := y*ycbcrImg.YStride + x
 			cOff := (y/2)*ycbcrImg.CStride + (x / 2)
-
 			rawYUV[yIndex] = ycbcrImg.Y[yOff]
 			yIndex++
 			if x%2 == 0 {
@@ -197,6 +177,5 @@ func imageToYUV422(img image.Image) []byte {
 			}
 		}
 	}
-
 	return rawYUV
 }

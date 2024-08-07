@@ -40,9 +40,10 @@ type filteredVideo struct {
 	resource.AlwaysRebuild
 	resource.TriviallyCloseable
 
-	name   resource.Name
-	conf   *Config
-	logger logging.Logger
+	name       resource.Name
+	conf       *Config
+	logger     logging.Logger
+	uploadPath string
 
 	cam    camera.Camera
 	stream gostream.VideoStream
@@ -52,8 +53,6 @@ type filteredVideo struct {
 
 	enc *encoder
 	seg *segmenter
-
-	uploadPath string
 
 	mu       sync.Mutex
 	triggers map[string]bool
@@ -224,7 +223,9 @@ func (fv *filteredVideo) Stream(ctx context.Context, errHandlers ...gostream.Err
 	return nil, errors.New("not implemented")
 }
 
-// processFrames
+// processFrames reads frames from the camera, encodes, and writes to the segmenter
+// which chuncks video stream into clips in the storage directory.
+// TODO(seanp): Should thie be throttled to a certain FPS?
 func (fv *filteredVideo) processFrames(ctx context.Context) {
 	for {
 		// TODO(seanp): How to gracefully exit this loop?
@@ -258,7 +259,8 @@ func (fv *filteredVideo) processFrames(ctx context.Context) {
 	}
 }
 
-// processDetections
+// processDetections reads frames from the camera, processes them with the vision service,
+// and triggers the copier to copy the frame to upload storage if a detection is found.
 func (fv *filteredVideo) processDetections(ctx context.Context) {
 	for {
 		select {
@@ -292,7 +294,7 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 	}
 }
 
-// deleter Cleans up old clips if storage is full
+// deleter cleans up old clips if storage is full.
 func (fv *filteredVideo) deleter(ctx context.Context) {
 	// TODO(seanp): Using seconds for now, but should be minutes in prod.
 	ticker := time.NewTicker(60 * time.Second)
@@ -313,6 +315,7 @@ func (fv *filteredVideo) deleter(ctx context.Context) {
 	}
 }
 
+// copier copies the latest frame to the upload storage directory if a trigger is found.
 func (fv *filteredVideo) copier(ctx context.Context) {
 	for {
 		select {
