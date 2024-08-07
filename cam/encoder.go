@@ -1,4 +1,4 @@
-package filtered_video
+package filteredvideo
 
 /*
 #include <libavcodec/avcodec.h>
@@ -60,7 +60,7 @@ func newEncoder(
 	tuneCStr := C.CString("zerolatency")
 	defer C.free(unsafe.Pointer(presetCStr))
 	defer C.free(unsafe.Pointer(tuneCStr))
-	var opts *C.AVDictionary = nil
+	var opts *C.AVDictionary
 	defer C.av_dict_free(&opts)
 	ret := C.av_dict_set(&opts, C.CString("preset"), presetCStr, 0)
 	if ret < 0 {
@@ -92,10 +92,13 @@ func newEncoder(
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
 func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
-	yuv := imageToYUV422(frame)
-	if yuv == nil {
-		return nil, 0, 0, errors.New("could not convert image to YUV420")
+	yuv, err := imageToYUV422(frame)
+	if err != nil {
+		return nil, 0, 0, err
 	}
+	// if yuv == nil {
+	// 	return nil, 0, 0, errors.New("could not convert image to YUV420")
+	// }
 	// TODO(seanp): make this calculated once instead of every frame
 	ySize := frame.Bounds().Dx() * frame.Bounds().Dy()
 	uSize := (frame.Bounds().Dx() / 2) * frame.Bounds().Dy()
@@ -132,7 +135,7 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 		return nil, 0, 0, fmt.Errorf("avcodec_receive_packet failed %s", ffmpegError(ret))
 	}
 	// convert the encoded data to a Go byte slice
-	encodedData := C.GoBytes(unsafe.Pointer(pkt.data), C.int(pkt.size))
+	encodedData := C.GoBytes(unsafe.Pointer(pkt.data), pkt.size)
 	pts := int64(pkt.pts)
 	dts := int64(pkt.dts)
 	e.frameCount++
@@ -150,11 +153,10 @@ func (e *encoder) Close() {
 // TODO(seanp): Only works on for yuv422 images. Add support for other formats.
 // TODO(seanp): Make this fast by finding a smarter way to remove padding
 // without iterating over every pixel.
-func imageToYUV422(img image.Image) []byte {
+func imageToYUV422(img image.Image) ([]byte, error) {
 	ycbcrImg, ok := img.(*image.YCbCr)
 	if !ok {
-		fmt.Printf("Expected type *image.YCbCr, got %s\n", reflect.TypeOf(img))
-		return nil
+		return nil, fmt.Errorf("expected type *image.YCbCr, got %s", reflect.TypeOf(img))
 	}
 	ySize := ycbcrImg.Rect.Dx() * ycbcrImg.Rect.Dy()
 	uSize := ySize / 2
@@ -177,5 +179,5 @@ func imageToYUV422(img image.Image) []byte {
 			}
 		}
 	}
-	return rawYUV
+	return rawYUV, nil
 }

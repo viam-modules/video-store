@@ -1,4 +1,4 @@
-package filtered_video
+package filteredvideo
 
 /*
 #include <libavfilter/avfilter.h>
@@ -9,6 +9,7 @@ package filtered_video
 #include <libavcodec/avcodec.h>
 */
 import "C"
+
 import (
 	"errors"
 	"fmt"
@@ -43,7 +44,7 @@ func newSegmenter(
 		logger:  logger,
 		encoder: enc,
 	}
-	// TOOD(seanp): MB for testing, should be GB in prod.
+	// TODO(seanp): MB for testing, should be GB in prod.
 	s.maxStorageSize = int64(storageSize) * 1024 * 1024
 
 	homeDir := getHomeDir()
@@ -51,18 +52,17 @@ func newSegmenter(
 	outputPatternCStr := C.CString(homeDir + outputPattern)
 	defer C.free(unsafe.Pointer(outputPatternCStr))
 
-	var fmt_ctx *C.AVFormatContext = nil
-	ret := C.avformat_alloc_output_context2(&fmt_ctx, nil, C.CString("segment"), outputPatternCStr)
+	var fmtCtx *C.AVFormatContext
+	ret := C.avformat_alloc_output_context2(&fmtCtx, nil, C.CString("segment"), outputPatternCStr)
 	if ret < 0 {
 		return nil, fmt.Errorf("failed to allocate output context: %s", ffmpegError(ret))
 	}
 
-	var stream *C.AVStream = nil
-	stream = C.avformat_new_stream(fmt_ctx, nil)
+	stream := C.avformat_new_stream(fmtCtx, nil)
 	if stream == nil {
 		return nil, errors.New("failed to allocate stream")
 	}
-	stream.id = C.int(fmt_ctx.nb_streams) - 1
+	stream.id = C.int(fmtCtx.nb_streams) - 1
 	stream.time_base = C.AVRational{num: 1, den: 25} // for 25 FPS
 
 	// copy codec parameters from encoder to segment stream
@@ -87,7 +87,7 @@ func newSegmenter(
 	defer C.free(unsafe.Pointer(breakNonKeyFramesCStr))
 	defer C.free(unsafe.Pointer(strftimeCStr))
 
-	var opts *C.AVDictionary = nil
+	var opts *C.AVDictionary
 	defer C.av_dict_free(&opts)
 	ret = C.av_dict_set(&opts, C.CString("segment_time"), segmentLengthCStr, 0)
 	if ret < 0 {
@@ -113,22 +113,22 @@ func newSegmenter(
 	}
 
 	// segment options must be packed in the initial header write
-	ret = C.avformat_write_header(fmt_ctx, &opts)
+	ret = C.avformat_write_header(fmtCtx, &opts)
 	if ret < 0 {
 		return nil, fmt.Errorf("failed to write header: %s", ffmpegError(ret))
 	}
 
 	// Writing header overwrites the time_base, so we need to reset it
 	stream.time_base = C.AVRational{num: 1, den: 25}
-	stream.id = C.int(fmt_ctx.nb_streams) - 1
+	stream.id = C.int(fmtCtx.nb_streams) - 1
 	s.stream = stream
-	s.outCtx = fmt_ctx
+	s.outCtx = fmtCtx
 
 	return s, nil
 }
 
 // writeEncodedFrame writes an encoded frame to the output segment file.
-func (s *segmenter) writeEncodedFrame(encodedData []byte, pts int64, dts int64) error {
+func (s *segmenter) writeEncodedFrame(encodedData []byte, pts, dts int64) error {
 	pkt := C.AVPacket{
 		data:         (*C.uint8_t)(C.CBytes(encodedData)),
 		size:         C.int(len(encodedData)),

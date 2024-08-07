@@ -7,6 +7,7 @@ SOURCE_ARCH := $(call normalize_arch,$(SOURCE_ARCH))
 TARGET_ARCH := $(call normalize_arch,$(TARGET_ARCH))
 
 BIN_OUTPUT_PATH = bin/$(TARGET_OS)-$(TARGET_ARCH)
+TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
 
 FFMPEG_TAG ?= n6.1
 FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
@@ -33,6 +34,8 @@ CGO_LDFLAGS := "-L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -l:libjpeg.a
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
+.PHONY: lint gofmt tool-install
+
 $(BIN_OUTPUT_PATH)/filtered-video: *.go cam/*.go $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_LDFLAGS=$(CGO_LDFLAGS) CGO_CFLAGS=$(CGO_CFLAGS) go build -o $(BIN_OUTPUT_PATH)/filtered-video main.go
@@ -42,3 +45,13 @@ $(FFMPEG_VERSION_PLATFORM):
 
 $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
+
+tool-install:
+	GOBIN=`pwd`/$(TOOL_BIN) go install \
+		github.com/edaniels/golinters/cmd/combined \
+		github.com/golangci/golangci-lint/cmd/golangci-lint \
+		github.com/rhysd/actionlint/cmd/actionlint
+
+lint: tool-install
+	go mod tidy
+	CGO_CFLAGS=$(CGO_CFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml

@@ -1,4 +1,5 @@
-package filtered_video
+// Package filteredvideo contains the implementation of the filtered video camera component.
+package filteredvideo
 
 import (
 	"context"
@@ -22,6 +23,7 @@ import (
 	"go.viam.com/utils"
 )
 
+// Model is the model for the filtered video camera component.
 var Model = resource.ModelNamespace("seanavery").WithFamily("camera").WithModel("filtered-video")
 
 const (
@@ -71,6 +73,7 @@ type video struct {
 	Format  string `json:"format"`
 }
 
+// Config is the configuration for the filtered video camera component.
 type Config struct {
 	Camera  string  `json:"camera"`
 	Vision  string  `json:"vision"`
@@ -178,6 +181,7 @@ func newFilteredVideo(
 	return fv, nil
 }
 
+// Validate validates the configuration for the filtered video camera component.
 func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Camera == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
@@ -195,15 +199,15 @@ func (fv *filteredVideo) Name() resource.Name {
 	return fv.name
 }
 
-func (fv *filteredVideo) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
+func (fv *filteredVideo) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
 	return nil, resource.ErrDoUnimplemented
 }
 
-func (fv *filteredVideo) Images(ctx context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+func (fv *filteredVideo) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
 	return nil, resource.ResponseMetadata{}, errors.New("not implemented")
 }
 
-func (fv *filteredVideo) NextPointCloud(ctx context.Context) (pointcloud.PointCloud, error) {
+func (fv *filteredVideo) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -219,7 +223,7 @@ func (fv *filteredVideo) Properties(ctx context.Context) (camera.Properties, err
 	return p, err
 }
 
-func (fv *filteredVideo) Stream(ctx context.Context, errHandlers ...gostream.ErrorHandler) (gostream.VideoStream, error) {
+func (fv *filteredVideo) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -355,11 +359,14 @@ func (fv *filteredVideo) copier(ctx context.Context) {
 }
 
 func (fv *filteredVideo) Close(ctx context.Context) error {
-	fv.stream.Close(ctx)
+	err := fv.stream.Close(ctx)
+	if err != nil {
+		return err
+	}
 	fv.workers.Stop()
 	fv.enc.Close()
 	fv.seg.Close()
-	err := fv.watcher.Close()
+	err = fv.watcher.Close()
 	if err != nil {
 		return err
 	}

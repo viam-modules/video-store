@@ -1,4 +1,4 @@
-package filtered_video
+package filteredvideo
 
 /*
 #include <libavutil/error.h>
@@ -6,6 +6,7 @@ package filtered_video
 #include <libavcodec/avcodec.h>
 */
 import "C"
+
 import (
 	"fmt"
 	"io"
@@ -64,11 +65,6 @@ func getHomeDir() string {
 		return ""
 	}
 	return home
-}
-
-// combineClips reads mp4 files from the provided list of files and combines them into a single mp4 file.
-func combineClips(files []string, output string) error {
-	return nil
 }
 
 // readVideoFile takes in a path to mp4 file and returns bytes of the file.
