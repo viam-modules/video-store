@@ -121,7 +121,6 @@ func newSegmenter(
 	// Writing header overwrites the time_base, so we need to reset it
 	stream.time_base = C.AVRational{num: 1, den: 25}
 	stream.id = C.int(fmt_ctx.nb_streams) - 1
-
 	s.stream = stream
 	s.outCtx = fmt_ctx
 
@@ -138,14 +137,11 @@ func (s *segmenter) writeEncodedFrame(encodedData []byte, pts int64, dts int64) 
 		dts:          C.int64_t(dts),
 	}
 	defer C.free(unsafe.Pointer(pkt.data))
-
 	ret := C.av_interleaved_write_frame(s.outCtx, &pkt)
 	if ret < 0 {
 		return fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
 	}
-
 	s.frameCount++
-
 	return nil
 }
 
@@ -176,7 +172,6 @@ func (s *segmenter) cleanupStorage() error {
 			return err
 		}
 	}
-
 	return nil
 }
 

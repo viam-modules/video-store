@@ -233,20 +233,17 @@ func (fv *filteredVideo) processFrames(ctx context.Context) {
 			return
 		default:
 		}
-
 		// TODO(seanp): Is this safe? Should we cache the latest frame from processFrame loop instead?
 		frame, _, err := fv.stream.Next(ctx)
 		if err != nil {
 			fv.logger.Error("failed to get frame from camera", err)
 			return
 		}
-
 		lazyImage, ok := frame.(*rimage.LazyEncodedImage)
 		if !ok {
 			fv.logger.Error("frame is not of type *rimage.LazyEncodedImage")
 			return
 		}
-
 		encoded, pts, dts, err := fv.enc.encode(lazyImage.DecodedImage())
 		if err != nil {
 			fv.logger.Error("failed to encode frame", err)
@@ -269,7 +266,6 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 			return
 		default:
 		}
-
 		// TODO(seanp): will this interfere with processFrames?
 		// If so, move to caching latest frame.
 		frame, _, err := fv.stream.Next(ctx)
@@ -277,13 +273,11 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 			fv.logger.Error("failed to get frame from camera", err)
 			return
 		}
-
 		res, err := fv.vis.Detections(ctx, frame, nil)
 		if err != nil {
 			fv.logger.Error("failed to get detections from vision service", err)
 			return
 		}
-
 		for _, detection := range res {
 			label := detection.Label()
 			score := detection.Score()
