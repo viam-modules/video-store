@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -53,8 +54,10 @@ type filteredVideo struct {
 	seg *segmenter
 
 	uploadPath string
-	triggers   map[string]bool
-	watcher    *fsnotify.Watcher
+
+	mu       sync.Mutex
+	triggers map[string]bool
+	watcher  *fsnotify.Watcher
 }
 
 type storage struct {
@@ -293,11 +296,11 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 
 		for _, detection := range res {
 			if detection.Score() > fv.conf.Detect.Threshold {
+				fv.mu.Lock()
 				fv.logger.Infof("detected %s with score %f", detection.Label(), detection.Score())
-				// add detection to triggers
-				// fv.triggers = append(fv.triggers, detection.Label())
 				label := detection.Label()
 				fv.triggers[label] = true
+				fv.mu.Unlock()
 			}
 		}
 	}
@@ -332,9 +335,9 @@ func (fv *filteredVideo) copier(ctx context.Context) {
 				return
 			}
 			if event.Op&fsnotify.Create == fsnotify.Create {
+				fv.mu.Lock()
 				fv.logger.Infof("new file created: %s", event.Name)
 				if len(fv.triggers) > 0 {
-					// create file name
 					filename := filepath.Base(event.Name)
 					var triggerKeys []string
 					for key := range fv.triggers {
@@ -343,10 +346,13 @@ func (fv *filteredVideo) copier(ctx context.Context) {
 					triggersStr := strings.Join(triggerKeys, "_")
 					copyName := fmt.Sprintf("%s%s_%s", fv.uploadPath, triggersStr, filename)
 					fv.logger.Infof("copying %s to %s", event.Name, copyName)
-					// copy to storage path
+					err := copyFile(event.Name, copyName)
+					if err != nil {
+						fv.logger.Error("failed to copy file", err)
+					}
 				}
-				// clear out the triggers
 				fv.triggers = make(map[string]bool)
+				fv.mu.Unlock()
 			}
 		case err, ok := <-fv.watcher.Errors:
 			if !ok {
