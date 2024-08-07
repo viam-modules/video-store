@@ -3,8 +3,13 @@ package filtered_video
 import (
 	"context"
 	"errors"
+	"fmt"
+	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/gostream"
 	"go.viam.com/rdk/logging"
@@ -20,20 +25,15 @@ import (
 var Model = resource.ModelNamespace("seanavery").WithFamily("camera").WithModel("filtered-video")
 
 const (
-	defaultClipLength   = 30
-	defaultStorageSize  = 10
+	defaultClipLength   = 30 // seconds
+	defaultStorageSize  = 10 // GB
 	defaultVideoCodec   = "h264"
 	defaultVideoBitrate = 1000000
 	defaultVideoPreset  = "medium"
 	defaultVideoFormat  = "mp4"
-	// defaultLogLevel     = "debug"
-	defaultLogLevel = "error"
+	defaultLogLevel     = "error"
+	uploadPath          = "/.viam/video-upload/"
 )
-
-type triggerWindow struct {
-	start int64
-	end   int64
-}
 
 type filteredVideo struct {
 	// TODO(seanp): what are these?
@@ -53,10 +53,11 @@ type filteredVideo struct {
 	enc *encoder
 	seg *segmenter
 
-	// TODO(seanp): put back in once state is required for vision service.
-	// mu  sync.Mutex
-	trigger triggerWindow
-	clips   []triggerWindow
+	uploadPath string
+
+	mu       sync.Mutex
+	triggers map[string]bool
+	watcher  *fsnotify.Watcher
 }
 
 type storage struct {
@@ -71,20 +72,14 @@ type video struct {
 	Format  string `json:"format"`
 }
 
-type detect struct {
-	Type      string  `json:"type"`
-	Label     string  `json:"label"`
-	Threshold float64 `json:"threshold"`
-	Alpha     float64 `json:"alpha"`
-	Timeout   int     `json:"timeout"`
-}
-
 type Config struct {
 	Camera  string  `json:"camera"`
 	Vision  string  `json:"vision"`
 	Storage storage `json:"storage"`
-	Detect  detect  `json:"detect"`
 	Video   video   `json:"video"`
+
+	Classifications map[string]float64 `json:"classifications"`
+	Objects         map[string]float64 `json:"objects"`
 }
 
 func init() {
@@ -165,7 +160,21 @@ func newFilteredVideo(
 		return nil, err
 	}
 
-	fv.workers = rdkutils.NewStoppableWorkers(fv.processFrames, fv.processDetections, fv.deleter)
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
+	fv.watcher = watcher
+
+	fv.triggers = make(map[string]bool)
+	fv.uploadPath = getHomeDir() + uploadPath
+
+	fv.workers = rdkutils.NewStoppableWorkers(fv.processFrames, fv.processDetections, fv.deleter, fv.copier)
+
+	err = watcher.Add(fv.seg.storagePath)
+	if err != nil {
+		return nil, err
+	}
 
 	return fv, nil
 }
@@ -224,20 +233,17 @@ func (fv *filteredVideo) processFrames(ctx context.Context) {
 			return
 		default:
 		}
-
 		// TODO(seanp): Is this safe? Should we cache the latest frame from processFrame loop instead?
 		frame, _, err := fv.stream.Next(ctx)
 		if err != nil {
 			fv.logger.Error("failed to get frame from camera", err)
 			return
 		}
-
 		lazyImage, ok := frame.(*rimage.LazyEncodedImage)
 		if !ok {
 			fv.logger.Error("frame is not of type *rimage.LazyEncodedImage")
 			return
 		}
-
 		encoded, pts, dts, err := fv.enc.encode(lazyImage.DecodedImage())
 		if err != nil {
 			fv.logger.Error("failed to encode frame", err)
@@ -260,7 +266,6 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 			return
 		default:
 		}
-
 		// TODO(seanp): will this interfere with processFrames?
 		// If so, move to caching latest frame.
 		frame, _, err := fv.stream.Next(ctx)
@@ -268,45 +273,29 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 			fv.logger.Error("failed to get frame from camera", err)
 			return
 		}
-
-		// get detections from vision service
-		labels := map[string]interface{}{
-			"label": fv.conf.Detect.Label,
-		}
-		res, err := fv.vis.Detections(ctx, frame, labels)
+		res, err := fv.vis.Detections(ctx, frame, nil)
 		if err != nil {
 			fv.logger.Error("failed to get detections from vision service", err)
 			return
 		}
-
 		for _, detection := range res {
-			if detection.Score() > fv.conf.Detect.Threshold {
-				fv.logger.Infof("detected %s with score %f", detection.Label(), detection.Score())
-				if fv.trigger.start == 0 {
-					fv.logger.Info("start recording")
-					fv.trigger.start = now()
-				} else {
-					fv.trigger.end = now()
-				}
+			label := detection.Label()
+			score := detection.Score()
+
+			if threshold, exists := fv.conf.Objects[label]; exists && score > threshold {
+				fv.mu.Lock()
+				fv.logger.Infof("detected %s with score %f", label, score)
+				fv.triggers[label] = true
+				fv.mu.Unlock()
 			}
 		}
-
-		if fv.trigger.end != 0 && now()-fv.trigger.end > int64(fv.conf.Detect.Timeout*1000) {
-			fv.clips = append(fv.clips, fv.trigger)
-			fv.logger.Info("stop recording")
-			fv.trigger.start = 0
-			fv.trigger.end = 0
-		}
-
-		// smooth out detections
-		// cache detections
 	}
 }
 
 // deleter Cleans up old clips if storage is full
 func (fv *filteredVideo) deleter(ctx context.Context) {
-	// ticker := time.NewTicker(5 * time.Minute)
-	ticker := time.NewTicker(30 * time.Second)
+	// TODO(seanp): Using seconds for now, but should be minutes in prod.
+	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -324,10 +313,52 @@ func (fv *filteredVideo) deleter(ctx context.Context) {
 	}
 }
 
+func (fv *filteredVideo) copier(ctx context.Context) {
+	for {
+		select {
+		case event, ok := <-fv.watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Op&fsnotify.Create == fsnotify.Create {
+				fv.mu.Lock()
+				fv.logger.Infof("new file created: %s", event.Name)
+				if len(fv.triggers) > 0 {
+					filename := filepath.Base(event.Name)
+					var triggerKeys []string
+					for key := range fv.triggers {
+						triggerKeys = append(triggerKeys, key)
+					}
+					triggersStr := strings.Join(triggerKeys, "_")
+					copyName := fmt.Sprintf("%s%s_%s", fv.uploadPath, triggersStr, filename)
+					fv.logger.Infof("copying %s to %s", event.Name, copyName)
+					err := copyFile(event.Name, copyName)
+					if err != nil {
+						fv.logger.Error("failed to copy file", err)
+					}
+				}
+				fv.triggers = make(map[string]bool)
+				fv.mu.Unlock()
+			}
+		case err, ok := <-fv.watcher.Errors:
+			if !ok {
+				return
+			}
+			fv.logger.Error("error:", err)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 func (fv *filteredVideo) Close(ctx context.Context) error {
 	fv.stream.Close(ctx)
 	fv.workers.Stop()
 	fv.enc.Close()
 	fv.seg.Close()
+	err := fv.watcher.Close()
+	if err != nil {
+		return err
+	}
 	return nil
 }

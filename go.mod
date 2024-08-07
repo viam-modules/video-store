@@ -3,7 +3,7 @@ module github.com/seanavery/filtered_video
 go 1.22.4
 
 require (
-	github.com/joho/godotenv v1.5.1
+	github.com/fsnotify/fsnotify v1.7.0
 	go.viam.com/rdk v0.32.1
 	go.viam.com/utils v0.1.83
 )
@@ -37,7 +37,6 @@ require (
 	github.com/edaniels/zeroconf v1.0.10 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
-	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/fullstorydev/grpcurl v1.8.6 // indirect
 	github.com/gen2brain/malgo v0.11.21 // indirect
 	github.com/go-fonts/liberation v0.3.0 // indirect

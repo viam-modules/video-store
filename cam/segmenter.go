@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	outputDirectory = "/.viam/segments/"
-	outputPattern   = outputDirectory + "segment_%Y-%m-%d_%H-%M-%S.mp4"
+	outputDirectory = "/.viam/video-storage/"
+	outputPattern   = outputDirectory + "%Y-%m-%d_%H-%M-%S.mp4"
 )
 
 type segmenter struct {
@@ -121,7 +121,6 @@ func newSegmenter(
 	// Writing header overwrites the time_base, so we need to reset it
 	stream.time_base = C.AVRational{num: 1, den: 25}
 	stream.id = C.int(fmt_ctx.nb_streams) - 1
-
 	s.stream = stream
 	s.outCtx = fmt_ctx
 
@@ -138,50 +137,41 @@ func (s *segmenter) writeEncodedFrame(encodedData []byte, pts int64, dts int64) 
 		dts:          C.int64_t(dts),
 	}
 	defer C.free(unsafe.Pointer(pkt.data))
-
 	ret := C.av_interleaved_write_frame(s.outCtx, &pkt)
 	if ret < 0 {
 		return fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
 	}
-
 	s.frameCount++
-
 	return nil
 }
 
 // cleanupStorage cleans up the storage directory.
 func (s *segmenter) cleanupStorage() error {
-	// check size of storage directory
 	currStorageSize, err := getDirectorySize(s.storagePath)
 	if err != nil {
 		return err
 	}
-
 	if currStorageSize < s.maxStorageSize {
 		return nil
 	}
-
 	files, err := getSortedFiles(s.storagePath)
 	if err != nil {
 		return err
 	}
-
 	for _, file := range files {
 		if currStorageSize < s.maxStorageSize {
 			break
 		}
-
 		err := os.Remove(file)
 		if err != nil {
 			return err
 		}
-
+		s.logger.Infof("deleted file: %s", file)
 		currStorageSize, err = getDirectorySize(s.storagePath)
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
