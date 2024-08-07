@@ -3,6 +3,9 @@ package filtered_video
 import (
 	"context"
 	"errors"
+	"fmt"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -49,7 +52,7 @@ type filteredVideo struct {
 	seg *segmenter
 
 	// triggers array of strings
-	triggers []string
+	triggers map[string]bool
 	watcher  *fsnotify.Watcher
 }
 
@@ -165,6 +168,7 @@ func newFilteredVideo(
 	}
 	fv.watcher = watcher
 
+	fv.triggers = make(map[string]bool)
 	fv.workers = rdkutils.NewStoppableWorkers(fv.processFrames, fv.processDetections, fv.deleter, fv.copier)
 
 	err = watcher.Add(fv.seg.storagePath)
@@ -289,7 +293,9 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 			if detection.Score() > fv.conf.Detect.Threshold {
 				fv.logger.Infof("detected %s with score %f", detection.Label(), detection.Score())
 				// add detection to triggers
-				fv.triggers = append(fv.triggers, detection.Label())
+				// fv.triggers = append(fv.triggers, detection.Label())
+				label := detection.Label()
+				fv.triggers[label] = true
 			}
 		}
 	}
@@ -327,10 +333,18 @@ func (fv *filteredVideo) copier(ctx context.Context) {
 				fv.logger.Infof("new file created: %s", event.Name)
 				if len(fv.triggers) > 0 {
 					// create file name
+					filename := filepath.Base(event.Name)
+					var triggerKeys []string
+					for key := range fv.triggers {
+						triggerKeys = append(triggerKeys, key)
+					}
+					triggersStr := strings.Join(triggerKeys, "_")
+					copyName := fmt.Sprintf("%s_%s", triggersStr, filename)
+					fv.logger.Infof("copying %s to %s", event.Name, copyName)
 					// copy to storage path
 				}
 				// clear out the triggers
-				fv.triggers = []string{}
+				fv.triggers = make(map[string]bool)
 			}
 		case err, ok := <-fv.watcher.Errors:
 			if !ok {
