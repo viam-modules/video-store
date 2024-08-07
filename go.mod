@@ -4,7 +4,6 @@ go 1.22.4
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
-	github.com/joho/godotenv v1.5.1
 	go.viam.com/rdk v0.32.1
 	go.viam.com/utils v0.1.83
 )
