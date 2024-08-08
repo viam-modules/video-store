@@ -63,6 +63,9 @@ func newEncoder(
 	defer C.free(unsafe.Pointer(presetCStr))
 	defer C.free(unsafe.Pointer(tuneCStr))
 
+	// The user can set the preset and tune for the encoder. This affects the
+	// encoding speed and quality. See https://trac.ffmpeg.org/wiki/Encode/H.264
+	// for more information.
 	var opts *C.AVDictionary
 	defer C.av_dict_free(&opts)
 	ret := C.av_dict_set(&opts, C.CString("preset"), presetCStr, 0)
@@ -102,9 +105,7 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	// if yuv == nil {
-	// 	return nil, 0, 0, errors.New("could not convert image to YUV420")
-	// }
+
 	// TODO(seanp): make this calculated once instead of every frame
 	ySize := frame.Bounds().Dx() * frame.Bounds().Dy()
 	uSize := (frame.Bounds().Dx() / 2) * frame.Bounds().Dy()
@@ -122,7 +123,9 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 	e.srcFrame.linesize[0] = C.int(frame.Bounds().Dx())
 	e.srcFrame.linesize[1] = C.int(frame.Bounds().Dx() / 2)
 	e.srcFrame.linesize[2] = C.int(frame.Bounds().Dx() / 2)
-	// PTS/DTS time is equal frameCount * time_base
+
+	// PTS/DTS time is equal frameCount times time_base. This assumes
+	// that the processFrame routine is running at the source framerate.
 	// TODO(seanp): What happens to playback if frame is dropped?
 	e.srcFrame.pts = C.int64_t(e.frameCount)
 	e.srcFrame.pkt_dts = e.srcFrame.pts
@@ -134,18 +137,22 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 	if pkt == nil {
 		return nil, 0, 0, errors.New("could not allocate packet")
 	}
+	// Safe to free the packet since we copy later.
 	defer C.av_packet_free(&pkt)
-	// receive encoded data
 	ret = C.avcodec_receive_packet(e.codecCtx, pkt)
 	if ret < 0 {
 		return nil, 0, 0, fmt.Errorf("avcodec_receive_packet failed %s", ffmpegError(ret))
 	}
-	// convert the encoded data to a Go byte slice
+
+	// Convert the encoded data to a Go byte slice. This is a necessary copy
+	// to prevent dangling pointer in C memory. By copying to a Go bytes we can
+	// allow the frame to be garbage collected automatically.
 	encodedData := C.GoBytes(unsafe.Pointer(pkt.data), pkt.size)
 	pts := int64(pkt.pts)
 	dts := int64(pkt.dts)
 	e.frameCount++
 	// return encoded data
+
 	return encodedData, pts, dts, nil
 }
 

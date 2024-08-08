@@ -329,7 +329,7 @@ func (fv *filteredVideo) deleter(ctx context.Context) {
 
 // copier is go routine that copies the latest frame to the upload storage directory.
 // It listens for files created in the storage path via fsnotify watcher which is
-// equivelant to inotify in linux. If detection triggers are found it copies the file
+// equivalent to inotify in linux. If detection triggers are found it copies the file
 // to the upload storage directory with the trigger keys in the filename.
 func (fv *filteredVideo) copier(ctx context.Context) {
 	for {
