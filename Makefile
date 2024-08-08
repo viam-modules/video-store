@@ -32,6 +32,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 # TODO: cleanup libx264 static link
 CGO_LDFLAGS := "-L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -l:libjpeg.a /usr/lib/aarch64-linux-gnu/libx264.a -lz"
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
+GOFLAGS := -buildvcs=false
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 .PHONY: lint tool-install
@@ -60,4 +61,4 @@ tool-install:
 
 lint: tool-install $(FFMPEG_BUILD)
 	go mod tidy
-	CGO_CFLAGS=$(CGO_CFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
+	CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml

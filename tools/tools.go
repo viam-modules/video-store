@@ -1,3 +1,6 @@
+//go:build tools
+// +build tools
+
 // Package tools defines helper build time tooling needed by the codebase.
 package tools
 
