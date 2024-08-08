@@ -129,7 +129,8 @@ func newSegmenter(
 
 	// Writing header overwrites the time_base, so we need to reset it.
 	// TODO(seanp): Figure out why this is necessary.
-	stream.time_base = C.AVRational{num: 1, den: 25}
+	// jstream.time_base = C.AVRational{num: 1, den: 25}
+	stream.time_base = enc.codecCtx.time_base
 	stream.id = C.int(fmtCtx.nb_streams) - 1
 	s.stream = stream
 	s.outCtx = fmtCtx

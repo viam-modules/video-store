@@ -74,6 +74,12 @@ type video struct {
 	Format  string `json:"format"`
 }
 
+type cameraProperties struct {
+	Width     int `json:"width"`
+	Height    int `json:"height"`
+	Framerate int `json:"framerate"`
+}
+
 // Config is the configuration for the filtered video camera component.
 type Config struct {
 	Camera  string  `json:"camera"`
@@ -83,6 +89,9 @@ type Config struct {
 
 	Classifications map[string]float64 `json:"classifications,omitempty"`
 	Objects         map[string]float64 `json:"objects,omitempty"`
+
+	// TODO(seanp): Remove once camera properties are returned from camera component.
+	Properties cameraProperties `json:"cam_props"`
 }
 
 func init() {
@@ -148,7 +157,25 @@ func newFilteredVideo(
 	if newConf.Video.Format == "" {
 		newConf.Video.Format = defaultVideoFormat
 	}
-	fv.enc, err = newEncoder(logger, newConf.Video.Codec, newConf.Video.Bitrate, newConf.Video.Preset)
+	// TODO(seanp): Remove once camera properties are returned from camera component.
+	if newConf.Properties.Width == 0 {
+		newConf.Properties.Width = 640
+	}
+	if newConf.Properties.Height == 0 {
+		newConf.Properties.Height = 480
+	}
+	if newConf.Properties.Framerate == 0 {
+		newConf.Properties.Framerate = 25
+	}
+	fv.enc, err = newEncoder(
+		logger,
+		newConf.Video.Codec,
+		newConf.Video.Bitrate,
+		newConf.Video.Preset,
+		newConf.Properties.Width,
+		newConf.Properties.Height,
+		newConf.Properties.Framerate,
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -30,6 +30,9 @@ func newEncoder(
 	videoCodec string,
 	bitrate int,
 	preset string,
+	width int,
+	height int,
+	framerate int,
 ) (*encoder, error) {
 	enc := &encoder{
 		logger:     logger,
@@ -51,11 +54,13 @@ func newEncoder(
 	// TODO(seanp): Remove hardcoded codec ctx params.
 	// Framerate will need to be added to properties API in order for
 	// time_base and gop_size to be configurable.
-	enc.codecCtx.time_base = C.AVRational{num: 1, den: 25} // for 25 FPS
-	enc.codecCtx.gop_size = 25
+	enc.codecCtx.time_base = C.AVRational{num: 1, den: C.int(framerate)} // for 25 FPS
+	enc.codecCtx.gop_size = C.int(framerate)
+
 	// TODO(seanp): These can be detected by fetching the intitial frame
-	enc.codecCtx.width = 640
-	enc.codecCtx.height = 480
+	enc.codecCtx.width = C.int(width)
+	enc.codecCtx.height = C.int(height)
+
 	// TODO(seanp): Do we want b frames? This could make it more complicated to split clips.
 	enc.codecCtx.max_b_frames = 0
 	presetCStr := C.CString(preset)
