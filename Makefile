@@ -34,7 +34,7 @@ CGO_LDFLAGS := "-L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -l:libjpeg.a
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
-.PHONY: lint gofmt tool-install
+.PHONY: lint tool-install
 
 $(BIN_OUTPUT_PATH)/filtered-video: *.go cam/*.go $(FFMPEG_BUILD)
 	go mod tidy
@@ -46,11 +46,11 @@ $(FFMPEG_VERSION_PLATFORM):
 $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
 # Only need nasm to build assembly kernels for amd64 targets.
 ifeq ($(SOURCE_OS),linux)
-	which x264 || (sudo apt update && sudo apt install -y libx264-dev)
 ifeq ($(SOURCE_ARCH),amd64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
 endif
 endif
+	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
