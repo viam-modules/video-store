@@ -206,6 +206,7 @@ func newFilteredVideo(
 
 	fv.workers = rdkutils.NewStoppableWorkers(fv.processFrames, fv.processDetections, fv.deleter, fv.copier)
 
+	// Start fsnotify watcher to listen for new files created in the storage path.
 	err = watcher.Add(fv.seg.storagePath)
 	if err != nil {
 		return nil, err
@@ -220,9 +221,13 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
 	}
 
-	// TODO(seanp): Re-enable this when vision service handler is implemented.
 	if cfg.Vision == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "vision")
+	}
+
+	// TODO(seanp): Remove once camera properties are returned from camera component.
+	if cfg.Properties == (cameraProperties{}) {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "cam_props")
 	}
 
 	return []string{cfg.Camera, cfg.Vision}, nil
