@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -60,6 +62,9 @@ type filteredVideo struct {
 	mu       sync.Mutex
 	triggers map[string]bool
 	watcher  *fsnotify.Watcher
+
+	latestFrame atomic.Pointer[image.Image]
+	lastFile    string
 }
 
 type storage struct {
@@ -260,7 +265,7 @@ func (fv *filteredVideo) Stream(_ context.Context, _ ...gostream.ErrorHandler) (
 // which chuncks video stream into clip files inside the storage directory. This is
 // meant for long term storage of video clips that are not necessarily triggered by
 // detections.
-// TODO(seanp): Should thie be throttled to a certain FPS?
+// TODO(seanp): Should this be throttled to a certain FPS?
 func (fv *filteredVideo) processFrames(ctx context.Context) {
 	for {
 		// TODO(seanp): How to gracefully exit this loop?
@@ -269,12 +274,12 @@ func (fv *filteredVideo) processFrames(ctx context.Context) {
 			return
 		default:
 		}
-		// TODO(seanp): Is this safe? Should we cache the latest frame from processFrame loop instead?
 		frame, _, err := fv.stream.Next(ctx)
 		if err != nil {
 			fv.logger.Error("failed to get frame from camera", err)
 			return
 		}
+		fv.latestFrame.Store(&frame)
 		lazyImage, ok := frame.(*rimage.LazyEncodedImage)
 		if !ok {
 			fv.logger.Error("frame is not of type *rimage.LazyEncodedImage")
@@ -303,14 +308,11 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 			return
 		default:
 		}
-		// TODO(seanp): will this interfere with processFrames?
-		// If so, move to caching latest frame.
-		frame, _, err := fv.stream.Next(ctx)
-		if err != nil {
-			fv.logger.Error("failed to get frame from camera", err)
-			return
+		frame := fv.latestFrame.Load()
+		if frame == nil {
+			continue
 		}
-		res, err := fv.vis.Detections(ctx, frame, nil)
+		res, err := fv.vis.Detections(ctx, *frame, nil)
 		if err != nil {
 			fv.logger.Error("failed to get detections from vision service", err)
 			return
@@ -352,8 +354,9 @@ func (fv *filteredVideo) deleter(ctx context.Context) {
 
 // copier is go routine that copies the latest frame to the upload storage directory.
 // It listens for files created in the storage path via fsnotify watcher which is
-// equivalent to inotify in linux. If detection triggers are found it copies the file
-// to the upload storage directory with the trigger keys in the filename.
+// equivalent to inotify in linux. If detection triggers are found during the last clip
+// window the previous clip is copied to the upload storage directory with the trigger
+// keys in the filename. The last file is then updated to the new file created.
 func (fv *filteredVideo) copier(ctx context.Context) {
 	for {
 		select {
@@ -364,20 +367,21 @@ func (fv *filteredVideo) copier(ctx context.Context) {
 			if event.Op&fsnotify.Create == fsnotify.Create {
 				fv.mu.Lock()
 				fv.logger.Infof("new file created: %s", event.Name)
-				if len(fv.triggers) > 0 {
-					filename := filepath.Base(event.Name)
+				if len(fv.triggers) > 0 && fv.lastFile != "" {
+					filename := filepath.Base(fv.lastFile)
 					var triggerKeys []string
 					for key := range fv.triggers {
 						triggerKeys = append(triggerKeys, key)
 					}
 					triggersStr := strings.Join(triggerKeys, "_")
 					copyName := fmt.Sprintf("%s%s_%s", fv.uploadPath, triggersStr, filename)
-					fv.logger.Infof("copying %s to %s", event.Name, copyName)
-					err := copyFile(event.Name, copyName)
+					fv.logger.Infof("copying %s to %s", fv.lastFile, copyName)
+					err := copyFile(fv.lastFile, copyName)
 					if err != nil {
 						fv.logger.Error("failed to copy file", err)
 					}
 				}
+				fv.lastFile = event.Name
 				fv.triggers = make(map[string]bool)
 				fv.mu.Unlock()
 			}
