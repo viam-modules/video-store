@@ -157,16 +157,7 @@ func newFilteredVideo(
 	if newConf.Video.Format == "" {
 		newConf.Video.Format = defaultVideoFormat
 	}
-	// TODO(seanp): Remove once camera properties are returned from camera component.
-	if newConf.Properties.Width == 0 {
-		newConf.Properties.Width = 640
-	}
-	if newConf.Properties.Height == 0 {
-		newConf.Properties.Height = 480
-	}
-	if newConf.Properties.Framerate == 0 {
-		newConf.Properties.Framerate = 25
-	}
+
 	fv.enc, err = newEncoder(
 		logger,
 		newConf.Video.Codec,

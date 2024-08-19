@@ -51,10 +51,7 @@ func newEncoder(
 
 	enc.codecCtx.bit_rate = C.long(bitrate)
 	enc.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV422P
-	// TODO(seanp): Remove hardcoded codec ctx params.
-	// Framerate will need to be added to properties API in order for
-	// time_base and gop_size to be configurable.
-	enc.codecCtx.time_base = C.AVRational{num: 1, den: C.int(framerate)} // for 25 FPS
+	enc.codecCtx.time_base = C.AVRational{num: 1, den: C.int(framerate)}
 	enc.codecCtx.gop_size = C.int(framerate)
 
 	// TODO(seanp): These can be detected by fetching the intitial frame
