@@ -1,0 +1,5 @@
+*filtered-video
+FFmpeg
+*.mp4
+.env
+*.DS_Store
