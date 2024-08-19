@@ -165,7 +165,6 @@ func (e *encoder) Close() {
 }
 
 // imageToYUV422 extracts unpadded yuv4222 bytes from iamge.Image.
-// TODO(seanp): Only works on for yuv422 images. Add support for other formats.
 // TODO(seanp): Make this fast by finding a smarter way to remove padding
 // without iterating over every pixel.
 func imageToYUV422(img image.Image) ([]byte, error) {

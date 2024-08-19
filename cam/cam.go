@@ -41,7 +41,6 @@ const (
 )
 
 type filteredVideo struct {
-	// TODO(seanp): what are these?
 	resource.AlwaysRebuild
 	resource.TriviallyCloseable
 

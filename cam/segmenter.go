@@ -129,7 +129,6 @@ func newSegmenter(
 
 	// Writing header overwrites the time_base, so we need to reset it.
 	// TODO(seanp): Figure out why this is necessary.
-	// jstream.time_base = C.AVRational{num: 1, den: 25}
 	stream.time_base = enc.codecCtx.time_base
 	stream.id = C.int(fmtCtx.nb_streams) - 1
 	s.stream = stream
@@ -148,7 +147,6 @@ func (s *segmenter) writeEncodedFrame(encodedData []byte, pts, dts int64) error 
 		dts:          C.int64_t(dts),
 	}
 	defer C.free(unsafe.Pointer(pkt.data))
-	// TODO(seanp): We probably do not need interleave here since we are only writing one stream.
 	ret := C.av_interleaved_write_frame(s.outCtx, &pkt)
 	if ret < 0 {
 		return fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
