@@ -28,7 +28,12 @@ Fill in the attributes as applicable to the component, according to the example 
         },
         "objects": {
             "Person": 0.8 // label key and threshold value
-        }
+        },
+        "cam_props": { // camera properties of the source camera
+            "width": 640,
+            "height": 480,
+            "framerate": 30
+        },
       },
       "depends_on": [
         "webcam-1",
