@@ -322,7 +322,7 @@ func (fv *filteredVideo) processDetections(ctx context.Context) {
 
 			if threshold, exists := fv.conf.Objects[label]; exists && score > threshold {
 				fv.mu.Lock()
-				fv.logger.Infof("detected %s with score %f", label, score)
+				fv.logger.Debugf("detected %s with score %f", label, score)
 				fv.triggers[label] = true
 				fv.mu.Unlock()
 			}
@@ -365,7 +365,7 @@ func (fv *filteredVideo) copier(ctx context.Context) {
 			}
 			if event.Op&fsnotify.Create == fsnotify.Create {
 				fv.mu.Lock()
-				fv.logger.Infof("new file created: %s", event.Name)
+				fv.logger.Debugf("new file created: %s", event.Name)
 				if len(fv.triggers) > 0 && fv.lastFile != "" {
 					filename := filepath.Base(fv.lastFile)
 					var triggerKeys []string
@@ -374,7 +374,7 @@ func (fv *filteredVideo) copier(ctx context.Context) {
 					}
 					triggersStr := strings.Join(triggerKeys, "_")
 					copyName := fmt.Sprintf("%s%s_%s", fv.uploadPath, triggersStr, filename)
-					fv.logger.Infof("copying %s to %s", fv.lastFile, copyName)
+					fv.logger.Debugf("copying %s to %s", fv.lastFile, copyName)
 					err := copyFile(fv.lastFile, copyName)
 					if err != nil {
 						fv.logger.Error("failed to copy file", err)

@@ -70,7 +70,7 @@ func newSegmenter(
 		return nil, errors.New("failed to allocate stream")
 	}
 	stream.id = C.int(fmtCtx.nb_streams) - 1
-	stream.time_base = C.AVRational{num: 1, den: 25} // for 25 FPS
+	stream.time_base = enc.codecCtx.time_base
 
 	// Copy codec parameters from encoder to segment stream. This is equivalent to
 	// -c:v copy in ffmpeg cli
@@ -177,7 +177,7 @@ func (s *segmenter) cleanupStorage() error {
 		if err != nil {
 			return err
 		}
-		s.logger.Infof("deleted file: %s", file)
+		s.logger.Debugf("deleted file: %s", file)
 		currStorageSize, err = getDirectorySize(s.storagePath)
 		if err != nil {
 			return err
