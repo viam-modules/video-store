@@ -136,7 +136,6 @@ func newFilteredVideo(
 		return nil, err
 	}
 
-	// TODO: should i add legit error handlers?
 	var errHandlers []gostream.ErrorHandler
 	fv.stream, err = fv.cam.Stream(ctx, errHandlers...)
 	if err != nil {
@@ -148,7 +147,6 @@ func newFilteredVideo(
 	ffmppegLogLevel(logLevel)
 
 	// TODO(seanp): Forcing h264 for now until h265 is supported.
-	// TODO(seanp): move this to validate step?
 	if newConf.Video.Codec != "h264" {
 		newConf.Video.Codec = defaultVideoCodec
 	}
@@ -352,10 +350,9 @@ func (fv *filteredVideo) deleter(ctx context.Context) {
 }
 
 // copier is go routine that copies the latest frame to the upload storage directory.
-// It listens for files created in the storage path via fsnotify watcher which is
-// equivalent to inotify in linux. If detection triggers are found during the last clip
-// window the previous clip is copied to the upload storage directory with the trigger
-// keys in the filename. The last file is then updated to the new file created.
+// It listens for files created in the storage path. If detection triggers are found during
+// the last clip window the previous clip is copied to the upload storage directory with the
+// trigger keys in the filename.
 func (fv *filteredVideo) copier(ctx context.Context) {
 	for {
 		select {
