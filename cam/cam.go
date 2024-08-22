@@ -230,8 +230,25 @@ func (fv *filteredVideo) Name() resource.Name {
 	return fv.name
 }
 
-func (fv *filteredVideo) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
-	return nil, resource.ErrDoUnimplemented
+func (fv *filteredVideo) DoCommand(_ context.Context, command map[string]interface{}) (map[string]interface{}, error) {
+	cmd, ok := command["command"].(string)
+	if !ok {
+		return nil, errors.New("command not found")
+	}
+	switch cmd {
+	case "start":
+		fv.logger.Info("starting video player")
+	case "pause":
+		fv.logger.Info("pausing video player")
+	case "save":
+		fv.logger.Info("saving video slice")
+	case "stop":
+		fv.logger.Info("stopping video player")
+	default:
+		return nil, errors.New("invalid command")
+	}
+
+	return nil, nil
 }
 
 func (fv *filteredVideo) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
