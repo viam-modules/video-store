@@ -55,8 +55,9 @@ type filteredVideo struct {
 
 	workers rdkutils.StoppableWorkers
 
-	enc *encoder
-	seg *segmenter
+	enc    *encoder
+	seg    *segmenter
+	player *Player
 
 	mu       sync.Mutex
 	triggers map[string]bool
@@ -184,6 +185,8 @@ func newFilteredVideo(
 		return nil, err
 	}
 
+	fv.player = newPlayer(logger)
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -237,6 +240,25 @@ func (fv *filteredVideo) DoCommand(_ context.Context, command map[string]interfa
 	}
 	switch cmd {
 	case "start":
+
+		// { "command": "start", "from": "2021-08-01T00:00:00Z", "to": "2021-08-01T00:00:00Z" }
+		// vlaidate from and to exist
+		if _, ok := command["from"]; !ok {
+			return nil, errors.New("from time not found")
+		}
+		if _, ok := command["to"]; !ok {
+			return nil, errors.New("to time not found")
+		}
+		// convert from and to to time.Time
+		from, err := time.Parse(time.RFC3339, command["from"].(string))
+		if err != nil {
+			return nil, err
+		}
+		to, err := time.Parse(time.RFC3339, command["to"].(string))
+		if err != nil {
+			return nil, err
+		}
+		fv.player.start(from, to)
 		fv.logger.Info("starting video player")
 	case "pause":
 		fv.logger.Info("pausing video player")
