@@ -6,7 +6,6 @@ require (
 	github.com/AlekSi/gocov-xml v1.0.0
 	github.com/axw/gocov v1.1.0
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
-	github.com/fsnotify/fsnotify v1.7.0
 	github.com/fullstorydev/grpcurl v1.8.6
 	github.com/golangci/golangci-lint v1.54.0
 	github.com/rhysd/actionlint v1.6.24
@@ -88,6 +87,7 @@ require (
 	github.com/fatih/structtag v1.2.0 // indirect
 	github.com/firefart/nonamedreturns v1.0.4 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
+	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fzipp/gocyclo v0.6.0 // indirect
 	github.com/gen2brain/malgo v0.11.21 // indirect
 	github.com/go-critic/go-critic v0.8.2 // indirect
