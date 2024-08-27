@@ -20,7 +20,7 @@ import (
 
 // Model is the model for the filtered video camera component.
 // TODO(seanp): Personal module for now, should be movied to viam module in prod.
-var Model = resource.ModelNamespace("seanavery").WithFamily("camera").WithModel("filtered-video")
+var Model = resource.ModelNamespace("seanavery").WithFamily("video").WithModel("storage")
 
 const (
 	defaultClipLength   = 30 // seconds
@@ -76,9 +76,6 @@ type Config struct {
 	Camera  string  `json:"camera"`
 	Storage storage `json:"storage"`
 	Video   video   `json:"video"`
-
-	Classifications map[string]float64 `json:"classifications,omitempty"`
-	Objects         map[string]float64 `json:"objects,omitempty"`
 
 	// TODO(seanp): Remove once camera properties are returned from camera component.
 	Properties cameraProperties `json:"cam_props"`
