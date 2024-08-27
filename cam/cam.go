@@ -4,7 +4,6 @@ package filteredvideo
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 
 	"go.viam.com/rdk/components/camera"
@@ -23,14 +22,14 @@ import (
 var Model = resource.ModelNamespace("seanavery").WithFamily("video").WithModel("storage")
 
 const (
-	defaultClipLength   = 30 // seconds
-	defaultStorageSize  = 10 // GB
-	defaultVideoCodec   = "h264"
-	defaultVideoBitrate = 1000000
-	defaultVideoPreset  = "medium"
-	defaultVideoFormat  = "mp4"
-	defaultLogLevel     = "error"
-	uploadPath          = "/.viam/video-upload/"
+	defaultSegmentSeconds = 30 // seconds
+	defaultStorageSize    = 10 // GB
+	defaultVideoCodec     = "h264"
+	defaultVideoBitrate   = 1000000
+	defaultVideoPreset    = "medium"
+	defaultVideoFormat    = "mp4"
+	defaultLogLevel       = "error"
+	uploadPath            = "/.viam/video-upload/"
 )
 
 type filteredVideo struct {
@@ -49,13 +48,11 @@ type filteredVideo struct {
 
 	enc *encoder
 	seg *segmenter
-
-	mu sync.Mutex
 }
 
 type storage struct {
-	ClipLength int `json:"clip_length"`
-	Size       int `json:"size"`
+	SegmentSeconds int `json:"segment_seconds"`
+	SizeGB         int `json:"size_gb"`
 }
 
 type video struct {
@@ -150,13 +147,13 @@ func newFilteredVideo(
 		return nil, err
 	}
 
-	if newConf.Storage.ClipLength == 0 {
-		newConf.Storage.ClipLength = defaultClipLength
+	if newConf.Storage.SegmentSeconds == 0 {
+		newConf.Storage.SegmentSeconds = defaultSegmentSeconds
 	}
-	if newConf.Storage.Size == 0 {
-		newConf.Storage.Size = defaultStorageSize
+	if newConf.Storage.SizeGB == 0 {
+		newConf.Storage.SizeGB = defaultStorageSize
 	}
-	fv.seg, err = newSegmenter(logger, fv.enc, newConf.Storage.Size, newConf.Storage.ClipLength)
+	fv.seg, err = newSegmenter(logger, fv.enc, newConf.Storage.SizeGB, newConf.Storage.SegmentSeconds)
 	if err != nil {
 		return nil, err
 	}
