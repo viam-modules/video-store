@@ -1,9 +1,9 @@
-# Filtered Video
-The `filtered-video` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and a [Vision Service](https://docs.viam.com/services/vision/), saves the camera output as video files to disk, and filters which video clips are uploaded to the cloud based on triggers from the vision service.
+# Video Storage
+The `video-store` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and a [Vision Service](https://docs.viam.com/services/vision/), saves the camera output as video files to disk, and filters which video clips are uploaded to the cloud based on triggers from the vision service.
 
 > **Note:** This component is a work in progress and is not yet fully implemented.
 
-## Configure your `filtered-video` component
+## Configure your `video-store` component
 
 Fill in the attributes as applicable to the component, according to the example below.
 
@@ -12,7 +12,7 @@ Fill in the attributes as applicable to the component, according to the example 
       "name": "fv-cam",
       "namespace": "rdk",
       "type": "camera",
-      "model": "viam:camera:filtered-video",
+      "model": "viam:camera:video-store",
       "attributes": {
         "camera": "webcam-1", // name of the camera to use
         "vision": "vision-service-1", // name of the vision service dependency

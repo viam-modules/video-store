@@ -1,4 +1,4 @@
-module github.com/seanavery/filteredvideo
+module github.com/seanavery/videostore
 
 go 1.22.4
 

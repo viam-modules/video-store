@@ -4,7 +4,7 @@ package main
 import (
 	"context"
 
-	filteredvideo "github.com/seanavery/filteredvideo/cam"
+	videostore "github.com/seanavery/videostore/cam"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	utils.ContextualMain(mainWithArgs, logging.NewLogger("filtered-video-module"))
+	utils.ContextualMain(mainWithArgs, logging.NewLogger("video-store-module"))
 }
 
 func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
@@ -21,7 +21,7 @@ func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error 
 		return err
 	}
 
-	err = module.AddModelFromRegistry(ctx, camera.API, filteredvideo.Model)
+	err = module.AddModelFromRegistry(ctx, camera.API, videostore.Model)
 	if err != nil {
 		return err
 	}

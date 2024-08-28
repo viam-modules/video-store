@@ -1,4 +1,4 @@
-*filtered-video
+*video-store
 FFmpeg
 *.mp4
 .env

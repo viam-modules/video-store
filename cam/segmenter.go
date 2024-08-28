@@ -1,4 +1,4 @@
-package filteredvideo
+package videostore
 
 /*
 #include <libavfilter/avfilter.h>
@@ -20,8 +20,7 @@ import (
 )
 
 const (
-	outputDirectory = "/.viam/video-storage/"
-	outputPattern   = outputDirectory + "%Y-%m-%d_%H-%M-%S.mp4"
+	outputPattern = "%Y-%m-%d_%H-%M-%S.mp4"
 )
 
 type segmenter struct {
@@ -39,6 +38,7 @@ func newSegmenter(
 	enc *encoder,
 	storageSize int,
 	clipLength int,
+	storagePath string,
 ) (*segmenter, error) {
 	s := &segmenter{
 		logger:  logger,
@@ -47,13 +47,12 @@ func newSegmenter(
 	// TODO(seanp): MB for testing, should be GB in prod.
 	s.maxStorageSize = int64(storageSize) * 1024 * 1024
 
-	homeDir := getHomeDir()
-	s.storagePath = homeDir + outputDirectory
+	s.storagePath = storagePath
 	err := createDir(s.storagePath)
 	if err != nil {
 		return nil, err
 	}
-	outputPatternCStr := C.CString(homeDir + outputPattern)
+	outputPatternCStr := C.CString(storagePath + "/" + outputPattern)
 	defer C.free(unsafe.Pointer(outputPatternCStr))
 
 	// Allocate output context for segmenter. The "segment" format is a special format
