@@ -202,27 +202,27 @@ func (vs *videostore) DoCommand(_ context.Context, _ map[string]interface{}) (ma
 	return nil, resource.ErrDoUnimplemented
 }
 
-func (fv *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+func (vs *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
 	return nil, resource.ResponseMetadata{}, errors.New("not implemented")
 }
 
-func (fv *videostore) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
+func (vs *videostore) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (fv *videostore) Projector(ctx context.Context) (transform.Projector, error) {
-	return fv.cam.Projector(ctx)
+func (vs *videostore) Projector(ctx context.Context) (transform.Projector, error) {
+	return vs.cam.Projector(ctx)
 }
 
-func (fv *videostore) Properties(ctx context.Context) (camera.Properties, error) {
-	p, err := fv.cam.Properties(ctx)
+func (vs *videostore) Properties(ctx context.Context) (camera.Properties, error) {
+	p, err := vs.cam.Properties(ctx)
 	if err == nil {
 		p.SupportsPCD = false
 	}
 	return p, err
 }
 
-func (fv *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
+func (vs *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -231,7 +231,7 @@ func (fv *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gos
 // meant for long term storage of video clips that are not necessarily triggered by
 // detections.
 // TODO(seanp): Should this be throttled to a certain FPS?
-func (fv *videostore) processFrames(ctx context.Context) {
+func (vs *videostore) processFrames(ctx context.Context) {
 	for {
 		// TODO(seanp): How to gracefully exit this loop?
 		select {
@@ -239,25 +239,25 @@ func (fv *videostore) processFrames(ctx context.Context) {
 			return
 		default:
 		}
-		frame, _, err := fv.stream.Next(ctx)
+		frame, _, err := vs.stream.Next(ctx)
 		if err != nil {
-			fv.logger.Error("failed to get frame from camera", err)
+			vs.logger.Error("failed to get frame from camera", err)
 			return
 		}
 		lazyImage, ok := frame.(*rimage.LazyEncodedImage)
 		if !ok {
-			fv.logger.Error("frame is not of type *rimage.LazyEncodedImage")
+			vs.logger.Error("frame is not of type *rimage.LazyEncodedImage")
 			return
 		}
-		encoded, pts, dts, err := fv.enc.encode(lazyImage.DecodedImage())
+		encoded, pts, dts, err := vs.enc.encode(lazyImage.DecodedImage())
 		if err != nil {
-			fv.logger.Error("failed to encode frame", err)
+			vs.logger.Error("failed to encode frame", err)
 			return
 		}
 		// segment frame
-		err = fv.seg.writeEncodedFrame(encoded, pts, dts)
+		err = vs.seg.writeEncodedFrame(encoded, pts, dts)
 		if err != nil {
-			fv.logger.Error("failed to segment frame", err)
+			vs.logger.Error("failed to segment frame", err)
 			return
 		}
 	}
@@ -265,7 +265,7 @@ func (fv *videostore) processFrames(ctx context.Context) {
 
 // deleter is a go routine that cleans up old clips if storage is full. It runs every
 // minute and deletes the oldest clip until the storage size is below the max.
-func (fv *videostore) deleter(ctx context.Context) {
+func (vs *videostore) deleter(ctx context.Context) {
 	// TODO(seanp): Using seconds for now, but should be minutes in prod.
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
@@ -275,9 +275,9 @@ func (fv *videostore) deleter(ctx context.Context) {
 			return
 		case <-ticker.C:
 			// Perform the deletion of the oldest clip
-			err := fv.seg.cleanupStorage()
+			err := vs.seg.cleanupStorage()
 			if err != nil {
-				fv.logger.Error("failed to clean up storage", err)
+				vs.logger.Error("failed to clean up storage", err)
 				continue
 			}
 		}
@@ -286,13 +286,13 @@ func (fv *videostore) deleter(ctx context.Context) {
 
 // Close closes the video storage camera component.
 // It closes the stream, workers, encoder, segmenter, and watcher.
-func (fv *videostore) Close(ctx context.Context) error {
-	err := fv.stream.Close(ctx)
+func (vs *videostore) Close(ctx context.Context) error {
+	err := vs.stream.Close(ctx)
 	if err != nil {
 		return err
 	}
-	fv.workers.Stop()
-	fv.enc.Close()
-	fv.seg.Close()
+	vs.workers.Stop()
+	vs.enc.Close()
+	vs.seg.Close()
 	return nil
 }
