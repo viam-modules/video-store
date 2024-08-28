@@ -29,7 +29,8 @@ const (
 	defaultVideoPreset    = "medium"
 	defaultVideoFormat    = "mp4"
 	defaultLogLevel       = "error"
-	uploadPath            = "/.viam/video-upload/"
+	defaultUploadPath     = "/.viam/video-upload/"
+	defaultStoragePath    = "/.viam/video-storage/"
 )
 
 type filteredVideo struct {
@@ -51,8 +52,10 @@ type filteredVideo struct {
 }
 
 type storage struct {
-	SegmentSeconds int `json:"segment_seconds"`
-	SizeGB         int `json:"size_gb"`
+	SegmentSeconds int    `json:"segment_seconds"`
+	SizeGB         int    `json:"size_gb"`
+	UploadPath     string `json:"upload_path"`
+	StoragePath    string `json:"storage_path"`
 }
 
 type video struct {
@@ -117,7 +120,8 @@ func newFilteredVideo(
 	}
 
 	// TODO(seanp): make this configurable
-	logLevel := lookupLogID(defaultLogLevel)
+	// logLevel := lookupLogID(defaultLogLevel)
+	logLevel := lookupLogID("debug")
 	ffmppegLogLevel(logLevel)
 
 	// TODO(seanp): Forcing h264 for now until h265 is supported.
@@ -153,12 +157,18 @@ func newFilteredVideo(
 	if newConf.Storage.SizeGB == 0 {
 		newConf.Storage.SizeGB = defaultStorageSize
 	}
-	fv.seg, err = newSegmenter(logger, fv.enc, newConf.Storage.SizeGB, newConf.Storage.SegmentSeconds)
+	if newConf.Storage.UploadPath == "" {
+		newConf.Storage.UploadPath = getHomeDir() + defaultUploadPath
+	}
+	if newConf.Storage.StoragePath == "" {
+		newConf.Storage.StoragePath = getHomeDir() + defaultStoragePath
+	}
+	fv.seg, err = newSegmenter(logger, fv.enc, newConf.Storage.SizeGB, newConf.Storage.SegmentSeconds, newConf.Storage.StoragePath)
 	if err != nil {
 		return nil, err
 	}
 
-	fv.uploadPath = getHomeDir() + uploadPath
+	fv.uploadPath = newConf.Storage.UploadPath
 	err = createDir(fv.uploadPath)
 	if err != nil {
 		return nil, err
