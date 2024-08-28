@@ -71,7 +71,7 @@ func getHomeDir() string {
 // createDir creates a directory at the provided path if it does not exist.
 func createDir(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err := os.Mkdir(path, 0755)
+		err := os.MkdirAll(path, 0755)
 		if err != nil {
 			return err
 		}
@@ -166,4 +166,13 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return nil
+}
+
+// fetchCompName
+func fetchCompName(resourceName string) string {
+	parts := strings.Split(resourceName, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return "unkown"
 }

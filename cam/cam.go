@@ -4,6 +4,7 @@ package filteredvideo
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"time"
 
 	"go.viam.com/rdk/components/camera"
@@ -29,8 +30,8 @@ const (
 	defaultVideoPreset    = "medium"
 	defaultVideoFormat    = "mp4"
 	defaultLogLevel       = "error"
-	defaultUploadPath     = "/.viam/video-upload/"
-	defaultStoragePath    = "/.viam/video-storage/"
+	defaultUploadPath     = ".viam/video-upload"
+	defaultStoragePath    = ".viam/video-storage"
 )
 
 type filteredVideo struct {
@@ -158,10 +159,10 @@ func newFilteredVideo(
 		newConf.Storage.SizeGB = defaultStorageSize
 	}
 	if newConf.Storage.UploadPath == "" {
-		newConf.Storage.UploadPath = getHomeDir() + defaultUploadPath
+		newConf.Storage.UploadPath = filepath.Join(getHomeDir(), defaultUploadPath, fv.name.Name)
 	}
 	if newConf.Storage.StoragePath == "" {
-		newConf.Storage.StoragePath = getHomeDir() + defaultStoragePath
+		newConf.Storage.StoragePath = filepath.Join(getHomeDir(), defaultStoragePath, fv.name.Name)
 	}
 	fv.seg, err = newSegmenter(logger, fv.enc, newConf.Storage.SizeGB, newConf.Storage.SegmentSeconds, newConf.Storage.StoragePath)
 	if err != nil {
