@@ -37,9 +37,9 @@ export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 .PHONY: lint tool-install
 
-$(BIN_OUTPUT_PATH)/filtered-video: *.go cam/*.go $(FFMPEG_BUILD)
+$(BIN_OUTPUT_PATH)/video-store: *.go cam/*.go $(FFMPEG_BUILD)
 	go mod tidy
-	CGO_LDFLAGS=$(CGO_LDFLAGS) CGO_CFLAGS=$(CGO_CFLAGS) go build -o $(BIN_OUTPUT_PATH)/filtered-video main.go
+	CGO_LDFLAGS=$(CGO_LDFLAGS) CGO_CFLAGS=$(CGO_CFLAGS) go build -o $(BIN_OUTPUT_PATH)/video-store main.go
 
 $(FFMPEG_VERSION_PLATFORM):
 	git clone https://github.com/FFmpeg/FFmpeg.git --depth 1 --branch $(FFMPEG_TAG) $(FFMPEG_VERSION_PLATFORM)

@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	utils.ContextualMain(mainWithArgs, logging.NewLogger("filtered-video-module"))
+	utils.ContextualMain(mainWithArgs, logging.NewLogger("video-store-module"))
 }
 
 func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
