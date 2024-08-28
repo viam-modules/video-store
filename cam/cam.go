@@ -121,8 +121,7 @@ func newvideostore(
 	}
 
 	// TODO(seanp): make this configurable
-	// logLevel := lookupLogID(defaultLogLevel)
-	logLevel := lookupLogID("debug")
+	logLevel := lookupLogID(defaultLogLevel)
 	ffmppegLogLevel(logLevel)
 
 	// TODO(seanp): Forcing h264 for now until h265 is supported.
