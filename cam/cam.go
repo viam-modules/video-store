@@ -1,5 +1,5 @@
-// Package filteredvideo contains the implementation of the filtered video camera component.
-package filteredvideo
+// Package videostore contains the implementation of the video storage camera component.
+package videostore
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	"go.viam.com/utils"
 )
 
-// Model is the model for the filtered video camera component.
+// Model is the model for the video storage camera component.
 // TODO(seanp): Personal module for now, should be movied to viam module in prod.
 var Model = resource.ModelNamespace("seanavery").WithFamily("video").WithModel("storage")
 
@@ -34,7 +34,7 @@ const (
 	defaultStoragePath    = ".viam/video-storage"
 )
 
-type filteredVideo struct {
+type videostore struct {
 	resource.AlwaysRebuild
 	resource.TriviallyCloseable
 
@@ -72,7 +72,7 @@ type cameraProperties struct {
 	Framerate int `json:"framerate"`
 }
 
-// Config is the configuration for the filtered video camera component.
+// Config is the configuration for the video storage camera component.
 type Config struct {
 	Camera  string  `json:"camera"`
 	Storage storage `json:"storage"`
@@ -87,11 +87,11 @@ func init() {
 		camera.API,
 		Model,
 		resource.Registration[camera.Camera, *Config]{
-			Constructor: newFilteredVideo,
+			Constructor: newvideostore,
 		})
 }
 
-func newFilteredVideo(
+func newvideostore(
 	ctx context.Context,
 	deps resource.Dependencies,
 	conf resource.Config,
@@ -102,20 +102,20 @@ func newFilteredVideo(
 		return nil, err
 	}
 
-	fv := &filteredVideo{
+	vs := &videostore{
 		name:   conf.ResourceName(),
 		conf:   newConf,
 		logger: logger,
 	}
 
 	// Source camera that provides the frames to be processed.
-	fv.cam, err = camera.FromDependencies(deps, newConf.Camera)
+	vs.cam, err = camera.FromDependencies(deps, newConf.Camera)
 	if err != nil {
 		return nil, err
 	}
 
 	var errHandlers []gostream.ErrorHandler
-	fv.stream, err = fv.cam.Stream(ctx, errHandlers...)
+	vs.stream, err = vs.cam.Stream(ctx, errHandlers...)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func newFilteredVideo(
 		newConf.Video.Format = defaultVideoFormat
 	}
 
-	fv.enc, err = newEncoder(
+	vs.enc, err = newEncoder(
 		logger,
 		newConf.Video.Codec,
 		newConf.Video.Bitrate,
@@ -159,28 +159,28 @@ func newFilteredVideo(
 		newConf.Storage.SizeGB = defaultStorageSize
 	}
 	if newConf.Storage.UploadPath == "" {
-		newConf.Storage.UploadPath = filepath.Join(getHomeDir(), defaultUploadPath, fv.name.Name)
+		newConf.Storage.UploadPath = filepath.Join(getHomeDir(), defaultUploadPath, vs.name.Name)
 	}
 	if newConf.Storage.StoragePath == "" {
-		newConf.Storage.StoragePath = filepath.Join(getHomeDir(), defaultStoragePath, fv.name.Name)
+		newConf.Storage.StoragePath = filepath.Join(getHomeDir(), defaultStoragePath, vs.name.Name)
 	}
-	fv.seg, err = newSegmenter(logger, fv.enc, newConf.Storage.SizeGB, newConf.Storage.SegmentSeconds, newConf.Storage.StoragePath)
+	vs.seg, err = newSegmenter(logger, vs.enc, newConf.Storage.SizeGB, newConf.Storage.SegmentSeconds, newConf.Storage.StoragePath)
 	if err != nil {
 		return nil, err
 	}
 
-	fv.uploadPath = newConf.Storage.UploadPath
-	err = createDir(fv.uploadPath)
+	vs.uploadPath = newConf.Storage.UploadPath
+	err = createDir(vs.uploadPath)
 	if err != nil {
 		return nil, err
 	}
 
-	fv.workers = rdkutils.NewStoppableWorkers(fv.processFrames, fv.deleter)
+	vs.workers = rdkutils.NewStoppableWorkers(vs.processFrames, vs.deleter)
 
-	return fv, nil
+	return vs, nil
 }
 
-// Validate validates the configuration for the filtered video camera component.
+// Validate validates the configuration for the video storage camera component.
 func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Camera == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
@@ -194,27 +194,27 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	return []string{cfg.Camera}, nil
 }
 
-func (fv *filteredVideo) Name() resource.Name {
-	return fv.name
+func (vs *videostore) Name() resource.Name {
+	return vs.name
 }
 
-func (fv *filteredVideo) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
+func (vs *videostore) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
 	return nil, resource.ErrDoUnimplemented
 }
 
-func (fv *filteredVideo) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+func (fv *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
 	return nil, resource.ResponseMetadata{}, errors.New("not implemented")
 }
 
-func (fv *filteredVideo) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
+func (fv *videostore) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (fv *filteredVideo) Projector(ctx context.Context) (transform.Projector, error) {
+func (fv *videostore) Projector(ctx context.Context) (transform.Projector, error) {
 	return fv.cam.Projector(ctx)
 }
 
-func (fv *filteredVideo) Properties(ctx context.Context) (camera.Properties, error) {
+func (fv *videostore) Properties(ctx context.Context) (camera.Properties, error) {
 	p, err := fv.cam.Properties(ctx)
 	if err == nil {
 		p.SupportsPCD = false
@@ -222,7 +222,7 @@ func (fv *filteredVideo) Properties(ctx context.Context) (camera.Properties, err
 	return p, err
 }
 
-func (fv *filteredVideo) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
+func (fv *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -231,7 +231,7 @@ func (fv *filteredVideo) Stream(_ context.Context, _ ...gostream.ErrorHandler) (
 // meant for long term storage of video clips that are not necessarily triggered by
 // detections.
 // TODO(seanp): Should this be throttled to a certain FPS?
-func (fv *filteredVideo) processFrames(ctx context.Context) {
+func (fv *videostore) processFrames(ctx context.Context) {
 	for {
 		// TODO(seanp): How to gracefully exit this loop?
 		select {
@@ -265,7 +265,7 @@ func (fv *filteredVideo) processFrames(ctx context.Context) {
 
 // deleter is a go routine that cleans up old clips if storage is full. It runs every
 // minute and deletes the oldest clip until the storage size is below the max.
-func (fv *filteredVideo) deleter(ctx context.Context) {
+func (fv *videostore) deleter(ctx context.Context) {
 	// TODO(seanp): Using seconds for now, but should be minutes in prod.
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
@@ -284,9 +284,9 @@ func (fv *filteredVideo) deleter(ctx context.Context) {
 	}
 }
 
-// Close closes the filtered video camera component.
+// Close closes the video storage camera component.
 // It closes the stream, workers, encoder, segmenter, and watcher.
-func (fv *filteredVideo) Close(ctx context.Context) error {
+func (fv *videostore) Close(ctx context.Context) error {
 	err := fv.stream.Close(ctx)
 	if err != nil {
 		return err

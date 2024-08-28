@@ -1,4 +1,4 @@
-package filteredvideo
+package videostore
 
 /*
 #include <libavutil/error.h>
