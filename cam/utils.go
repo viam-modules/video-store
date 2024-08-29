@@ -183,7 +183,6 @@ func fetchCompName(resourceName string) string {
 // concatFiles concatenates video files in the provided list into a single file.
 func concatFiles(files []string, output string) error {
 	// create concat.txt file
-	fmt.Println("Creating concat.txt file")
 	concatFile, err := os.Create("/home/viam/.viam/concat.txt")
 	if err != nil {
 		return err
@@ -229,7 +228,6 @@ func concatFiles(files []string, output string) error {
 	}
 
 	// copy the streams from the input to the output
-	fmt.Println("Copying streams")
 	for i := 0; i < int(inputCtx.nb_streams); i++ {
 		// pointer arithmetic to get the stream
 		inStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams)) + uintptr(i)*unsafe.Sizeof(inputCtx.streams)))
@@ -261,7 +259,6 @@ func concatFiles(files []string, output string) error {
 	}
 
 	// read the packets from the input and write them to the output
-	fmt.Println("Writing packets")
 	packet := C.av_packet_alloc()
 	for {
 		ret := C.av_read_frame(inputCtx, packet)

@@ -208,31 +208,35 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 	case "save":
 		vs.logger.Info("save command received")
 		// validate from and to timestamps in command
-		// from, ok := command["from"].(time.Time)
-		// if !ok {
-		// 	return nil, errors.New("invalid from timestamp")
-		// }
-		// to, ok := command["to"].(time.Time)
-		// if !ok {
-		// 	return nil, errors.New("invalid to timestamp")
-		// }
-		// // check from is after to
-		// if from.After(to) {
-		// 	return nil, errors.New("from timestamp is after to timestamp")
-		// }
-		// validate from is after min storage time
-		// validate to is before max storage time
-		// TODO(seanp): Handle the "save" command
-		// creeate list of strings of file paths
-		// filePaths := []string{
-		// 	"/home/viam/.viam/video-storage/video-store/2024-08-28_13-57-28.mp4",
-		// 	"/home/viam/.viam/video-storage/video-store/2024-08-28_14-09-55.mp4",
-		// }
+		from, ok := command["from"].(string)
+		if !ok {
+			return nil, errors.New("missing from timestamp")
+		}
+		to, ok := command["to"].(string)
+		if !ok {
+			return nil, errors.New("missing to timestamp")
+		}
+		// validate format with extractDateTime helper
+		fromTime, err := extractDateTime(from)
+		if err != nil {
+			return nil, err
+		}
+		toTime, err := extractDateTime(to)
+		if err != nil {
+			return nil, err
+		}
+		// check from is after to
+		if fromTime.After(toTime) {
+			return nil, errors.New("from timestamp is after to timestamp")
+		}
+		// TODO(seanp): validate from is after min storage time
+		// TODO(seanp): validate to is before max storage time
+		// TODO(seanp): fetch files in time range from storage path
 		filePaths := []string{
 			"video-storage/video-store/2024-08-28_13-57-28.mp4",
 			"video-storage/video-store/2024-08-28_14-09-55.mp4",
 		}
-		err := concatFiles(filePaths, "/home/viam/.viam/test-upload.mp4")
+		err = concatFiles(filePaths, "/home/viam/.viam/test-upload.mp4")
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err
