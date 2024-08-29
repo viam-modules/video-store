@@ -19,12 +19,16 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --disable-doc \
                --disable-everything \
                --enable-static \
-			   --enable-libx264 \
-			   --enable-gpl \
+               --enable-libx264 \
+               --enable-gpl \
                --enable-encoder=libx264 \
                --enable-muxer=segment \
                --enable-muxer=mp4 \
                --enable-demuxer=segment \
+               --enable-demuxer=concat \
+			   --enable-demuxer=mov \
+			   --enable-demuxer=mp4 \
+			   --enable-parser=h264 \
                --enable-protocol=file \
                --enable-protocol=concat \
                --enable-protocol=crypto
