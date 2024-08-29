@@ -266,6 +266,7 @@ func concatFiles(files []string, output string) error {
 	for {
 		ret := C.av_read_frame(inputCtx, packet)
 		if ret == C.AVERROR_EOF {
+			fmt.Println("EOF")
 			break
 		}
 		if ret < 0 {
@@ -273,15 +274,13 @@ func concatFiles(files []string, output string) error {
 		}
 
 		// adjust the PTS and DTS
-		// packet.pts = C.av_rescale_q_rnd(packet.pts, inputCtx.streams[packet.stream_index].time_base, outputCtx.streams[packet.stream_index].time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
-		// packet.dts = C.av_rescale_q_rnd(packet.dts, inputCtx.streams[packet.stream_index].time_base, outputCtx.streams[packet.stream_index].time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
-		// packet.duration = C.av_rescale_q(packet.duration, inputCtx.streams[packet.stream_index].time_base, outputCtx.streams[packet.stream_index].time_base)
-		// Adjust the PTS and DTS
-		packet.pts = C.av_rescale_q_rnd(packet.pts, (*C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams))+uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0)))).time_base, (*C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(outputCtx.streams))+uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0)))).time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
+		inStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams)) + uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
+		outStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(outputCtx.streams)) + uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
 
-		packet.dts = C.av_rescale_q_rnd(packet.dts, (*C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams))+uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0)))).time_base, (*C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(outputCtx.streams))+uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0)))).time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
-
-		packet.duration = C.av_rescale_q(packet.duration, (*C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams))+uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0)))).time_base, (*C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(outputCtx.streams))+uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0)))).time_base)
+		// Adjust the PTS, DTS, and duration correctly for each packet
+		packet.pts = C.av_rescale_q_rnd(packet.pts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
+		packet.dts = C.av_rescale_q_rnd(packet.dts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
+		packet.duration = C.av_rescale_q(packet.duration, inStream.time_base, outStream.time_base)
 
 		packet.pos = -1
 
