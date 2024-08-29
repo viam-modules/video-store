@@ -26,12 +26,13 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-muxer=mp4 \
                --enable-demuxer=segment \
                --enable-demuxer=concat \
-			   --enable-demuxer=mov \
-			   --enable-demuxer=mp4 \
-			   --enable-parser=h264 \
+               --enable-demuxer=mov \
+               --enable-demuxer=mp4 \
+               --enable-parser=h264 \
                --enable-protocol=file \
                --enable-protocol=concat \
-               --enable-protocol=crypto
+               --enable-protocol=crypto \
+               --enable-bsf=h264_mp4toannexb
 
 # TODO: cleanup libx264 static link
 CGO_LDFLAGS := "-L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -l:libjpeg.a /usr/lib/aarch64-linux-gnu/libx264.a -lz"
