@@ -218,11 +218,11 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		if !ok {
 			return nil, errors.New("missing to timestamp")
 		}
-		fromTime, err := extractDateTimeStr(from)
+		fromTime, err := parseDateTimeString(from)
 		if err != nil {
 			return nil, err
 		}
-		toTime, err := extractDateTimeStr(to)
+		toTime, err := parseDateTimeString(to)
 		if err != nil {
 			return nil, err
 		}
@@ -237,7 +237,8 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		if len(storageFiles) == 0 {
 			return nil, errors.New("no video data to save")
 		}
-		minStorageTime, err := extractDateTime(storageFiles[0])
+		// minStorageTime, err := parseDateTimeString(storageFiles[0])
+		minStorageTime, err := extractDateTimeFromFilename(storageFiles[0])
 		if err != nil {
 			vs.logger.Error("failed to extract min storage time from file:", storageFiles[0], "error:", err)
 			return nil, err
@@ -245,7 +246,8 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		if fromTime.Before(minStorageTime) {
 			return nil, errors.New("from timestamp is before min storage time")
 		}
-		maxStorageTime, err := extractDateTime(storageFiles[len(storageFiles)-1])
+		// maxStorageTime, err := parseDateTimeString(storageFiles[len(storageFiles)-1])
+		maxStorageTime, err := extractDateTimeFromFilename(storageFiles[len(storageFiles)-1])
 		if err != nil {
 			vs.logger.Error("failed to extract max storage time", err)
 			return nil, err

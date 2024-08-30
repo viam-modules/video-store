@@ -120,8 +120,8 @@ func getSortedFiles(path string) ([]string, error) {
 		filePaths = append(filePaths, filepath.Join(path, file.Name()))
 	}
 	sort.Slice(filePaths, func(i, j int) bool {
-		timeI, errI := extractDateTime(filePaths[i])
-		timeJ, errJ := extractDateTime(filePaths[j])
+		timeI, errI := extractDateTimeFromFilename(filePaths[i])
+		timeJ, errJ := extractDateTimeFromFilename(filePaths[j])
 		if errI != nil || errJ != nil {
 			return false
 		}
@@ -131,7 +131,7 @@ func getSortedFiles(path string) ([]string, error) {
 	return filePaths, nil
 }
 
-func extractDateTime(filePath string) (time.Time, error) {
+func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
 	parts := strings.Split(baseName, "_")
 	if len(parts) < 2 {
@@ -140,14 +140,10 @@ func extractDateTime(filePath string) (time.Time, error) {
 	datePart := parts[0]
 	timePart := strings.TrimSuffix(parts[1], filepath.Ext(parts[1]))
 	dateTimeStr := datePart + "_" + timePart
-	dateTime, err := time.Parse("2006-01-02_15-04-05", dateTimeStr)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return dateTime, nil
+	return parseDateTimeString(dateTimeStr)
 }
 
-func extractDateTimeStr(datetime string) (time.Time, error) {
+func parseDateTimeString(datetime string) (time.Time, error) {
 	dateTime, err := time.Parse("2006-01-02_15-04-05", datetime)
 	if err != nil {
 		return time.Time{}, err
@@ -158,7 +154,7 @@ func extractDateTimeStr(datetime string) (time.Time, error) {
 func matchStorageToRange(files []string, start, end time.Time) []string {
 	var matchedFiles []string
 	for _, file := range files {
-		dateTime, err := extractDateTime(file)
+		dateTime, err := extractDateTimeFromFilename(file)
 		if err != nil {
 			continue
 		}
