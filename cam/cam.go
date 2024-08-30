@@ -38,10 +38,9 @@ type videostore struct {
 	resource.AlwaysRebuild
 	resource.TriviallyCloseable
 
-	name       resource.Name
-	conf       *Config
-	logger     logging.Logger
-	uploadPath string
+	name   resource.Name
+	conf   *Config
+	logger logging.Logger
 
 	cam    camera.Camera
 	stream gostream.VideoStream
@@ -50,6 +49,9 @@ type videostore struct {
 
 	enc *encoder
 	seg *segmenter
+
+	storagePath string
+	uploadPath  string
 }
 
 type storage struct {
@@ -168,7 +170,7 @@ func newvideostore(
 	if err != nil {
 		return nil, err
 	}
-
+	vs.storagePath = newConf.Storage.StoragePath
 	vs.uploadPath = newConf.Storage.UploadPath
 	err = createDir(vs.uploadPath)
 	if err != nil {
@@ -207,7 +209,6 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 	switch cmd {
 	case "save":
 		vs.logger.Info("save command received")
-		// validate from and to timestamps in command
 		from, ok := command["from"].(string)
 		if !ok {
 			return nil, errors.New("missing from timestamp")
@@ -216,27 +217,46 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		if !ok {
 			return nil, errors.New("missing to timestamp")
 		}
-		// validate format with extractDateTime helper
-		fromTime, err := extractDateTime(from)
+		fromTime, err := extractDateTimeStr(from)
 		if err != nil {
 			return nil, err
 		}
-		toTime, err := extractDateTime(to)
+		toTime, err := extractDateTimeStr(to)
 		if err != nil {
 			return nil, err
 		}
-		// check from is after to
 		if fromTime.After(toTime) {
 			return nil, errors.New("from timestamp is after to timestamp")
 		}
-		// TODO(seanp): validate from is after min storage time
-		// TODO(seanp): validate to is before max storage time
-		// TODO(seanp): fetch files in time range from storage path
-		filePaths := []string{
-			"video-storage/video-store/2024-08-28_13-57-28.mp4",
-			"video-storage/video-store/2024-08-28_14-09-55.mp4",
+		storageFiles, err := getSortedFiles(vs.storagePath)
+		if err != nil {
+			vs.logger.Error("failed to get sorted files", err)
+			return nil, err
 		}
-		err = concatFiles(filePaths, "/home/viam/.viam/test-upload.mp4")
+		if len(storageFiles) == 0 {
+			return nil, errors.New("no video data to save")
+		}
+		minStorageTime, err := extractDateTime(storageFiles[0])
+		if err != nil {
+			vs.logger.Error("failed to extract min storage time from file:", storageFiles[0], "error:", err)
+			return nil, err
+		}
+		if fromTime.Before(minStorageTime) {
+			return nil, errors.New("from timestamp is before min storage time")
+		}
+		maxStorageTime, err := extractDateTime(storageFiles[len(storageFiles)-1])
+		if err != nil {
+			vs.logger.Error("failed to extract max storage time", err)
+			return nil, err
+		}
+		if toTime.After(maxStorageTime) {
+			return nil, errors.New("to timestamp is after max storage time")
+		}
+		fileMatches := matchStorageToRange(storageFiles, fromTime, toTime)
+		for _, file := range fileMatches {
+			vs.logger.Info("file match:", file)
+		}
+		err = concatFiles(fileMatches, "/home/viam/.viam/test-upload.mp4")
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err
@@ -245,7 +265,6 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 	default:
 		return nil, resource.ErrDoUnimplemented
 	}
-
 }
 
 func (vs *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {

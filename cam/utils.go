@@ -131,21 +131,42 @@ func getSortedFiles(path string) ([]string, error) {
 	return filePaths, nil
 }
 
-// extractDateTime extracts the date and time from the file name.
 func extractDateTime(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
 	parts := strings.Split(baseName, "_")
 	if len(parts) < 2 {
 		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
 	}
-	datePart := parts[1]
-	timePart := strings.TrimSuffix(parts[1], filepath.Ext(baseName))
+	datePart := parts[0]
+	timePart := strings.TrimSuffix(parts[1], filepath.Ext(parts[1]))
 	dateTimeStr := datePart + "_" + timePart
 	dateTime, err := time.Parse("2006-01-02_15-04-05", dateTimeStr)
 	if err != nil {
 		return time.Time{}, err
 	}
 	return dateTime, nil
+}
+
+func extractDateTimeStr(datetime string) (time.Time, error) {
+	dateTime, err := time.Parse("2006-01-02_15-04-05", datetime)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return dateTime, nil
+}
+
+func matchStorageToRange(files []string, start, end time.Time) []string {
+	var matchedFiles []string
+	for _, file := range files {
+		dateTime, err := extractDateTime(file)
+		if err != nil {
+			continue
+		}
+		if dateTime.After(start) && dateTime.Before(end) {
+			matchedFiles = append(matchedFiles, file)
+		}
+	}
+	return matchedFiles
 }
 
 // copyFile copies a file from the source to the destination.
@@ -199,14 +220,21 @@ func concatFiles(files []string, output string) error {
 	filename := C.CString("/home/viam/.viam/concat.txt")
 	defer C.free(unsafe.Pointer(filename))
 	var inputCtx *C.AVFormatContext
-	inputFormat := C.av_find_input_format(C.CString("concat"))
+	concatStr := C.CString("concat")
+	defer C.free(unsafe.Pointer(concatStr))
+	inputFormat := C.av_find_input_format(concatStr)
 	if inputFormat == nil {
 		return fmt.Errorf("failed to find input format")
 	}
 
 	// we need this to allow absolute paths
 	var options *C.AVDictionary
-	C.av_dict_set(&options, C.CString("safe"), C.CString("0"), 0)
+	safeStr := C.CString("safe")
+	safeValStr := C.CString("0")
+	defer C.free(unsafe.Pointer(safeValStr))
+	defer C.free(unsafe.Pointer(safeStr))
+	defer C.av_dict_free(&options)
+	C.av_dict_set(&options, safeStr, safeValStr, 0)
 
 	ret := C.avformat_open_input(&inputCtx, filename, inputFormat, &options)
 	if ret < 0 {
@@ -221,6 +249,7 @@ func concatFiles(files []string, output string) error {
 
 	// create the output format context
 	outputFile := C.CString(output)
+	defer C.free(unsafe.Pointer(outputFile))
 	var outputCtx *C.AVFormatContext
 	ret = C.avformat_alloc_output_context2(&outputCtx, nil, nil, outputFile)
 	if ret < 0 {
@@ -270,15 +299,12 @@ func concatFiles(files []string, output string) error {
 			return fmt.Errorf("failed to read frame: %s", ffmpegError(ret))
 		}
 
-		// adjust the PTS and DTS
+		// Adjust the PTS, DTS, and duration correctly for each packet
 		inStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams)) + uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
 		outStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(outputCtx.streams)) + uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
-
-		// Adjust the PTS, DTS, and duration correctly for each packet
 		packet.pts = C.av_rescale_q_rnd(packet.pts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
 		packet.dts = C.av_rescale_q_rnd(packet.dts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
 		packet.duration = C.av_rescale_q(packet.duration, inStream.time_base, outStream.time_base)
-
 		packet.pos = -1
 
 		// write the packet
@@ -295,6 +321,7 @@ func concatFiles(files []string, output string) error {
 	}
 
 	// cleanup
+	C.avio_closep(&outputCtx.pb)
 	C.avformat_close_input(&inputCtx)
 	C.avformat_free_context(outputCtx)
 	C.av_packet_free(&packet)
