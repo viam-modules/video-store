@@ -4,7 +4,6 @@ package videostore
 import (
 	"context"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"time"
 
@@ -48,8 +47,9 @@ type videostore struct {
 
 	workers rdkutils.StoppableWorkers
 
-	enc *encoder
-	seg *segmenter
+	enc  *encoder
+	seg  *segmenter
+	conc *concater
 
 	storagePath string
 	uploadPath  string
@@ -178,6 +178,12 @@ func newvideostore(
 		return nil, err
 	}
 
+	// create concater
+	vs.conc, err = newConcater(logger, vs.storagePath, vs.uploadPath, vs.name.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	vs.workers = rdkutils.NewStoppableWorkers(vs.processFrames, vs.deleter)
 
 	return vs, nil
@@ -204,79 +210,24 @@ func (vs *videostore) Name() resource.Name {
 func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{}) (map[string]interface{}, error) {
 	cmd, ok := command["command"].(string)
 	if !ok {
-		return nil, errors.New("invalid command parameter")
+		return nil, errors.New("invalid command type")
 	}
 
 	switch cmd {
 	case "save":
 		vs.logger.Info("save command received")
-		from, ok := command["from"].(string)
-		if !ok {
-			return nil, errors.New("missing from timestamp")
-		}
-		to, ok := command["to"].(string)
-		if !ok {
-			return nil, errors.New("missing to timestamp")
-		}
-		fromTime, err := parseDateTimeString(from)
+		from, to, metadata, err := validateSaveCommand(command)
 		if err != nil {
 			return nil, err
 		}
-		toTime, err := parseDateTimeString(to)
-		if err != nil {
-			return nil, err
-		}
-		if fromTime.After(toTime) {
-			return nil, errors.New("from timestamp is after to timestamp")
-		}
-		storageFiles, err := getSortedFiles(vs.storagePath)
-		if err != nil {
-			vs.logger.Error("failed to get sorted files", err)
-			return nil, err
-		}
-		if len(storageFiles) == 0 {
-			return nil, errors.New("no video data to save")
-		}
-		// minStorageTime, err := parseDateTimeString(storageFiles[0])
-		minStorageTime, err := extractDateTimeFromFilename(storageFiles[0])
-		if err != nil {
-			vs.logger.Error("failed to extract min storage time from file:", storageFiles[0], "error:", err)
-			return nil, err
-		}
-		if fromTime.Before(minStorageTime) {
-			return nil, errors.New("from timestamp is before min storage time")
-		}
-		// maxStorageTime, err := parseDateTimeString(storageFiles[len(storageFiles)-1])
-		maxStorageTime, err := extractDateTimeFromFilename(storageFiles[len(storageFiles)-1])
-		if err != nil {
-			vs.logger.Error("failed to extract max storage time", err)
-			return nil, err
-		}
-		if toTime.After(maxStorageTime) {
-			return nil, errors.New("to timestamp is after max storage time")
-		}
-		fileMatches := matchStorageToRange(storageFiles, fromTime, toTime)
-		for _, file := range fileMatches {
-			vs.logger.Info("file match:", file)
-		}
-		metadata, ok := command["metadata"].(string)
-		var concatFilename string
-		if !ok || metadata == "" {
-			concatFilename = fmt.Sprintf("%s_%s_%s.%s", vs.name.Name, from, to, defaultVideoFormat)
-		} else {
-			concatFilename = fmt.Sprintf("%s_%s_%s_%s.%s", vs.name.Name, from, to, metadata, defaultVideoFormat)
-		}
-		concatPath := filepath.Join(vs.uploadPath, concatFilename)
-		vs.logger.Info("concatenating files to:", concatPath)
-		err = concatFiles(fileMatches, concatPath)
+		uploadFile, err := vs.conc.concat(from, to, metadata)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err
 		}
 		return map[string]interface{}{
 			"command": "save",
-			"file":    concatFilename,
-			"error":   "",
+			"file":    uploadFile,
 		}, nil
 	case "fetch":
 		vs.logger.Info("fetch command received")

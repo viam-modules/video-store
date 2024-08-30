@@ -17,7 +17,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unsafe"
 )
 
 // ffmpegError returns a string representation of the ffmpeg error code.
@@ -151,6 +150,10 @@ func parseDateTimeString(datetime string) (time.Time, error) {
 	return dateTime, nil
 }
 
+func formatDateTimeToString(dateTime time.Time) string {
+	return dateTime.Format("2006-01-02_15-04-05")
+}
+
 func matchStorageToRange(files []string, start, end time.Time) []string {
 	var matchedFiles []string
 	for _, file := range files {
@@ -197,130 +200,48 @@ func fetchCompName(resourceName string) string {
 	return "unknown"
 }
 
-// concatFiles concatenates video files in the provided list into a single file.
-func concatFiles(files []string, output string) error {
-	// create concat.txt file
-	concatFile, err := os.Create("/home/viam/.viam/concat.txt")
+// validateTimeRange validates the start and end time range against storage files.
+func validateTimeRange(files []string, start, end time.Time) error {
+	if len(files) == 0 {
+		return fmt.Errorf("no files found")
+	}
+	oldestFile, err := extractDateTimeFromFilename(files[0])
 	if err != nil {
 		return err
 	}
-	defer concatFile.Close()
-	for _, file := range files {
-		_, err := concatFile.WriteString(fmt.Sprintf("file '%s'\n", file))
-		if err != nil {
-			return err
-		}
+	newestFile, err := extractDateTimeFromFilename(files[len(files)-1])
+	if err != nil {
+		return err
 	}
-
-	// open the concat format context
-	filename := C.CString("/home/viam/.viam/concat.txt")
-	defer C.free(unsafe.Pointer(filename))
-	var inputCtx *C.AVFormatContext
-	concatStr := C.CString("concat")
-	defer C.free(unsafe.Pointer(concatStr))
-	inputFormat := C.av_find_input_format(concatStr)
-	if inputFormat == nil {
-		return fmt.Errorf("failed to find input format")
+	if start.Before(oldestFile) || end.After(newestFile) {
+		return fmt.Errorf("time range is outside of storage range")
 	}
-
-	// we need this to allow absolute paths
-	var options *C.AVDictionary
-	safeStr := C.CString("safe")
-	safeValStr := C.CString("0")
-	defer C.free(unsafe.Pointer(safeValStr))
-	defer C.free(unsafe.Pointer(safeStr))
-	defer C.av_dict_free(&options)
-	C.av_dict_set(&options, safeStr, safeValStr, 0)
-
-	ret := C.avformat_open_input(&inputCtx, filename, inputFormat, &options)
-	if ret < 0 {
-		return fmt.Errorf("failed to open input context: %s", ffmpegError(ret))
-	}
-
-	// find the stream info
-	ret = C.avformat_find_stream_info(inputCtx, nil)
-	if ret < 0 {
-		return fmt.Errorf("failed to find stream info: %s", ffmpegError(ret))
-	}
-
-	// create the output format context
-	outputFile := C.CString(output)
-	defer C.free(unsafe.Pointer(outputFile))
-	var outputCtx *C.AVFormatContext
-	ret = C.avformat_alloc_output_context2(&outputCtx, nil, nil, outputFile)
-	if ret < 0 {
-		return fmt.Errorf("failed to allocate output context: %s", ffmpegError(ret))
-	}
-
-	// copy the streams from the input to the output
-	for i := 0; i < int(inputCtx.nb_streams); i++ {
-		// pointer arithmetic to get the stream
-		inStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams)) + uintptr(i)*unsafe.Sizeof(inputCtx.streams)))
-		outStream := C.avformat_new_stream(outputCtx, nil)
-		if outStream == nil {
-			return fmt.Errorf("failed to allocate stream")
-		}
-
-		// copy codec parameters from input stream to output stream
-		ret := C.avcodec_parameters_copy(outStream.codecpar, inStream.codecpar)
-		if ret < 0 {
-			return fmt.Errorf("failed to copy codec parameters: %s", ffmpegError(ret))
-		}
-
-		// let ffmpeg handle the codec tag for us
-		outStream.codecpar.codec_tag = 0
-	}
-
-	// open the output file
-	ret = C.avio_open(&outputCtx.pb, outputFile, C.AVIO_FLAG_WRITE)
-	if ret < 0 {
-		return fmt.Errorf("failed to open output file: %s", ffmpegError(ret))
-	}
-
-	// write the header
-	ret = C.avformat_write_header(outputCtx, nil)
-	if ret < 0 {
-		return fmt.Errorf("failed to write header: %s", ffmpegError(ret))
-	}
-
-	// read the packets from the input and write them to the output
-	packet := C.av_packet_alloc()
-	for {
-		ret := C.av_read_frame(inputCtx, packet)
-		if ret == C.AVERROR_EOF {
-			fmt.Println("EOF")
-			break
-		}
-		if ret < 0 {
-			return fmt.Errorf("failed to read frame: %s", ffmpegError(ret))
-		}
-
-		// Adjust the PTS, DTS, and duration correctly for each packet
-		inStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams)) + uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
-		outStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(outputCtx.streams)) + uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
-		packet.pts = C.av_rescale_q_rnd(packet.pts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
-		packet.dts = C.av_rescale_q_rnd(packet.dts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
-		packet.duration = C.av_rescale_q(packet.duration, inStream.time_base, outStream.time_base)
-		packet.pos = -1
-
-		// write the packet
-		ret = C.av_interleaved_write_frame(outputCtx, packet)
-		if ret < 0 {
-			return fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
-		}
-	}
-
-	// write the trailer
-	ret = C.av_write_trailer(outputCtx)
-	if ret < 0 {
-		return fmt.Errorf("failed to write trailer: %s", ffmpegError(ret))
-	}
-
-	// cleanup
-	C.avio_closep(&outputCtx.pb)
-	C.avformat_close_input(&inputCtx)
-	C.avformat_free_context(outputCtx)
-	C.av_packet_free(&packet)
-
 	return nil
+}
+
+func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, string, error) {
+	fromStr, ok := command["from"].(string)
+	if !ok {
+		return time.Time{}, time.Time{}, "", fmt.Errorf("from timestamp not found")
+	}
+	from, err := parseDateTimeString(fromStr)
+	if err != nil {
+		return time.Time{}, time.Time{}, "", err
+	}
+	toStr, ok := command["to"].(string)
+	if !ok {
+		return time.Time{}, time.Time{}, "", fmt.Errorf("to timestamp not found")
+	}
+	to, err := parseDateTimeString(toStr)
+	if err != nil {
+		return time.Time{}, time.Time{}, "", err
+	}
+	if from.After(to) {
+		return time.Time{}, time.Time{}, "", fmt.Errorf("from timestamp is after to timestamp")
+	}
+	metadata, ok := command["metadata"].(string)
+	if !ok {
+		metadata = ""
+	}
+	return from, to, metadata, nil
 }
