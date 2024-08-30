@@ -4,6 +4,7 @@ package videostore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -256,11 +257,27 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		for _, file := range fileMatches {
 			vs.logger.Info("file match:", file)
 		}
-		err = concatFiles(fileMatches, "/home/viam/.viam/test-upload.mp4")
+		metadata, ok := command["metadata"].(string)
+		var concatFilename string
+		if !ok || metadata == "" {
+			concatFilename = fmt.Sprintf("%s_%s_%s.%s", vs.name.Name, from, to, defaultVideoFormat)
+		} else {
+			concatFilename = fmt.Sprintf("%s_%s_%s_%s.%s", vs.name.Name, from, to, metadata, defaultVideoFormat)
+		}
+		concatPath := filepath.Join(vs.uploadPath, concatFilename)
+		vs.logger.Info("concatenating files to:", concatPath)
+		err = concatFiles(fileMatches, concatPath)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err
 		}
+		return map[string]interface{}{
+			"command": "save",
+			"file":    concatFilename,
+			"error":   "",
+		}, nil
+	case "fetch":
+		vs.logger.Info("fetch command received")
 		return nil, resource.ErrDoUnimplemented
 	default:
 		return nil, resource.ErrDoUnimplemented
