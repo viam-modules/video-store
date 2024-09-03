@@ -10,6 +10,7 @@ package videostore
 import "C"
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,7 +25,7 @@ func ffmpegError(ret C.int) string {
 	var errbuf [256]C.char
 	C.av_strerror(ret, &errbuf[0], 256)
 	if errbuf[0] == 0 {
-		return "unknown error"
+		return "unknown ffmpeg error"
 	}
 	return C.GoString(&errbuf[0])
 }
@@ -191,30 +192,21 @@ func copyFile(src, dst string) error {
 	return nil
 }
 
-// fetchCompName
-func fetchCompName(resourceName string) string {
-	parts := strings.Split(resourceName, "/")
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
-	}
-	return "unknown"
-}
-
 // validateTimeRange validates the start and end time range against storage files.
 func validateTimeRange(files []string, start, end time.Time) error {
 	if len(files) == 0 {
-		return fmt.Errorf("no files found")
+		return errors.New("no storage files found")
 	}
-	oldestFile, err := extractDateTimeFromFilename(files[0])
+	oldestFileStart, err := extractDateTimeFromFilename(files[0])
 	if err != nil {
 		return err
 	}
-	newestFile, err := extractDateTimeFromFilename(files[len(files)-1])
+	newestFileEnd, err := extractDateTimeFromFilename(files[len(files)-1])
 	if err != nil {
 		return err
 	}
-	if start.Before(oldestFile) || end.After(newestFile) {
-		return fmt.Errorf("time range is outside of storage range")
+	if start.Before(oldestFileStart) || end.After(newestFileEnd) {
+		return errors.New("time range is outside of storage range")
 	}
 	return nil
 }
@@ -222,7 +214,7 @@ func validateTimeRange(files []string, start, end time.Time) error {
 func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, string, error) {
 	fromStr, ok := command["from"].(string)
 	if !ok {
-		return time.Time{}, time.Time{}, "", fmt.Errorf("from timestamp not found")
+		return time.Time{}, time.Time{}, "", errors.New("from timestamp not found")
 	}
 	from, err := parseDateTimeString(fromStr)
 	if err != nil {
@@ -230,14 +222,14 @@ func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, 
 	}
 	toStr, ok := command["to"].(string)
 	if !ok {
-		return time.Time{}, time.Time{}, "", fmt.Errorf("to timestamp not found")
+		return time.Time{}, time.Time{}, "", errors.New("to timestamp not found")
 	}
 	to, err := parseDateTimeString(toStr)
 	if err != nil {
 		return time.Time{}, time.Time{}, "", err
 	}
 	if from.After(to) {
-		return time.Time{}, time.Time{}, "", fmt.Errorf("from timestamp is after to timestamp")
+		return time.Time{}, time.Time{}, "", errors.New("from timestamp is after to timestamp")
 	}
 	metadata, ok := command["metadata"].(string)
 	if !ok {
