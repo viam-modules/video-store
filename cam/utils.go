@@ -131,6 +131,7 @@ func getSortedFiles(path string) ([]string, error) {
 	return filePaths, nil
 }
 
+// extractDateTimeFromFilename extracts the date and time from the filename.
 func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
 	parts := strings.Split(baseName, "_")
@@ -143,6 +144,8 @@ func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	return parseDateTimeString(dateTimeStr)
 }
 
+// parseDateTimeString parses a date and time string in the format "2006-01-02_15-04-05".
+// Returns a time.Time object and an error if the string is not in the correct format.
 func parseDateTimeString(datetime string) (time.Time, error) {
 	dateTime, err := time.Parse("2006-01-02_15-04-05", datetime)
 	if err != nil {
@@ -155,6 +158,8 @@ func formatDateTimeToString(dateTime time.Time) string {
 	return dateTime.Format("2006-01-02_15-04-05")
 }
 
+// matchStorageToRange returns a list of files that fall within the provided time range.
+// TODO(seanp): This should also include trimming offsets to the file list.
 func matchStorageToRange(files []string, start, end time.Time) []string {
 	var matchedFiles []string
 	for _, file := range files {
@@ -193,6 +198,9 @@ func copyFile(src, dst string) error {
 }
 
 // validateTimeRange validates the start and end time range against storage files.
+// Extracts the start timestamp of the oldest file and the start of the most recent file.
+// Since the most recent segment file is still being written to by the segmenter
+// we do not want to include it in the time range.
 func validateTimeRange(files []string, start, end time.Time) error {
 	if len(files) == 0 {
 		return errors.New("no storage files found")
@@ -201,16 +209,17 @@ func validateTimeRange(files []string, start, end time.Time) error {
 	if err != nil {
 		return err
 	}
-	newestFileEnd, err := extractDateTimeFromFilename(files[len(files)-1])
+	newestFileStart, err := extractDateTimeFromFilename(files[len(files)-1])
 	if err != nil {
 		return err
 	}
-	if start.Before(oldestFileStart) || end.After(newestFileEnd) {
+	if start.Before(oldestFileStart) || end.After(newestFileStart) {
 		return errors.New("time range is outside of storage range")
 	}
 	return nil
 }
 
+// validateSaveCommand validates the save command params and checks for valid time format.
 func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, string, error) {
 	fromStr, ok := command["from"].(string)
 	if !ok {
