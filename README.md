@@ -1,5 +1,5 @@
 # Video Storage
-The `video-store` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and a [Vision Service](https://docs.viam.com/services/vision/), saves the camera output as video files to disk, and filters which video clips are uploaded to the cloud based on triggers from the vision service.
+The `video-store` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and saves the camera output as video files on disk. You can then later request to upload video slices to the cloud using the [save](#save) command, or request the video bytes directly using the [fetch](#fetch) command.
 
 > **Note:** This component is a work in progress and is not yet fully implemented.
 
@@ -9,15 +9,15 @@ Fill in the attributes as applicable to the component, according to the example 
 
 ```json
     {
-      "name": "fv-cam",
+      "name": "video-store-1",
       "namespace": "rdk",
       "type": "camera",
-      "model": "viam:camera:video-store",
+      "model": "viam:video:storage",
       "attributes": {
-        "camera": "webcam-1", // name of the camera to use
-        "vision": "vision-service-1", // name of the vision service dependency
+        "camera": "webcam-1", 
+        "vision": "vision-service-1", 
         "storage": {
-            "clip_seconds": 30,
+            "segment_seconds": 30,
             "size_gb": 100
         },
         "video": {
@@ -26,10 +26,7 @@ Fill in the attributes as applicable to the component, according to the example 
             "bitrate": 1000000,
             "preset": "medium"
         },
-        "objects": {
-            "Person": 0.8 // label key and threshold value
-        },
-        "cam_props": { // camera properties of the source camera
+        "cam_props": { 
             "width": 640,
             "height": 480,
             "framerate": 30
@@ -37,7 +34,6 @@ Fill in the attributes as applicable to the component, according to the example 
       },
       "depends_on": [
         "webcam-1",
-        "vision-service-1"
       ]
     }
 ```
@@ -51,12 +47,31 @@ Make sure to configure a [Data Manager Service](https://docs.viam.com/services/d
       "type": "data_manager",
       "attributes": {
         "tags": [],
-        "additional_sync_paths": [
-          "/home/viam/.viam/video-upload/"
-        ],
+        "additional_sync_paths": [],
         "capture_disabled": true,
         "sync_interval_mins": 1,
         "capture_dir": ""
       }
     }
+```
+
+## Commands
+
+### `save`
+```json
+{
+  "command": "save",
+  "from": <start_timestamp>, [required]
+  "to": <end_timestamp>, [required]
+  "metadata": <arbitrary_metadata_string> [optional]
+}
+```
+
+### `fetch`
+```json
+{
+  "command": "fetch",
+  "from": <start_timestamp>, [required]
+  "to": <end_timestamp>, [required]
+}
 ```
