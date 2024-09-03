@@ -168,11 +168,14 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 			return "", fmt.Errorf("failed to read frame: %s", ffmpegError(ret))
 		}
 		// Adjust the PTS, DTS, and duration correctly for each packet.
-		// Can have multiple streams, so need to adjust each packet based on the stream it belongs to.
-		//nolint:lll
-		inStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams)) + uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
-		//nolint:lll
-		outStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(outputCtx.streams)) + uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
+		// Can have multiple streams, so need to adjust each packet based on the
+		// timebase of the stream the packet belongs to.
+		inStream := *(**C.AVStream)(unsafe.Pointer(
+			uintptr(unsafe.Pointer(inputCtx.streams)) +
+				uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
+		outStream := *(**C.AVStream)(unsafe.Pointer(
+			uintptr(unsafe.Pointer(outputCtx.streams)) +
+				uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
 		packet.pts = C.av_rescale_q_rnd(packet.pts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
 		packet.dts = C.av_rescale_q_rnd(packet.dts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
 		packet.duration = C.av_rescale_q(packet.duration, inStream.time_base, outStream.time_base)
