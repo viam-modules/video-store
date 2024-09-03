@@ -30,9 +30,11 @@ type concater struct {
 }
 
 func newConcater(logger logging.Logger, storagePath string, uploadPath string, camName string) (*concater, error) {
-	// create concat file
-	// TODO(seanp): figure out where to put this file (some temp dir)
-	concatFile, err := os.Create("/home/viam/.viam/" + conactTextFileName)
+	// Create concat text file. This is a temporary file that will be used to store the list of files to concatenate.
+	// TODO(seanp): Figure out where to put this file. In some temp dir?
+	concatPath := filepath.Join(getHomeDir(), ".viam", conactTextFileName)
+	logger.Debugf("concatPath: %s", concatPath)
+	concatFile, err := os.Create(concatPath)
 	if err != nil {
 		logger.Error("failed to create concat file", err)
 		return nil, err
@@ -76,7 +78,6 @@ func (c *concater) concat(from time.Time, to time.Time, metadata string) (string
 		}
 	}
 
-	// open the concat format context
 	concatFilePath := C.CString(c.concatFile.Name())
 	defer C.free(unsafe.Pointer(concatFilePath))
 	concatStr := C.CString("concat")
