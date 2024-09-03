@@ -33,7 +33,7 @@ const (
 	defaultUploadPath     = ".viam/capture/video-upload"
 	defaultStoragePath    = ".viam/video-storage"
 
-	defaultLogLevel = "error"
+	defaultLogLevel = "info"
 	deleterInterval = 60 // seconds
 )
 
@@ -127,10 +127,10 @@ func newvideostore(
 	}
 
 	// TODO(seanp): make this configurable
-	// logLevel := lookupLogID(defaultLogLevel)
-	logLevel := lookupLogID("debug")
+	logLevel := lookupLogID(defaultLogLevel)
 	ffmppegLogLevel(logLevel)
 
+	// Create encoder to handle encoding of frames.
 	// TODO(seanp): Forcing h264 for now until h265 is supported.
 	if newConf.Video.Codec != "h264" {
 		newConf.Video.Codec = defaultVideoCodec
@@ -144,7 +144,6 @@ func newvideostore(
 	if newConf.Video.Format == "" {
 		newConf.Video.Format = defaultVideoFormat
 	}
-
 	vs.enc, err = newEncoder(
 		logger,
 		newConf.Video.Codec,
@@ -158,11 +157,9 @@ func newvideostore(
 		return nil, err
 	}
 
+	// Create segmenter to handle segmentation of video stream into clips.
 	if newConf.Storage.SegmentSeconds == 0 {
 		newConf.Storage.SegmentSeconds = defaultSegmentSeconds
-	}
-	if newConf.Storage.SizeGB == 0 {
-		newConf.Storage.SizeGB = defaultStorageSize
 	}
 	if newConf.Storage.UploadPath == "" {
 		newConf.Storage.UploadPath = filepath.Join(getHomeDir(), defaultUploadPath, vs.name.Name)
@@ -170,23 +167,24 @@ func newvideostore(
 	if newConf.Storage.StoragePath == "" {
 		newConf.Storage.StoragePath = filepath.Join(getHomeDir(), defaultStoragePath, vs.name.Name)
 	}
+	vs.storagePath = newConf.Storage.StoragePath
 	vs.seg, err = newSegmenter(logger, vs.enc, newConf.Storage.SizeGB, newConf.Storage.SegmentSeconds, newConf.Storage.StoragePath)
 	if err != nil {
 		return nil, err
 	}
-	vs.storagePath = newConf.Storage.StoragePath
+
+	// Create concater to handle concatenation of video clips when requested.
 	vs.uploadPath = newConf.Storage.UploadPath
 	err = createDir(vs.uploadPath)
 	if err != nil {
 		return nil, err
 	}
-
-	// create concater
 	vs.conc, err = newConcater(logger, vs.storagePath, vs.uploadPath, vs.name.Name)
 	if err != nil {
 		return nil, err
 	}
 
+	// Start workers to process frames and clean up storage.
 	vs.workers = rdkutils.NewStoppableWorkers(vs.processFrames, vs.deleter)
 
 	return vs, nil
@@ -197,7 +195,13 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Camera == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
 	}
-
+	// Check Storage
+	if cfg.Storage == (storage{}) {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "storage")
+	}
+	if cfg.Storage.SizeGB == 0 {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "size_gb")
+	}
 	// TODO(seanp): Remove once camera properties are returned from camera component.
 	if cfg.Properties == (cameraProperties{}) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "cam_props")
