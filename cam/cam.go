@@ -30,7 +30,7 @@ const (
 	defaultVideoBitrate   = 1000000
 	defaultVideoPreset    = "medium"
 	defaultVideoFormat    = "mp4"
-	defaultUploadPath     = ".viam/video-upload"
+	defaultUploadPath     = ".viam/capture/video-upload"
 	defaultStoragePath    = ".viam/video-storage"
 
 	defaultLogLevel = "error"
