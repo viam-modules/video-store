@@ -52,6 +52,7 @@ func newConcater(logger logging.Logger, storagePath, uploadPath, camName string)
 // concat takes in from and to timestamps and concates the video files between them.
 // returns the path to the concated video file.
 func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
+	// Find the storage files that match the concat query.
 	storageFiles, err := getSortedFiles(c.storagePath)
 	if err != nil {
 		c.logger.Error("failed to get sorted files", err)
@@ -88,9 +89,10 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 		return "", errors.New("failed to find input format")
 	}
 
-	// Open the input format context with the concat demuxer.
-	// This block sets up the input format context to read the concatenated input files.
-	// It uses the concat demuxer with the 'safe' option set to '0' to allow absolute paths in the input file list.
+	// Open the input format context with the concat demuxer. This block sets up
+	// the input format context to read the concatenated input files. It uses the
+	// concat demuxer with the 'safe' option set to '0' to allow absolute paths in
+	// the input file list.
 	var options *C.AVDictionary
 	safeStr := C.CString("safe")
 	safeValStr := C.CString("0")
@@ -108,8 +110,8 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 		return "", fmt.Errorf("failed to find stream info: %s", ffmpegError(ret))
 	}
 
-	// create the output format context
-	// create output filename
+	// Open the output format context and write the header. This block sets up the
+	// output format context to write the concatenated video data to a new file.
 	var outputFilename string
 	fromStr := formatDateTimeToString(from)
 	toStr := formatDateTimeToString(to)
@@ -186,11 +188,12 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 		}
 	}
 
+	// Write the trailer, close the output file, and free context memory.
 	ret = C.av_write_trailer(outputCtx)
 	if ret < 0 {
 		return "", fmt.Errorf("failed to write trailer: %s", ffmpegError(ret))
 	}
-
+	// FFmpeg methods handle null pointers, so no need to check for nil.
 	C.avio_closep(&outputCtx.pb)
 	C.avformat_close_input(&inputCtx)
 	C.avformat_free_context(outputCtx)
