@@ -158,7 +158,7 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 	return encodedData, pts, dts, nil
 }
 
-func (e *encoder) Close() {
+func (e *encoder) close() {
 	C.avcodec_close(e.codecCtx)
 	C.av_frame_free(&e.srcFrame)
 	C.avcodec_free_context(&e.codecCtx)
