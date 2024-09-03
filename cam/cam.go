@@ -19,19 +19,22 @@ import (
 )
 
 // Model is the model for the video storage camera component.
-// TODO(seanp): Personal module for now, should be movied to viam module in prod.
+// TODO(seanp): Personal module for now, should be moved to viam module in prod.
 var Model = resource.ModelNamespace("seanavery").WithFamily("video").WithModel("storage")
 
 const (
+	// Default values for the video storage camera component.
 	defaultSegmentSeconds = 30 // seconds
 	defaultStorageSize    = 10 // GB
 	defaultVideoCodec     = "h264"
 	defaultVideoBitrate   = 1000000
 	defaultVideoPreset    = "medium"
 	defaultVideoFormat    = "mp4"
-	defaultLogLevel       = "error"
 	defaultUploadPath     = ".viam/video-upload"
 	defaultStoragePath    = ".viam/video-storage"
+
+	defaultLogLevel = "error"
+	deleterInterval = 60 // seconds
 )
 
 type videostore struct {
@@ -215,7 +218,7 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 
 	switch cmd {
 	case "save":
-		vs.logger.Info("save command received")
+		vs.logger.Debug("save command received")
 		from, to, metadata, err := validateSaveCommand(command)
 		if err != nil {
 			return nil, err
@@ -230,10 +233,10 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 			"file":    uploadFile,
 		}, nil
 	case "fetch":
-		vs.logger.Info("fetch command received")
+		vs.logger.Debug("fetch command received")
 		return nil, resource.ErrDoUnimplemented
 	default:
-		return nil, resource.ErrDoUnimplemented
+		return nil, errors.New("invalid command")
 	}
 }
 
@@ -262,9 +265,7 @@ func (vs *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gos
 }
 
 // processFrames reads frames from the camera, encodes, and writes to the segmenter
-// which chuncks video stream into clip files inside the storage directory. This is
-// meant for long term storage of video clips that are not necessarily triggered by
-// detections.
+// which chunks video stream into clip files inside the storage directory.
 // TODO(seanp): Should this be throttled to a certain FPS?
 func (vs *videostore) processFrames(ctx context.Context) {
 	for {
@@ -298,11 +299,11 @@ func (vs *videostore) processFrames(ctx context.Context) {
 	}
 }
 
-// deleter is a go routine that cleans up old clips if storage is full. It runs every
-// minute and deletes the oldest clip until the storage size is below the max.
+// deleter is a go routine that cleans up old clips if storage is full. Runs on interval
+// and deletes the oldest clip until the storage size is below the configured max.
 func (vs *videostore) deleter(ctx context.Context) {
 	// TODO(seanp): Using seconds for now, but should be minutes in prod.
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(deleterInterval * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
@@ -320,14 +321,14 @@ func (vs *videostore) deleter(ctx context.Context) {
 }
 
 // Close closes the video storage camera component.
-// It closes the stream, workers, encoder, segmenter, and watcher.
 func (vs *videostore) Close(ctx context.Context) error {
 	err := vs.stream.Close(ctx)
 	if err != nil {
 		return err
 	}
 	vs.workers.Stop()
-	vs.enc.Close()
-	vs.seg.Close()
+	vs.enc.close()
+	vs.seg.close()
+	vs.conc.close()
 	return nil
 }
