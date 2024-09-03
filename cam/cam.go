@@ -168,7 +168,13 @@ func newvideostore(
 		newConf.Storage.StoragePath = filepath.Join(getHomeDir(), defaultStoragePath, vs.name.Name)
 	}
 	vs.storagePath = newConf.Storage.StoragePath
-	vs.seg, err = newSegmenter(logger, vs.enc, newConf.Storage.SizeGB, newConf.Storage.SegmentSeconds, newConf.Storage.StoragePath)
+	vs.seg, err = newSegmenter(
+		logger,
+		vs.enc,
+		newConf.Storage.SizeGB,
+		newConf.Storage.SegmentSeconds,
+		newConf.Storage.StoragePath,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -214,6 +220,7 @@ func (vs *videostore) Name() resource.Name {
 	return vs.name
 }
 
+// DoCommand processes the commands for the video storage camera component.
 func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{}) (map[string]interface{}, error) {
 	cmd, ok := command["command"].(string)
 	if !ok {
@@ -221,20 +228,24 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 	}
 
 	switch cmd {
+	// Save command is used to concatenate video clips between the given timestamps.
+	// The concatenated video file is then uploaded to the cloud the upload path.
+	// The response contains the name of the uploaded file.
 	case "save":
 		vs.logger.Debug("save command received")
 		from, to, metadata, err := validateSaveCommand(command)
 		if err != nil {
 			return nil, err
 		}
-		uploadFile, err := vs.conc.concat(from, to, metadata)
+		uploadFilePath, err := vs.conc.concat(from, to, metadata)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err
 		}
+		uploadFileName := filepath.Base(uploadFilePath)
 		return map[string]interface{}{
 			"command": "save",
-			"file":    uploadFile,
+			"file":    uploadFileName,
 		}, nil
 	case "fetch":
 		vs.logger.Debug("fetch command received")

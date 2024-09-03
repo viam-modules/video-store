@@ -30,9 +30,10 @@ type concater struct {
 	concatFile  *os.File
 }
 
-func newConcater(logger logging.Logger, storagePath, uploadPath, camName string) (*concater, error) {
-	// Create concat text file. This is a temporary file that will be used to store the list of files to concatenate.
-	// TODO(seanp): Figure out where to put this file. In some temp dir?
+func newConcater(
+	logger logging.Logger,
+	storagePath, uploadPath, camName string,
+) (*concater, error) {
 	concatPath := filepath.Join(getHomeDir(), ".viam", conactTextFileName)
 	logger.Debugf("concatPath: %s", concatPath)
 	concatFile, err := os.Create(concatPath)
@@ -133,7 +134,9 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 	// Copy codec info from input to output context. This is necessary to ensure
 	// we do not decode and re-encode the video data.
 	for i := 0; i < int(inputCtx.nb_streams); i++ {
-		inStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams)) + uintptr(i)*unsafe.Sizeof(inputCtx.streams)))
+		inStream := *(**C.AVStream)(
+			unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams)) +
+				uintptr(i)*unsafe.Sizeof(inputCtx.streams)))
 		outStream := C.avformat_new_stream(outputCtx, nil)
 		if outStream == nil {
 			return "", fmt.Errorf("failed to allocate stream")

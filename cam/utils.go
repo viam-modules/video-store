@@ -167,7 +167,8 @@ func matchStorageToRange(files []string, start, end time.Time) []string {
 		if err != nil {
 			continue
 		}
-		if dateTime.After(start) && dateTime.Before(end) {
+		// !dateTime.Before(start) allows us to include the start time in the range inclusively.
+		if !dateTime.Before(start) && dateTime.Before(end) {
 			matchedFiles = append(matchedFiles, file)
 		}
 	}
