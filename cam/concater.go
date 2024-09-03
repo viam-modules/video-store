@@ -6,6 +6,7 @@ package videostore
 #include <libavcodec/avcodec.h>
 */
 import "C"
+
 import (
 	"errors"
 	"fmt"
@@ -29,7 +30,7 @@ type concater struct {
 	concatFile  *os.File
 }
 
-func newConcater(logger logging.Logger, storagePath string, uploadPath string, camName string) (*concater, error) {
+func newConcater(logger logging.Logger, storagePath, uploadPath, camName string) (*concater, error) {
 	// Create concat text file. This is a temporary file that will be used to store the list of files to concatenate.
 	// TODO(seanp): Figure out where to put this file. In some temp dir?
 	concatPath := filepath.Join(getHomeDir(), ".viam", conactTextFileName)
@@ -50,7 +51,7 @@ func newConcater(logger logging.Logger, storagePath string, uploadPath string, c
 
 // concat takes in from and to timestamps and concates the video files between them.
 // returns the path to the concated video file.
-func (c *concater) concat(from time.Time, to time.Time, metadata string) (string, error) {
+func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 	storageFiles, err := getSortedFiles(c.storagePath)
 	if err != nil {
 		c.logger.Error("failed to get sorted files", err)
@@ -168,7 +169,9 @@ func (c *concater) concat(from time.Time, to time.Time, metadata string) (string
 		}
 		// Adjust the PTS, DTS, and duration correctly for each packet.
 		// Can have multiple streams, so need to adjust each packet based on the stream it belongs to.
+		//nolint:lll
 		inStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams)) + uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
+		//nolint:lll
 		outStream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(outputCtx.streams)) + uintptr(packet.stream_index)*unsafe.Sizeof(uintptr(0))))
 		packet.pts = C.av_rescale_q_rnd(packet.pts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
 		packet.dts = C.av_rescale_q_rnd(packet.dts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
