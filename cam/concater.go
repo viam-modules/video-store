@@ -115,11 +115,10 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 	// output format context to write the concatenated video data to a new file.
 	var outputFilename string
 	fromStr := formatDateTimeToString(from)
-	toStr := formatDateTimeToString(to)
 	if metadata == "" {
-		outputFilename = fmt.Sprintf("%s_%s_%s.%s", c.camName, fromStr, toStr, defaultVideoFormat)
+		outputFilename = fmt.Sprintf("%s_%s.%s", c.camName, fromStr, defaultVideoFormat)
 	} else {
-		outputFilename = fmt.Sprintf("%s_%s_%s_%s.%s", c.camName, fromStr, toStr, metadata, defaultVideoFormat)
+		outputFilename = fmt.Sprintf("%s_%s_%s.%s", c.camName, fromStr, metadata, defaultVideoFormat)
 	}
 	outputPath := filepath.Join(c.uploadPath, outputFilename)
 	c.logger.Debug("outputPath", outputPath)
