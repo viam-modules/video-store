@@ -4,10 +4,13 @@ package videostore
 #include <libavutil/error.h>
 #include <libavutil/opt.h>
 #include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
 */
 import "C"
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,7 +25,7 @@ func ffmpegError(ret C.int) string {
 	var errbuf [256]C.char
 	C.av_strerror(ret, &errbuf[0], 256)
 	if errbuf[0] == 0 {
-		return "unknown error"
+		return "unknown ffmpeg error"
 	}
 	return C.GoString(&errbuf[0])
 }
@@ -117,8 +120,8 @@ func getSortedFiles(path string) ([]string, error) {
 		filePaths = append(filePaths, filepath.Join(path, file.Name()))
 	}
 	sort.Slice(filePaths, func(i, j int) bool {
-		timeI, errI := extractDateTime(filePaths[i])
-		timeJ, errJ := extractDateTime(filePaths[j])
+		timeI, errI := extractDateTimeFromFilename(filePaths[i])
+		timeJ, errJ := extractDateTimeFromFilename(filePaths[j])
 		if errI != nil || errJ != nil {
 			return false
 		}
@@ -128,21 +131,48 @@ func getSortedFiles(path string) ([]string, error) {
 	return filePaths, nil
 }
 
-// extractDateTime extracts the date and time from the file name.
-func extractDateTime(filePath string) (time.Time, error) {
+// extractDateTimeFromFilename extracts the date and time from the filename.
+func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
 	parts := strings.Split(baseName, "_")
 	if len(parts) < 2 {
 		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
 	}
-	datePart := parts[1]
-	timePart := strings.TrimSuffix(parts[1], filepath.Ext(baseName))
+	datePart := parts[0]
+	timePart := strings.TrimSuffix(parts[1], filepath.Ext(parts[1]))
 	dateTimeStr := datePart + "_" + timePart
-	dateTime, err := time.Parse("2006-01-02_15-04-05", dateTimeStr)
+	return parseDateTimeString(dateTimeStr)
+}
+
+// parseDateTimeString parses a date and time string in the format "2006-01-02_15-04-05".
+// Returns a time.Time object and an error if the string is not in the correct format.
+func parseDateTimeString(datetime string) (time.Time, error) {
+	dateTime, err := time.Parse("2006-01-02_15-04-05", datetime)
 	if err != nil {
 		return time.Time{}, err
 	}
 	return dateTime, nil
+}
+
+func formatDateTimeToString(dateTime time.Time) string {
+	return dateTime.Format("2006-01-02_15-04-05")
+}
+
+// matchStorageToRange returns a list of files that fall within the provided time range.
+// TODO(seanp): This should also include trimming offsets to the file list.
+func matchStorageToRange(files []string, start, end time.Time) []string {
+	var matchedFiles []string
+	for _, file := range files {
+		dateTime, err := extractDateTimeFromFilename(file)
+		if err != nil {
+			continue
+		}
+		// !dateTime.Before(start) allows us to include the start time in the range inclusively.
+		if !dateTime.Before(start) && dateTime.Before(end) {
+			matchedFiles = append(matchedFiles, file)
+		}
+	}
+	return matchedFiles
 }
 
 // copyFile copies a file from the source to the destination.
@@ -168,11 +198,52 @@ func copyFile(src, dst string) error {
 	return nil
 }
 
-// fetchCompName
-func fetchCompName(resourceName string) string {
-	parts := strings.Split(resourceName, "/")
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
+// validateTimeRange validates the start and end time range against storage files.
+// Extracts the start timestamp of the oldest file and the start of the most recent file.
+// Since the most recent segment file is still being written to by the segmenter
+// we do not want to include it in the time range.
+func validateTimeRange(files []string, start, end time.Time) error {
+	if len(files) == 0 {
+		return errors.New("no storage files found")
 	}
-	return "unknown"
+	oldestFileStart, err := extractDateTimeFromFilename(files[0])
+	if err != nil {
+		return err
+	}
+	newestFileStart, err := extractDateTimeFromFilename(files[len(files)-1])
+	if err != nil {
+		return err
+	}
+	if start.Before(oldestFileStart) || end.After(newestFileStart) {
+		return errors.New("time range is outside of storage range")
+	}
+	return nil
+}
+
+// validateSaveCommand validates the save command params and checks for valid time format.
+func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, string, error) {
+	fromStr, ok := command["from"].(string)
+	if !ok {
+		return time.Time{}, time.Time{}, "", errors.New("from timestamp not found")
+	}
+	from, err := parseDateTimeString(fromStr)
+	if err != nil {
+		return time.Time{}, time.Time{}, "", err
+	}
+	toStr, ok := command["to"].(string)
+	if !ok {
+		return time.Time{}, time.Time{}, "", errors.New("to timestamp not found")
+	}
+	to, err := parseDateTimeString(toStr)
+	if err != nil {
+		return time.Time{}, time.Time{}, "", err
+	}
+	if from.After(to) {
+		return time.Time{}, time.Time{}, "", errors.New("from timestamp is after to timestamp")
+	}
+	metadata, ok := command["metadata"].(string)
+	if !ok {
+		metadata = ""
+	}
+	return from, to, metadata, nil
 }

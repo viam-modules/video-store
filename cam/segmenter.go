@@ -187,7 +187,7 @@ func (s *segmenter) cleanupStorage() error {
 
 // Close closes the segmenter and writes the trailer to prevent corruption
 // when exiting early in the middle of a segment.
-func (s *segmenter) Close() {
+func (s *segmenter) close() {
 	ret := C.av_write_trailer(s.outCtx)
 	if ret < 0 {
 		s.logger.Errorf("failed to write trailer", "error", ffmpegError(ret))

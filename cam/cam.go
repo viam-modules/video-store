@@ -19,37 +19,43 @@ import (
 )
 
 // Model is the model for the video storage camera component.
-// TODO(seanp): Personal module for now, should be movied to viam module in prod.
+// TODO(seanp): Personal module for now, should be moved to viam module in prod.
 var Model = resource.ModelNamespace("seanavery").WithFamily("video").WithModel("storage")
 
 const (
+	// Default values for the video storage camera component.
 	defaultSegmentSeconds = 30 // seconds
 	defaultStorageSize    = 10 // GB
 	defaultVideoCodec     = "h264"
 	defaultVideoBitrate   = 1000000
 	defaultVideoPreset    = "medium"
 	defaultVideoFormat    = "mp4"
-	defaultLogLevel       = "error"
-	defaultUploadPath     = ".viam/video-upload"
+	defaultUploadPath     = ".viam/capture/video-upload"
 	defaultStoragePath    = ".viam/video-storage"
+
+	defaultLogLevel = "info"
+	deleterInterval = 60 // seconds
 )
 
 type videostore struct {
 	resource.AlwaysRebuild
 	resource.TriviallyCloseable
 
-	name       resource.Name
-	conf       *Config
-	logger     logging.Logger
-	uploadPath string
+	name   resource.Name
+	conf   *Config
+	logger logging.Logger
 
 	cam    camera.Camera
 	stream gostream.VideoStream
 
 	workers rdkutils.StoppableWorkers
 
-	enc *encoder
-	seg *segmenter
+	enc  *encoder
+	seg  *segmenter
+	conc *concater
+
+	storagePath string
+	uploadPath  string
 }
 
 type storage struct {
@@ -121,10 +127,10 @@ func newvideostore(
 	}
 
 	// TODO(seanp): make this configurable
-	// logLevel := lookupLogID(defaultLogLevel)
-	logLevel := lookupLogID("debug")
+	logLevel := lookupLogID(defaultLogLevel)
 	ffmppegLogLevel(logLevel)
 
+	// Create encoder to handle encoding of frames.
 	// TODO(seanp): Forcing h264 for now until h265 is supported.
 	if newConf.Video.Codec != "h264" {
 		newConf.Video.Codec = defaultVideoCodec
@@ -138,7 +144,6 @@ func newvideostore(
 	if newConf.Video.Format == "" {
 		newConf.Video.Format = defaultVideoFormat
 	}
-
 	vs.enc, err = newEncoder(
 		logger,
 		newConf.Video.Codec,
@@ -152,11 +157,9 @@ func newvideostore(
 		return nil, err
 	}
 
+	// Create segmenter to handle segmentation of video stream into clips.
 	if newConf.Storage.SegmentSeconds == 0 {
 		newConf.Storage.SegmentSeconds = defaultSegmentSeconds
-	}
-	if newConf.Storage.SizeGB == 0 {
-		newConf.Storage.SizeGB = defaultStorageSize
 	}
 	if newConf.Storage.UploadPath == "" {
 		newConf.Storage.UploadPath = filepath.Join(getHomeDir(), defaultUploadPath, vs.name.Name)
@@ -164,17 +167,30 @@ func newvideostore(
 	if newConf.Storage.StoragePath == "" {
 		newConf.Storage.StoragePath = filepath.Join(getHomeDir(), defaultStoragePath, vs.name.Name)
 	}
-	vs.seg, err = newSegmenter(logger, vs.enc, newConf.Storage.SizeGB, newConf.Storage.SegmentSeconds, newConf.Storage.StoragePath)
+	vs.storagePath = newConf.Storage.StoragePath
+	vs.seg, err = newSegmenter(
+		logger,
+		vs.enc,
+		newConf.Storage.SizeGB,
+		newConf.Storage.SegmentSeconds,
+		newConf.Storage.StoragePath,
+	)
 	if err != nil {
 		return nil, err
 	}
 
+	// Create concater to handle concatenation of video clips when requested.
 	vs.uploadPath = newConf.Storage.UploadPath
 	err = createDir(vs.uploadPath)
 	if err != nil {
 		return nil, err
 	}
+	vs.conc, err = newConcater(logger, vs.storagePath, vs.uploadPath, vs.name.Name)
+	if err != nil {
+		return nil, err
+	}
 
+	// Start workers to process frames and clean up storage.
 	vs.workers = rdkutils.NewStoppableWorkers(vs.processFrames, vs.deleter)
 
 	return vs, nil
@@ -185,7 +201,13 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Camera == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
 	}
-
+	// Check Storage
+	if cfg.Storage == (storage{}) {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "storage")
+	}
+	if cfg.Storage.SizeGB == 0 {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "size_gb")
+	}
 	// TODO(seanp): Remove once camera properties are returned from camera component.
 	if cfg.Properties == (cameraProperties{}) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "cam_props")
@@ -198,8 +220,39 @@ func (vs *videostore) Name() resource.Name {
 	return vs.name
 }
 
-func (vs *videostore) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
-	return nil, resource.ErrDoUnimplemented
+// DoCommand processes the commands for the video storage camera component.
+func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{}) (map[string]interface{}, error) {
+	cmd, ok := command["command"].(string)
+	if !ok {
+		return nil, errors.New("invalid command type")
+	}
+
+	switch cmd {
+	// Save command is used to concatenate video clips between the given timestamps.
+	// The concatenated video file is then uploaded to the cloud the upload path.
+	// The response contains the name of the uploaded file.
+	case "save":
+		vs.logger.Debug("save command received")
+		from, to, metadata, err := validateSaveCommand(command)
+		if err != nil {
+			return nil, err
+		}
+		uploadFilePath, err := vs.conc.concat(from, to, metadata)
+		if err != nil {
+			vs.logger.Error("failed to concat files ", err)
+			return nil, err
+		}
+		uploadFileName := filepath.Base(uploadFilePath)
+		return map[string]interface{}{
+			"command": "save",
+			"file":    uploadFileName,
+		}, nil
+	case "fetch":
+		vs.logger.Debug("fetch command received")
+		return nil, resource.ErrDoUnimplemented
+	default:
+		return nil, errors.New("invalid command")
+	}
 }
 
 func (vs *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
@@ -227,9 +280,7 @@ func (vs *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gos
 }
 
 // processFrames reads frames from the camera, encodes, and writes to the segmenter
-// which chuncks video stream into clip files inside the storage directory. This is
-// meant for long term storage of video clips that are not necessarily triggered by
-// detections.
+// which chunks video stream into clip files inside the storage directory.
 // TODO(seanp): Should this be throttled to a certain FPS?
 func (vs *videostore) processFrames(ctx context.Context) {
 	for {
@@ -263,11 +314,11 @@ func (vs *videostore) processFrames(ctx context.Context) {
 	}
 }
 
-// deleter is a go routine that cleans up old clips if storage is full. It runs every
-// minute and deletes the oldest clip until the storage size is below the max.
+// deleter is a go routine that cleans up old clips if storage is full. Runs on interval
+// and deletes the oldest clip until the storage size is below the configured max.
 func (vs *videostore) deleter(ctx context.Context) {
 	// TODO(seanp): Using seconds for now, but should be minutes in prod.
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(deleterInterval * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
@@ -285,14 +336,14 @@ func (vs *videostore) deleter(ctx context.Context) {
 }
 
 // Close closes the video storage camera component.
-// It closes the stream, workers, encoder, segmenter, and watcher.
 func (vs *videostore) Close(ctx context.Context) error {
 	err := vs.stream.Close(ctx)
 	if err != nil {
 		return err
 	}
 	vs.workers.Stop()
-	vs.enc.Close()
-	vs.seg.Close()
+	vs.enc.close()
+	vs.seg.close()
+	vs.conc.close()
 	return nil
 }
