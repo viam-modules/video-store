@@ -44,8 +44,7 @@ func newSegmenter(
 		logger:  logger,
 		encoder: enc,
 	}
-	// TODO(seanp): MB for testing, should be GB in prod.
-	s.maxStorageSize = int64(storageSize) * 1024 * 1024
+	s.maxStorageSize = int64(storageSize) * 1024 * 1024 * 1024
 
 	s.storagePath = storagePath
 	err := createDir(s.storagePath)

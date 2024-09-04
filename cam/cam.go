@@ -34,7 +34,7 @@ const (
 	defaultStoragePath    = ".viam/video-storage"
 
 	defaultLogLevel = "info"
-	deleterInterval = 60 // seconds
+	deleterInterval = 10 // minutes
 )
 
 type videostore struct {
@@ -284,7 +284,6 @@ func (vs *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gos
 // TODO(seanp): Should this be throttled to a certain FPS?
 func (vs *videostore) processFrames(ctx context.Context) {
 	for {
-		// TODO(seanp): How to gracefully exit this loop?
 		select {
 		case <-ctx.Done():
 			return
@@ -317,8 +316,7 @@ func (vs *videostore) processFrames(ctx context.Context) {
 // deleter is a go routine that cleans up old clips if storage is full. Runs on interval
 // and deletes the oldest clip until the storage size is below the configured max.
 func (vs *videostore) deleter(ctx context.Context) {
-	// TODO(seanp): Using seconds for now, but should be minutes in prod.
-	ticker := time.NewTicker(deleterInterval * time.Second)
+	ticker := time.NewTicker(deleterInterval * time.Minute)
 	defer ticker.Stop()
 	for {
 		select {

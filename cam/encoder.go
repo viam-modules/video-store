@@ -53,8 +53,6 @@ func newEncoder(
 	enc.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV422P
 	enc.codecCtx.time_base = C.AVRational{num: 1, den: C.int(framerate)}
 	enc.codecCtx.gop_size = C.int(framerate)
-
-	// TODO(seanp): These can be detected by fetching the intitial frame
 	enc.codecCtx.width = C.int(width)
 	enc.codecCtx.height = C.int(height)
 
@@ -108,11 +106,9 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 		return nil, 0, 0, err
 	}
 
-	// TODO(seanp): make this calculated once instead of every frame
 	ySize := frame.Bounds().Dx() * frame.Bounds().Dy()
 	uSize := (frame.Bounds().Dx() / 2) * frame.Bounds().Dy()
 	vSize := (frame.Bounds().Dx() / 2) * frame.Bounds().Dy()
-	// TODO(seanp): directly copy into srcFrame
 	yPlane := C.CBytes(yuv[:ySize])
 	uPlane := C.CBytes(yuv[ySize : ySize+uSize])
 	vPlane := C.CBytes(yuv[ySize+uSize : ySize+uSize+vSize])

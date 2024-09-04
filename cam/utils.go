@@ -32,7 +32,6 @@ func ffmpegError(ret C.int) string {
 
 // ffmppegLogLevel sets the log level for ffmpeg logger.
 func ffmppegLogLevel(loglevel C.int) {
-	// TODO(seanp): make sure log level is valid before setting
 	C.av_log_set_level(loglevel)
 }
 
