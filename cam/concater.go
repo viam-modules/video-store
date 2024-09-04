@@ -55,7 +55,7 @@ func newConcater(
 
 // concat takes in from and to timestamps and concates the video files between them.
 // returns the path to the concated video file.
-func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
+func (c *concater) concat(from, to time.Time, metadata, path string) (string, error) {
 	// Find the storage files that match the concat query.
 	storageFiles, err := getSortedFiles(c.storagePath)
 	if err != nil {
@@ -123,8 +123,7 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 	} else {
 		outputFilename = fmt.Sprintf("%s_%s_%s.%s", c.camName, fromStr, metadata, defaultVideoFormat)
 	}
-	outputPath := filepath.Join(c.uploadPath, outputFilename)
-	c.logger.Debug("outputPath", outputPath)
+	outputPath := filepath.Join(path, outputFilename)
 	outputPathCStr := C.CString(outputPath)
 	defer C.free(unsafe.Pointer(outputPathCStr))
 	var outputCtx *C.AVFormatContext

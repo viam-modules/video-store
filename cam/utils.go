@@ -108,6 +108,15 @@ func getDirectorySize(path string) (int64, error) {
 	return size, err
 }
 
+// getFileSize returns the size of a file in bytes.
+func getFileSize(path string) (int64, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
+	return info.Size(), nil
+}
+
 // getSortedFiles returns a list of files in the provided directory sorted by creation time.
 func getSortedFiles(path string) ([]string, error) {
 	files, err := os.ReadDir(path)
@@ -268,4 +277,28 @@ func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, 
 		metadata = ""
 	}
 	return from, to, metadata, nil
+}
+
+// validateFetchCommand validates the fetch command params and checks for valid time format.
+func validateFetchCommand(command map[string]interface{}) (time.Time, time.Time, error) {
+	fromStr, ok := command["from"].(string)
+	if !ok {
+		return time.Time{}, time.Time{}, errors.New("from timestamp not found")
+	}
+	from, err := parseDateTimeString(fromStr)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	toStr, ok := command["to"].(string)
+	if !ok {
+		return time.Time{}, time.Time{}, errors.New("to timestamp not found")
+	}
+	to, err := parseDateTimeString(toStr)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	if from.After(to) {
+		return time.Time{}, time.Time{}, errors.New("from timestamp is after to timestamp")
+	}
+	return from, to, nil
 }
