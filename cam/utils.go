@@ -158,19 +158,42 @@ func formatDateTimeToString(dateTime time.Time) string {
 }
 
 // matchStorageToRange returns a list of files that fall within the provided time range.
-// TODO(seanp): This should also include trimming offsets to the file list.
-func matchStorageToRange(files []string, start, end time.Time) []string {
+// Includes trimming video files to the time range if they overlap. Assumes that all video
+// files have the same duration.
+func matchStorageToRange(files []string, start, end time.Time, duration time.Duration) []string {
 	var matchedFiles []string
 	for _, file := range files {
 		dateTime, err := extractDateTimeFromFilename(file)
 		if err != nil {
 			continue
 		}
-		// !dateTime.Before(start) allows us to include the start time in the range inclusively.
-		if !dateTime.Before(start) && dateTime.Before(end) {
-			matchedFiles = append(matchedFiles, file)
+		fileEndTime := dateTime.Add(duration)
+		// Check if the file's time range intersects with [start, end)
+		if dateTime.Before(end) && fileEndTime.After(start) {
+			var inpoint, outpoint float64
+			inpointSet := false
+			outpointSet := false
+			// Calculate inpoint if the file starts before the 'start' time and overlaps
+			if dateTime.Before(start) {
+				inpoint = start.Sub(dateTime).Seconds()
+				inpointSet = true
+			}
+			// Calculate outpoint if the file ends after the 'end' time
+			if fileEndTime.After(end) {
+				outpoint = end.Sub(dateTime).Seconds()
+				outpointSet = true
+			}
+			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", file))
+			if inpointSet {
+				matchedFiles = append(matchedFiles, fmt.Sprintf("inpoint %.2f", inpoint))
+			}
+			if outpointSet && outpoint < duration.Seconds() {
+				// Only include outpoint if it's less than the full duration
+				matchedFiles = append(matchedFiles, fmt.Sprintf("outpoint %.2f", outpoint))
+			}
 		}
 	}
+
 	return matchedFiles
 }
 

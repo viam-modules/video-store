@@ -27,12 +27,14 @@ type concater struct {
 	storagePath string
 	uploadPath  string
 	camName     string
+	segmentDur  time.Duration
 	concatFile  *os.File
 }
 
 func newConcater(
 	logger logging.Logger,
 	storagePath, uploadPath, camName string,
+	segmentSeconds int,
 ) (*concater, error) {
 	concatPath := filepath.Join(getHomeDir(), ".viam", conactTextFileName)
 	logger.Debugf("concatPath: %s", concatPath)
@@ -47,6 +49,7 @@ func newConcater(
 		uploadPath:  uploadPath,
 		concatFile:  concatFile,
 		camName:     camName,
+		segmentDur:  time.Duration(segmentSeconds) * time.Second,
 	}, nil
 }
 
@@ -66,7 +69,7 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	matchingFiles := matchStorageToRange(storageFiles, from, to)
+	matchingFiles := matchStorageToRange(storageFiles, from, to, c.segmentDur)
 	if len(matchingFiles) == 0 {
 		return "", errors.New("no matching video data to save")
 	}
@@ -75,7 +78,7 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 	c.concatFile.Truncate(0)
 	c.concatFile.Seek(0, 0)
 	for _, file := range matchingFiles {
-		_, err := c.concatFile.WriteString(fmt.Sprintf("file '%s'\n", file))
+		_, err := c.concatFile.WriteString(file + "\n")
 		if err != nil {
 			return "", err
 		}

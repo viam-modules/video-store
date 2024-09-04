@@ -185,7 +185,7 @@ func newvideostore(
 	if err != nil {
 		return nil, err
 	}
-	vs.conc, err = newConcater(logger, vs.storagePath, vs.uploadPath, vs.name.Name)
+	vs.conc, err = newConcater(logger, vs.storagePath, vs.uploadPath, vs.name.Name, newConf.Storage.SegmentSeconds)
 	if err != nil {
 		return nil, err
 	}
