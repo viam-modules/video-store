@@ -122,8 +122,8 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 	e.srcFrame.linesize[1] = C.int(frame.Bounds().Dx() / 2)
 	e.srcFrame.linesize[2] = C.int(frame.Bounds().Dx() / 2)
 
-	// PTS/DTS time is equal frameCount times time_base. This assumes
-	// that the processFrame routine is running at the source framerate.
+	// Both PTS and DTS times are equal frameCount multiplied by the time_base.
+	// This assumes that the processFrame routine is running at the source framerate.
 	// TODO(seanp): What happens to playback if frame is dropped?
 	e.srcFrame.pts = C.int64_t(e.frameCount)
 	e.srcFrame.pkt_dts = e.srcFrame.pts
