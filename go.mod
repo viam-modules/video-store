@@ -9,8 +9,8 @@ require (
 	github.com/fullstorydev/grpcurl v1.8.6
 	github.com/golangci/golangci-lint v1.54.0
 	github.com/rhysd/actionlint v1.6.24
-	go.viam.com/rdk v0.32.1
-	go.viam.com/utils v0.1.83
+	go.viam.com/rdk v0.40.0
+	go.viam.com/utils v0.1.98
 	golang.org/x/mobile v0.0.0-20240112133503-c713f31d574b
 	golang.org/x/tools v0.22.0
 	gotest.tools/gotestsum v1.10.0
@@ -42,7 +42,7 @@ require (
 	github.com/ashanbrown/forbidigo v1.6.0 // indirect
 	github.com/ashanbrown/makezero v1.1.1 // indirect
 	github.com/aybabtme/uniplot v0.0.0-20151203143629-039c559e5e7e // indirect
-	github.com/benbjohnson/clock v1.3.3 // indirect
+	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/bkielbasa/cyclop v1.2.1 // indirect
@@ -183,10 +183,8 @@ require (
 	github.com/mbilski/exhaustivestruct v1.2.0 // indirect
 	github.com/mgechev/revive v1.3.2 // indirect
 	github.com/miekg/dns v1.1.53 // indirect
-	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/montanaflynn/stats v0.7.0 // indirect
 	github.com/moricho/tparallel v0.3.1 // indirect
 	github.com/muesli/clusters v0.0.0-20200529215643-2700303c1762 // indirect
@@ -199,22 +197,22 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
-	github.com/pion/datachannel v1.5.5 // indirect
-	github.com/pion/dtls/v2 v2.2.7 // indirect
-	github.com/pion/ice/v2 v2.3.13 // indirect
-	github.com/pion/interceptor v0.1.25 // indirect
+	github.com/pion/datachannel v1.5.8 // indirect
+	github.com/pion/dtls/v2 v2.2.12 // indirect
+	github.com/pion/ice/v2 v2.3.34 // indirect
+	github.com/pion/interceptor v0.1.29 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/mdns v0.0.12 // indirect
 	github.com/pion/mediadevices v0.6.4 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/rtcp v1.2.14 // indirect
-	github.com/pion/rtp v1.8.5 // indirect
-	github.com/pion/sctp v1.8.14 // indirect
+	github.com/pion/rtp v1.8.7 // indirect
+	github.com/pion/sctp v1.8.33 // indirect
 	github.com/pion/sdp/v3 v3.0.9 // indirect
-	github.com/pion/srtp/v2 v2.0.18 // indirect
+	github.com/pion/srtp/v2 v2.0.20 // indirect
 	github.com/pion/stun v0.6.1 // indirect
-	github.com/pion/transport/v2 v2.2.4 // indirect
-	github.com/pion/turn/v2 v2.1.3 // indirect
+	github.com/pion/transport/v2 v2.2.10 // indirect
+	github.com/pion/turn/v2 v2.1.6 // indirect
 	github.com/pion/webrtc/v3 v3.2.36 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -229,7 +227,7 @@ require (
 	github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
-	github.com/rs/cors v1.9.0 // indirect
+	github.com/rs/cors v1.11.1 // indirect
 	github.com/ryancurrah/gomodguard v1.3.0 // indirect
 	github.com/ryanrolds/sqlclosecheck v0.4.0 // indirect
 	github.com/sanposhiho/wastedassign/v2 v2.0.7 // indirect
@@ -267,7 +265,8 @@ require (
 	github.com/ultraware/funlen v0.1.0 // indirect
 	github.com/ultraware/whitespace v0.0.5 // indirect
 	github.com/uudashr/gocognit v1.0.7 // indirect
-	github.com/viam-labs/go-libjpeg v0.3.1 // indirect
+	github.com/viamrobotics/webrtc/v3 v3.99.10 // indirect
+	github.com/wlynxg/anet v0.0.3 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
@@ -288,19 +287,19 @@ require (
 	go.uber.org/goleak v1.2.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	go.viam.com/api v0.1.317 // indirect
+	go.viam.com/api v0.1.336 // indirect
 	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2 // indirect
 	golang.org/x/crypto v0.24.0 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
 	golang.org/x/exp/typeparams v0.0.0-20230224173230-c95f2b4c22f2 // indirect
-	golang.org/x/image v0.15.0 // indirect
+	golang.org/x/image v0.19.0 // indirect
 	golang.org/x/mod v0.18.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
+	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/term v0.21.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/text v0.17.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gonum.org/v1/gonum v0.12.0 // indirect
 	gonum.org/v1/plot v0.12.0 // indirect
