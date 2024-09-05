@@ -17,8 +17,7 @@ import (
 )
 
 // Model is the model for the video storage camera component.
-// TODO(seanp): Personal module for now, should be moved to viam module in prod.
-var Model = resource.ModelNamespace("seanavery").WithFamily("video").WithModel("storage")
+var Model = resource.ModelNamespace("viam").WithFamily("video").WithModel("storage")
 
 const (
 	// Default values for the video storage camera component.
