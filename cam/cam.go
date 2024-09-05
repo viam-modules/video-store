@@ -39,7 +39,6 @@ const (
 
 type videostore struct {
 	resource.AlwaysRebuild
-	resource.TriviallyCloseable
 
 	name   resource.Name
 	conf   *Config
