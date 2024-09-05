@@ -87,11 +87,13 @@ func newSegmenter(
 	resetTimestampsCStr := C.CString("1")
 	breakNonKeyFramesCStr := C.CString("1")
 	strftimeCStr := C.CString("1")
-	defer C.free(unsafe.Pointer(segmentLengthCStr))
-	defer C.free(unsafe.Pointer(segmentFormatCStr))
-	defer C.free(unsafe.Pointer(resetTimestampsCStr))
-	defer C.free(unsafe.Pointer(breakNonKeyFramesCStr))
-	defer C.free(unsafe.Pointer(strftimeCStr))
+	defer func() {
+		C.free(unsafe.Pointer(segmentLengthCStr))
+		C.free(unsafe.Pointer(segmentFormatCStr))
+		C.free(unsafe.Pointer(resetTimestampsCStr))
+		C.free(unsafe.Pointer(breakNonKeyFramesCStr))
+		C.free(unsafe.Pointer(strftimeCStr))
+	}()
 
 	// Segment options are passed as opts to avformat_write_header. This only needs
 	// to be done once, and not for every segment file.
