@@ -19,33 +19,36 @@ import (
 	"time"
 )
 
-type CodecType int
+type codecType int
 
 const (
-	CodecUnknown CodecType = iota
-	CodecH264
-	CodecH265
+	// CodecUnknown represents an unknown codec type.
+	codecUnknown codecType = iota
+	// CodecH264 represents the H.264 codec type.
+	codecH264
+	// CodecH265 represents the H.265 codec type.
+	codecH265
 )
 
-func (c CodecType) String() string {
+func (c codecType) String() string {
 	switch c {
-	case CodecH264:
+	case codecH264:
 		return "h264"
-	case CodecH265:
+	case codecH265:
 		return "h265"
 	default:
 		return "unknown"
 	}
 }
 
-func ParseCodecType(codec string) CodecType {
+func parseCodecType(codec string) codecType {
 	switch codec {
 	case "h264":
-		return CodecH264
+		return codecH264
 	case "h265":
-		return CodecH265
+		return codecH265
 	default:
-		return CodecUnknown
+		return codecUnknown
 	}
 }
 
