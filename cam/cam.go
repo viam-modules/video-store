@@ -14,8 +14,6 @@ import (
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/rimage"
 	"go.viam.com/utils"
-
-	goutils "go.viam.com/utils"
 )
 
 // Model is the model for the video storage camera component.
@@ -47,7 +45,7 @@ type videostore struct {
 	cam    camera.Camera
 	stream gostream.VideoStream
 
-	workers *goutils.StoppableWorkers
+	workers *utils.StoppableWorkers
 
 	enc  *encoder
 	seg  *segmenter
@@ -190,7 +188,7 @@ func newvideostore(
 	}
 
 	// Start workers to process frames and clean up storage.
-	vs.workers = goutils.NewBackgroundStoppableWorkers(vs.processFrames, vs.deleter)
+	vs.workers = utils.NewBackgroundStoppableWorkers(vs.processFrames, vs.deleter)
 
 	return vs, nil
 }
@@ -333,9 +331,11 @@ func (vs *videostore) Close(ctx context.Context) error {
 func (vs *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
 	return nil, errors.New("not implemented")
 }
+
 func (vs *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
 	return nil, resource.ResponseMetadata{}, errors.New("not implemented")
 }
+
 func (vs *videostore) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
 	return nil, errors.New("not implemented")
 }
