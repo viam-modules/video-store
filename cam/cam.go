@@ -56,17 +56,17 @@ type videostore struct {
 }
 
 type storage struct {
-	SegmentSeconds int    `json:"segment_seconds"`
+	SegmentSeconds int    `json:"segment_seconds,omitempty"`
 	SizeGB         int    `json:"size_gb"`
-	UploadPath     string `json:"upload_path"`
-	StoragePath    string `json:"storage_path"`
+	UploadPath     string `json:"upload_path,omitempty"`
+	StoragePath    string `json:"storage_path,omitempty"`
 }
 
 type video struct {
-	Codec   string `json:"codec"`
-	Bitrate int    `json:"bitrate"`
-	Preset  string `json:"preset"`
-	Format  string `json:"format"`
+	Codec   string `json:"codec,omitempty"`
+	Bitrate int    `json:"bitrate,omitempty"`
+	Preset  string `json:"preset,omitempty"`
+	Format  string `json:"format,omitempty"`
 }
 
 type cameraProperties struct {
@@ -79,7 +79,7 @@ type cameraProperties struct {
 type Config struct {
 	Camera  string  `json:"camera"`
 	Storage storage `json:"storage"`
-	Video   video   `json:"video"`
+	Video   video   `json:"video,omitempty"`
 
 	// TODO(seanp): Remove once camera properties are returned from camera component.
 	Properties cameraProperties `json:"cam_props"`
