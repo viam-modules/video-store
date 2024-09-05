@@ -254,28 +254,12 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 	}
 }
 
-func (vs *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
-	return nil, resource.ResponseMetadata{}, errors.New("not implemented")
-}
-
-func (vs *videostore) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (vs *videostore) Projector(ctx context.Context) (transform.Projector, error) {
-	return vs.cam.Projector(ctx)
-}
-
 func (vs *videostore) Properties(ctx context.Context) (camera.Properties, error) {
 	p, err := vs.cam.Properties(ctx)
 	if err == nil {
 		p.SupportsPCD = false
 	}
 	return p, err
-}
-
-func (vs *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
-	return nil, errors.New("not implemented")
 }
 
 // processFrames reads frames from the camera, encodes, and writes to the segmenter
@@ -343,4 +327,18 @@ func (vs *videostore) Close(ctx context.Context) error {
 	vs.seg.close()
 	vs.conc.close()
 	return nil
+}
+
+// Unimplemented methods for the video storage camera component.
+func (vs *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
+	return nil, errors.New("not implemented")
+}
+func (vs *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+	return nil, resource.ResponseMetadata{}, errors.New("not implemented")
+}
+func (vs *videostore) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
+	return nil, errors.New("not implemented")
+}
+func (vs *videostore) Projector(ctx context.Context) (transform.Projector, error) {
+	return vs.cam.Projector(ctx)
 }
