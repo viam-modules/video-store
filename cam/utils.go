@@ -12,7 +12,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -195,29 +194,6 @@ func matchStorageToRange(files []string, start, end time.Time, duration time.Dur
 	}
 
 	return matchedFiles
-}
-
-// copyFile copies a file from the source to the destination.
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer sourceFile.Close()
-	destinationFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destinationFile.Close()
-	_, err = io.Copy(destinationFile, sourceFile)
-	if err != nil {
-		return err
-	}
-	err = destinationFile.Sync()
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // validateTimeRange validates the start and end time range against storage files.
