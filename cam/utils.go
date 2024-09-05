@@ -19,6 +19,36 @@ import (
 	"time"
 )
 
+type CodecType int
+
+const (
+	CodecUnknown CodecType = iota
+	CodecH264
+	CodecH265
+)
+
+func (c CodecType) String() string {
+	switch c {
+	case CodecH264:
+		return "h264"
+	case CodecH265:
+		return "h265"
+	default:
+		return "unknown"
+	}
+}
+
+func ParseCodecType(codec string) CodecType {
+	switch codec {
+	case "h264":
+		return CodecH264
+	case "h265":
+		return CodecH265
+	default:
+		return CodecUnknown
+	}
+}
+
 // ffmpegError returns a string representation of the ffmpeg error code.
 func ffmpegError(ret C.int) string {
 	var errbuf [256]C.char

@@ -24,7 +24,7 @@ const (
 	// Default values for the video storage camera component.
 	defaultSegmentSeconds = 30 // seconds
 	defaultStorageSize    = 10 // GB
-	defaultVideoCodec     = "h264"
+	defaultVideoCodec     = CodecH264
 	defaultVideoBitrate   = 1000000
 	defaultVideoPreset    = "medium"
 	defaultVideoFormat    = "mp4"
@@ -129,8 +129,8 @@ func newvideostore(
 
 	// Create encoder to handle encoding of frames.
 	// TODO(seanp): Forcing h264 for now until h265 is supported.
-	if newConf.Video.Codec != "h264" {
-		newConf.Video.Codec = defaultVideoCodec
+	if ParseCodecType(newConf.Video.Codec) != CodecH264 {
+		newConf.Video.Codec = defaultVideoCodec.String()
 	}
 	if newConf.Video.Bitrate == 0 {
 		newConf.Video.Bitrate = defaultVideoBitrate
