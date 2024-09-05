@@ -189,15 +189,14 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 		}
 		// Adjust the PTS, DTS, and duration correctly for each packet.
 		// Can have multiple streams, so need to adjust each packet based on the
-		inputStreamsBase := uintptr(unsafe.Pointer(inputCtx.streams))
-		inputStreamOffset := uintptr(packet.stream_index) * unsafe.Sizeof(uintptr(0))
-		inputStreamAddr := inputStreamsBase + inputStreamOffset
-		inStream := *(**C.AVStream)(unsafe.Pointer(inputStreamAddr))
+		inputStreamsBase := unsafe.Pointer(inputCtx.streams)
+		inputStreamOffset := uintptr(packet.stream_index) * unsafe.Sizeof(inputCtx.streams)
+		inStream := *(**C.AVStream)(unsafe.Pointer(uintptr(inputStreamsBase) + inputStreamOffset))
 
-		outputStreamsBase := uintptr(unsafe.Pointer(outputCtx.streams))
-		outputStreamOffset := uintptr(packet.stream_index) * unsafe.Sizeof(uintptr(0))
-		outputStreamAddr := outputStreamsBase + outputStreamOffset
-		outStream := *(**C.AVStream)(unsafe.Pointer(outputStreamAddr))
+		// Calculate the output stream pointer safely
+		outputStreamsBase := unsafe.Pointer(outputCtx.streams)
+		outputStreamOffset := uintptr(packet.stream_index) * unsafe.Sizeof(outputCtx.streams)
+		outStream := *(**C.AVStream)(unsafe.Pointer(uintptr(outputStreamsBase) + outputStreamOffset))
 
 		packet.pts = C.av_rescale_q_rnd(packet.pts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
 		packet.dts = C.av_rescale_q_rnd(packet.dts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
