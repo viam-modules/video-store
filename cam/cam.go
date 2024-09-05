@@ -142,7 +142,7 @@ func newvideostore(
 	}
 	vs.enc, err = newEncoder(
 		logger,
-		newConf.Video.Codec,
+		parseCodecType(newConf.Video.Codec),
 		newConf.Video.Bitrate,
 		newConf.Video.Preset,
 		newConf.Properties.Width,

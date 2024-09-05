@@ -27,7 +27,7 @@ type encoder struct {
 
 func newEncoder(
 	logger logging.Logger,
-	videoCodec string,
+	videoCodec codecType,
 	bitrate int,
 	preset string,
 	width int,
@@ -38,7 +38,7 @@ func newEncoder(
 		logger:     logger,
 		frameCount: 0,
 	}
-	codecID := lookupCodecID(videoCodec)
+	codecID := lookupCodecIDByType(videoCodec)
 	codec := C.avcodec_find_encoder(codecID)
 	if codec == nil {
 		return nil, errors.New("codec not found")
