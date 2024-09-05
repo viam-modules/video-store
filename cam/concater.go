@@ -85,9 +85,11 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 	}
 
 	concatFilePath := C.CString(c.concatFile.Name())
-	defer C.free(unsafe.Pointer(concatFilePath))
 	concatStr := C.CString("concat")
-	defer C.free(unsafe.Pointer(concatStr))
+	defer func() {
+		C.free(unsafe.Pointer(concatFilePath))
+		C.free(unsafe.Pointer(concatStr))
+	}()
 	inputFormat := C.av_find_input_format(concatStr)
 	if inputFormat == nil {
 		return "", errors.New("failed to find input format")
@@ -100,12 +102,18 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 	var options *C.AVDictionary
 	safeStr := C.CString("safe")
 	safeValStr := C.CString("0")
-	defer C.free(unsafe.Pointer(safeValStr))
-	defer C.free(unsafe.Pointer(safeStr))
-	defer C.av_dict_free(&options)
-	C.av_dict_set(&options, safeStr, safeValStr, 0)
 	var inputCtx *C.AVFormatContext
-	ret := C.avformat_open_input(&inputCtx, concatFilePath, inputFormat, &options)
+	defer func() {
+		C.free(unsafe.Pointer(safeValStr))
+		C.free(unsafe.Pointer(safeStr))
+		C.av_dict_free(&options)
+		C.avformat_close_input(&inputCtx)
+	}()
+	ret := C.av_dict_set(&options, safeStr, safeValStr, 0)
+	if ret < 0 {
+		return "", fmt.Errorf("failed to set option: %s", ffmpegError(ret))
+	}
+	ret = C.avformat_open_input(&inputCtx, concatFilePath, inputFormat, &options)
 	if ret < 0 {
 		return "", fmt.Errorf("failed to open input format: %s", ffmpegError(ret))
 	}
@@ -124,10 +132,14 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 		outputFilename = fmt.Sprintf("%s_%s_%s.%s", c.camName, fromStr, metadata, defaultVideoFormat)
 	}
 	outputPath := filepath.Join(c.uploadPath, outputFilename)
-	c.logger.Debug("outputPath", outputPath)
 	outputPathCStr := C.CString(outputPath)
-	defer C.free(unsafe.Pointer(outputPathCStr))
 	var outputCtx *C.AVFormatContext
+	defer func() {
+		C.free(unsafe.Pointer(outputPathCStr))
+		C.avio_closep(&outputCtx.pb)
+		C.avformat_free_context(outputCtx)
+	}()
+
 	ret = C.avformat_alloc_output_context2(&outputCtx, nil, nil, outputPathCStr)
 	if ret < 0 {
 		return "", fmt.Errorf("failed to allocate output context: %s", ffmpegError(ret))
@@ -164,6 +176,7 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 	// Iterate through each packet in the input context and write it to the output context.
 	// TODO(seanp): We can hopefully optimize this by copying input segments entirely instead of packet by packet.
 	packet := C.av_packet_alloc()
+	defer C.av_packet_free(&packet)
 	for {
 		ret := C.av_read_frame(inputCtx, packet)
 		if ret == C.AVERROR_EOF {
@@ -198,11 +211,6 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 	if ret < 0 {
 		return "", fmt.Errorf("failed to write trailer: %s", ffmpegError(ret))
 	}
-	// FFmpeg methods handle null pointers, so no need to check for nil.
-	C.avio_closep(&outputCtx.pb)
-	C.avformat_close_input(&inputCtx)
-	C.avformat_free_context(outputCtx)
-	C.av_packet_free(&packet)
 
 	return outputPath, nil
 }
