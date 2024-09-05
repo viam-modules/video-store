@@ -1,4 +1,4 @@
-module github.com/seanavery/videostore
+module github.com/viam-modules/video-store
 
 go 1.22.4
 

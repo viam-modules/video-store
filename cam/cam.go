@@ -128,7 +128,7 @@ func newvideostore(
 
 	// Create encoder to handle encoding of frames.
 	// TODO(seanp): Forcing h264 for now until h265 is supported.
-	if parseCodecType(newConf.Video.Codec) != CodecH264 {
+	if parseCodecType(newConf.Video.Codec) != codecH264 {
 		newConf.Video.Codec = defaultVideoCodec.String()
 	}
 	if newConf.Video.Bitrate == 0 {
