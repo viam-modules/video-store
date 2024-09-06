@@ -4,6 +4,7 @@ package videostore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -77,6 +78,7 @@ type cameraProperties struct {
 // Config is the configuration for the video storage camera component.
 type Config struct {
 	Camera  string  `json:"camera"`
+	Sync    string  `json:"sync"`
 	Storage storage `json:"storage"`
 	Video   video   `json:"video,omitempty"`
 
@@ -163,6 +165,24 @@ func newvideostore(
 	if newConf.Storage.StoragePath == "" {
 		newConf.Storage.StoragePath = filepath.Join(getHomeDir(), defaultStoragePath, vs.name.Name)
 	}
+
+	// Check for data_manager service dependency.
+	// TODO(seanp): Check if custom_sync_paths is set if not using default paths.
+	syncFound := false
+	for key, dep := range deps {
+		if key.Name == newConf.Sync {
+			if dep.Name().API.Type.String() != "rdk:service" {
+				return nil, fmt.Errorf("sync service %s is not a sync service", newConf.Sync)
+			}
+			logger.Debugf("found sync service: %s", key.Name)
+			syncFound = true
+			break
+		}
+	}
+	if !syncFound {
+		return nil, fmt.Errorf("sync service %s not found", newConf.Sync)
+	}
+
 	vs.storagePath = newConf.Storage.StoragePath
 	vs.seg, err = newSegmenter(
 		logger,
@@ -197,12 +217,14 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Camera == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
 	}
-	// Check Storage
 	if cfg.Storage == (storage{}) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "storage")
 	}
 	if cfg.Storage.SizeGB == 0 {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "size_gb")
+	}
+	if cfg.Sync == "" {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "sync")
 	}
 	// TODO(seanp): Remove once camera properties are returned from camera component.
 	if cfg.Properties == (cameraProperties{}) {
