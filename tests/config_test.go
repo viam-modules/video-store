@@ -13,6 +13,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/robot"
 	robotimpl "go.viam.com/rdk/robot/impl"
+	_ "go.viam.com/rdk/services/datamanager/builtin" // Register the data manager service
 	"go.viam.com/test"
 )
 
@@ -49,6 +50,7 @@ func TestModuleConfiguration(t *testing.T) {
 				"model": "viam:video:storage",
 				"attributes": {
 					"camera": "fake-cam-1",
+					"sync": "data_manager-1",
 					"storage": {
 						"size_gb": 10,
 						"segment_seconds": 30,
@@ -68,15 +70,30 @@ func TestModuleConfiguration(t *testing.T) {
 					}
 				},
 				"depends_on": [
-					"fake-cam-1"
+					"fake-cam-1",
+					"data_manager-1"
 				]
 			},
 			{
-			"name": "fake-cam-1",
-			"namespace": "rdk",
-			"type": "camera",
-			"model": "fake",
-			"attributes": {}
+				"name": "fake-cam-1",
+				"namespace": "rdk",
+				"type": "camera",
+				"model": "fake",
+				"attributes": {}
+			}
+		],
+		"services": [
+			{
+				"name": "data_manager-1",
+				"namespace": "rdk",
+				"type": "data_manager",
+				"attributes": {
+					"additional_sync_paths": [],
+					"capture_disabled": true,
+					"sync_interval_mins": 0.1,
+					"capture_dir": "",
+					"tags": []
+				}
 			}
 		],
 		"modules": [
@@ -99,13 +116,31 @@ func TestModuleConfiguration(t *testing.T) {
                 "type": "camera",
                 "model": "viam:video:storage",
                 "attributes": {
+					"sync": "data_manager-1",
                     "storage": {
                         "size_gb": 10,
                         "segment_seconds": 30
                     }
-                }
+                },
+				"depends_on": [
+					"data_manager-1"
+				]
             }
         ],
+		"services": [
+			{
+				"name": "data_manager-1",
+				"namespace": "rdk",
+				"type": "data_manager",
+				"attributes": {
+					"additional_sync_paths": [],
+					"capture_disabled": true,
+					"sync_interval_mins": 0.1,
+					"capture_dir": "",
+					"tags": []
+				}
+			}
+		],
         "modules": [
             {
                 "type": "local",
@@ -127,6 +162,7 @@ func TestModuleConfiguration(t *testing.T) {
 				"model": "viam:video:storage",
 				"attributes": {
 					"camera": "fake-cam-1",
+					"sync": "data_manager-1",
 					"cam_props": {
 						"width": 1920,
 						"height": 1080,
@@ -140,7 +176,8 @@ func TestModuleConfiguration(t *testing.T) {
 					}
 				},
 				"depends_on": [
-					"fake-cam-1"
+					"fake-cam-1",
+					"data_manager-1"
 				]
 			},
 			{
@@ -149,6 +186,20 @@ func TestModuleConfiguration(t *testing.T) {
 				"type": "camera",
 				"model": "fake",
 				"attributes": {}
+			}
+		],
+		"services": [
+			{
+				"name": "data_manager-1",
+				"namespace": "rdk",
+				"type": "data_manager",
+				"attributes": {
+					"additional_sync_paths": [],
+					"capture_disabled": true,
+					"sync_interval_mins": 0.1,
+					"capture_dir": "",
+					"tags": []
+				}
 			}
 		],
 		"modules": [
@@ -172,6 +223,7 @@ func TestModuleConfiguration(t *testing.T) {
 				"model": "viam:video:storage",
 				"attributes": {
 					"camera": "fake-cam-1",
+					"sync": "data_manager-1",
 					"storage": {
 						"segment_seconds": 30,
 						"upload_path": "/tmp/video-upload",
@@ -190,7 +242,8 @@ func TestModuleConfiguration(t *testing.T) {
 					}
 				},
 				"depends_on": [
-					"fake-cam-1"
+					"fake-cam-1",
+					"data_manager-1"
 				]
 			},
 			{
@@ -199,6 +252,20 @@ func TestModuleConfiguration(t *testing.T) {
 				"type": "camera",
 				"model": "fake",
 				"attributes": {}
+			}
+		],
+		"services": [
+			{
+				"name": "data_manager-1",
+				"namespace": "rdk",
+				"type": "data_manager",
+				"attributes": {
+					"additional_sync_paths": [],
+					"capture_disabled": true,
+					"sync_interval_mins": 0.1,
+					"capture_dir": "",
+					"tags": []
+				}
 			}
 		],
 		"modules": [
@@ -222,6 +289,7 @@ func TestModuleConfiguration(t *testing.T) {
 				"model": "viam:video:storage",
 				"attributes": {
 					"camera": "fake-cam-1",
+					"sync": "data_manager-1",
 					"storage": {
 						"size_gb": 10,
 						"segment_seconds": 30,
@@ -236,7 +304,8 @@ func TestModuleConfiguration(t *testing.T) {
 					}
 				},
 				"depends_on": [
-					"fake-cam-1"
+					"fake-cam-1",
+					"data_manager-1"
 				]
 			},
 			{
@@ -245,6 +314,20 @@ func TestModuleConfiguration(t *testing.T) {
 				"type": "camera",
 				"model": "fake",
 				"attributes": {}
+			}
+		],
+		"services": [
+			{
+				"name": "data_manager-1",
+				"namespace": "rdk",
+				"type": "data_manager",
+				"attributes": {
+					"additional_sync_paths": [],
+					"capture_disabled": true,
+					"sync_interval_mins": 0.1,
+					"capture_dir": "",
+					"tags": []
+				}
 			}
 		],
 		"modules": [
@@ -256,6 +339,58 @@ func TestModuleConfiguration(t *testing.T) {
 			}
 		]
 	}`, moduleBinPath)
+
+	// no data_manager specified
+	config6 := fmt.Sprintf(`
+{
+    "components": [
+        {
+            "name": "video-store-1",
+            "namespace": "rdk",
+            "type": "camera",
+            "model": "viam:video:storage",
+            "attributes": {
+                "camera": "fake-cam-1",
+                "storage": {
+                    "size_gb": 10,
+                    "segment_seconds": 30,
+                    "upload_path": "/tmp",
+                    "storage_path": "/tmp"
+                },
+                "cam_props": {
+                    "width": 1920,
+                    "height": 1080,
+                    "framerate": 30
+                },
+                "video": {
+                    "codec": "h264",
+                    "bitrate": 1000000,
+                    "preset": "ultrafast",
+                    "format": "mp4"
+                },
+                "sync": "sync-service"
+            },
+            "depends_on": [
+                "fake-cam-1"
+            ]
+        },
+        {
+            "name": "fake-cam-1",
+            "namespace": "rdk",
+            "type": "camera",
+            "model": "fake",
+            "attributes": {}
+        }
+    ],
+    "modules": [
+        {
+            "type": "local",
+            "name": "video-storage",
+            "executable_path": "%s",
+            "log_level": "debug"
+        }
+    ]
+}`, moduleBinPath)
 
 	t.Run("Valid Configuration Successful", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -303,6 +438,16 @@ func TestModuleConfiguration(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config5)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		_, err = camera.FromRobot(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldNotBeNil)
+	})
+
+	t.Run("Fails Configuration No DataManager", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config6)
 		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
 		_, err = camera.FromRobot(r, videoStoreComponentName)
