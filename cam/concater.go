@@ -217,7 +217,13 @@ func (c *concater) concat(from, to time.Time, metadata string) (string, error) {
 	return outputPath, nil
 }
 
+// close closes the concater and removes the concat file.
+// Do not need to clean up FFmpeg resources as they are handled in the concat function.
 func (c *concater) close() {
-	c.concatFile.Close()
-	os.Remove(c.concatFile.Name())
+	if err := c.concatFile.Close(); err != nil {
+		c.logger.Error("failed to close concat file", err)
+	}
+	if err := os.Remove(c.concatFile.Name()); err != nil {
+		c.logger.Error("failed to remove concat file", err)
+	}
 }

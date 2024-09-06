@@ -317,7 +317,7 @@ func (vs *videostore) deleter(ctx context.Context) {
 func (vs *videostore) Close(ctx context.Context) error {
 	err := vs.stream.Close(ctx)
 	if err != nil {
-		return err
+		vs.logger.Error("failed to close stream", err)
 	}
 	vs.workers.Stop()
 	vs.enc.close()
