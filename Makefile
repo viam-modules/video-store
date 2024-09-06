@@ -40,7 +40,7 @@ CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 GOFLAGS := -buildvcs=false
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
-.PHONY: lint tool-install
+.PHONY: lint tool-install test
 
 $(BIN_OUTPUT_PATH)/video-store: *.go cam/*.go $(FFMPEG_BUILD)
 	go mod tidy
@@ -67,3 +67,7 @@ tool-install:
 lint: tool-install $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
+
+
+test: $(BIN_OUTPUT_PATH)/video-store
+	go test -v ./tests/
