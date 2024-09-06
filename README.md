@@ -5,35 +5,38 @@ The `video-store` module brings security camera functionality to your smart mach
 
 ## Configure your `video-store` component
 
-Fill in the attributes as applicable to the component, according to the example below.
+Fill in the attributes as applicable to the component, according to the template below.
 
 ```json
     {
-      "name": "video-store-1",
+      "name": <video_store_component_name>,
       "namespace": "rdk",
       "type": "camera",
       "model": "viam:video:storage",
       "attributes": {
-        "camera": "webcam-1", 
-        "vision": "vision-service-1", 
-        "storage": {
-            "segment_seconds": 30,
-            "size_gb": 100
+        "camera": <camera_component_name>, [required]
+        "sync": <data_manager_service_name>, [required]
+        "storage": { [required]
+            "segment_seconds": <length_of_video_segments>, [optional]
+            "size_gb": <total_storage_max_size>, [required]
+            "storage_path": <custom_path_to_store_video_files>, [optional]
+            "upload_path": <custom_path_to_upload_video_files>, [optional]
         },
-        "video": {
-            "format": "mp4",
-            "codec": "h264",
-            "bitrate": 1000000,
-            "preset": "medium"
+        "video": { [required]
+            "format": <video_format>, [optional]
+            "codec": <video_codec>, [optional]
+            "bitrate": <bits_pers_second>, [optional]
+            "preset": <video_preset>, [optional]
         },
-        "cam_props": { 
-            "width": 640,
-            "height": 480,
-            "framerate": 30
+        "cam_props": { [required]
+            "width": <pixel_width>, [required]
+            "height": <pixel_height>, [required]
+            "framerate": <frames_per_second>, [required]
         },
       },
       "depends_on": [
-        "webcam-1",
+        <camera_component_name>, [required]
+        <data_manager_service_name> [required]
       ]
     }
 ```
@@ -42,22 +45,26 @@ Make sure to configure a [Data Manager Service](https://docs.viam.com/services/d
 
 ```json
     {
-      "name": "data_manager-1",
+      "name": <data_manager_service_name>,
       "namespace": "rdk",
       "type": "data_manager",
       "attributes": {
         "tags": [],
-        "additional_sync_paths": [],
+        "additional_sync_paths": [
+          <custom_path_to_upload_video_files>
+        ],
         "capture_disabled": true,
-        "sync_interval_mins": 1,
+        "sync_interval_mins": <sync_interval_minutes>,
         "capture_dir": ""
       }
     }
 ```
 
-## Commands
+## Do Commands
 
 ### `save`
+
+#### Save Request
 ```json
 {
   "command": "save",
@@ -67,11 +74,30 @@ Make sure to configure a [Data Manager Service](https://docs.viam.com/services/d
 }
 ```
 
+#### Save Response
+```json
+{
+  "command": "save",
+  "from": <start_timestamp>, [required]
+  "to": <end_timestamp>, [required]
+}
+```
+
 ### `fetch`
+
+#### Fetch Request
 ```json
 {
   "command": "fetch",
   "from": <start_timestamp>, [required]
   "to": <end_timestamp>, [required]
+}
+```
+
+#### Fetch Response
+```json
+{
+  "command": "fetch",
+  "video": <video_bytes>, [required]
 }
 ```
