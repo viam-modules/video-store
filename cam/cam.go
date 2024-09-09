@@ -167,12 +167,15 @@ func newvideostore(
 	}
 
 	// Check for data_manager service dependency.
-	// TODO(seanp): Check if custom_sync_paths is set if not using default paths.
+	// TODO(seanp): Check custom_sync_paths if not using default upload_path in config.
 	syncFound := false
 	for key, dep := range deps {
 		if key.Name == newConf.Sync {
 			if dep.Name().API.Type.String() != "rdk:service" {
-				return nil, fmt.Errorf("sync service %s is not a sync service", newConf.Sync)
+				return nil, fmt.Errorf("sync service %s is not a service", newConf.Sync)
+			}
+			if dep.Name().API.SubtypeName != "data_manager" {
+				return nil, fmt.Errorf("sync service %s is not a data_manager service", newConf.Sync)
 			}
 			logger.Debugf("found sync service: %s", key.Name)
 			syncFound = true
