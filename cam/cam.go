@@ -3,6 +3,7 @@ package videostore
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -30,9 +31,11 @@ const (
 	defaultVideoFormat    = "mp4"
 	defaultUploadPath     = ".viam/capture/video-upload"
 	defaultStoragePath    = ".viam/video-storage"
+	defaultLogLevel       = "info"
 
-	defaultLogLevel = "info"
-	deleterInterval = 10 // minutes
+	maxGRPCSize     = 1024 * 1024 * 32 // bytes
+	deleterInterval = 10               // minutes
+	tempPath        = "/tmp"
 )
 
 type videostore struct {
@@ -258,7 +261,7 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		if err != nil {
 			return nil, err
 		}
-		uploadFilePath, err := vs.conc.concat(from, to, metadata)
+		uploadFilePath, err := vs.conc.concat(from, to, metadata, vs.uploadPath)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err
@@ -270,7 +273,33 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		}, nil
 	case "fetch":
 		vs.logger.Debug("fetch command received")
-		return nil, resource.ErrDoUnimplemented
+		from, to, err := validateFetchCommand(command)
+		if err != nil {
+			return nil, err
+		}
+		tmpFilePath, err := vs.conc.concat(from, to, "", tempPath)
+		if err != nil {
+			vs.logger.Error("failed to concat files ", err)
+			return nil, err
+		}
+		vs.logger.Debug("fetching video data between ", from, " and ", to)
+		videoSize, err := getFileSize(tmpFilePath)
+		if err != nil {
+			return nil, err
+		}
+		if videoSize > maxGRPCSize {
+			return nil, errors.New("video file size exceeds max grpc size")
+		}
+		videoBytes, err := readVideoFile(tmpFilePath)
+		if err != nil {
+			return nil, err
+		}
+		vs.logger.Info("video bytes: ", len(videoBytes))
+		videoBytesBase64 := base64.StdEncoding.EncodeToString(videoBytes)
+		return map[string]interface{}{
+			"command": "fetch",
+			"video":   videoBytesBase64,
+		}, nil
 	default:
 		return nil, errors.New("invalid command")
 	}
