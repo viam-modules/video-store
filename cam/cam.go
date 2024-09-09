@@ -282,7 +282,6 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err
 		}
-		vs.logger.Debug("fetching video data between ", from, " and ", to)
 		videoSize, err := getFileSize(tmpFilePath)
 		if err != nil {
 			return nil, err
@@ -294,7 +293,9 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		if err != nil {
 			return nil, err
 		}
-		vs.logger.Info("video bytes: ", len(videoBytes))
+		vs.logger.Debug("video bytes: ", len(videoBytes))
+		// TODO(seanp): Check against max grpc size.
+		// TODO(seanp): Do we need to encode the video bytes to base64?
 		videoBytesBase64 := base64.StdEncoding.EncodeToString(videoBytes)
 		return map[string]interface{}{
 			"command": "fetch",
