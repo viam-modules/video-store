@@ -1,5 +1,5 @@
 # Video Storage
-The `video-store` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and saves the camera output as video files on disk. You can then later request to upload video slices to the cloud using the [save](#save) command, or request the video bytes directly using the [fetch](#fetch) command.
+The `video-store` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and saves the output as video files on disk. You can then upload video slices to the cloud using the [save](#save) command, or request the video bytes directly using the [fetch](#fetch) command.
 
 > **Note:** This component is a work in progress and is not yet fully implemented.
 
@@ -22,7 +22,7 @@ Fill in the attributes as applicable to the component, according to the template
             "storage_path": <custom_path_to_store_video_files>, [optional]
             "upload_path": <custom_path_to_upload_video_files>, [optional]
         },
-        "video": { [required]
+        "video": { [optional]
             "format": <video_format>, [optional]
             "codec": <video_codec>, [optional]
             "bitrate": <bits_pers_second>, [optional]
@@ -78,8 +78,7 @@ Make sure to configure a [Data Manager Service](https://docs.viam.com/services/d
 ```json
 {
   "command": "save",
-  "from": <start_timestamp>, [required]
-  "to": <end_timestamp>, [required]
+  "filename": <filename_to_be_uploaded>
 }
 ```
 
@@ -90,7 +89,7 @@ Make sure to configure a [Data Manager Service](https://docs.viam.com/services/d
 {
   "command": "fetch",
   "from": <start_timestamp>, [required]
-  "to": <end_timestamp>, [required]
+  "to": <end_timestamp> [required]
 }
 ```
 
@@ -98,6 +97,6 @@ Make sure to configure a [Data Manager Service](https://docs.viam.com/services/d
 ```json
 {
   "command": "fetch",
-  "video": <video_bytes>, [required]
+  "video": <video_bytes>
 }
 ```
