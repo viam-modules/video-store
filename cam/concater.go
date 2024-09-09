@@ -131,7 +131,7 @@ func (c *concater) concat(from, to time.Time, metadata, path string) (string, er
 	} else {
 		outputFilename = fmt.Sprintf("%s_%s_%s.%s", c.camName, fromStr, metadata, defaultVideoFormat)
 	}
-	outputPath := filepath.Join(c.uploadPath, outputFilename)
+	outputPath := filepath.Join(path, outputFilename)
 	outputPathCStr := C.CString(outputPath)
 	var outputCtx *C.AVFormatContext
 	defer func() {
