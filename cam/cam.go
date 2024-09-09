@@ -294,7 +294,6 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 			return nil, err
 		}
 		vs.logger.Debug("video bytes: ", len(videoBytes))
-		// TODO(seanp): Check against max grpc size.
 		// TODO(seanp): Do we need to encode the video bytes to base64?
 		videoBytesBase64 := base64.StdEncoding.EncodeToString(videoBytes)
 		return map[string]interface{}{
