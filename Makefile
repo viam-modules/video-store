@@ -70,4 +70,5 @@ lint: tool-install $(FFMPEG_BUILD)
 
 
 test: $(BIN_OUTPUT_PATH)/video-store
+	git lfs pull
 	go test -v ./tests/

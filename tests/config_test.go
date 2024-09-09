@@ -20,10 +20,11 @@ import (
 const (
 	moduleBinPath           = "/host/bin/linux-arm64/video-store"
 	videoStoreComponentName = "video-store-1"
+	testStoragePath         = "/tmp/video-storage"
+	testUploadPath          = "/tmp/video-upload"
 )
 
 func setupViamServer(ctx context.Context, configStr string) (robot.Robot, error) {
-	// setup viam server
 	logger := logging.NewLogger("video-store-module")
 	cfg, err := config.FromReader(ctx, "default.json", bytes.NewReader([]byte(configStr)), logger)
 	if err != nil {
@@ -39,12 +40,12 @@ func setupViamServer(ctx context.Context, configStr string) (robot.Robot, error)
 }
 
 func TestModuleConfiguration(t *testing.T) {
-	// full config
+	// Full configuration
 	config1 := fmt.Sprintf(`
 	{
 		"components": [
 			{
-				"name": "video-store-1",
+				"name": "%s",
 				"namespace": "rdk",
 				"type": "camera",
 				"model": "viam:video:storage",
@@ -54,8 +55,8 @@ func TestModuleConfiguration(t *testing.T) {
 					"storage": {
 						"size_gb": 10,
 						"segment_seconds": 30,
-						"upload_path": "/tmp",
-						"storage_path": "/tmp"
+						"upload_path": "%s",
+						"storage_path": "%s"
 					},
 					"cam_props": {
 						"width": 1920,
@@ -104,7 +105,7 @@ func TestModuleConfiguration(t *testing.T) {
 				"log_level": "debug"
 			}
 		]
-	}`, moduleBinPath)
+	}`, videoStoreComponentName, testStoragePath, testUploadPath, moduleBinPath)
 
 	// no camera specified
 	config2 := fmt.Sprintf(`
@@ -151,7 +152,7 @@ func TestModuleConfiguration(t *testing.T) {
         ]
     }`, moduleBinPath)
 
-	// no storage specified
+	// Storage NOT specified
 	config3 := fmt.Sprintf(`
 	{
 		"components": [
@@ -212,7 +213,7 @@ func TestModuleConfiguration(t *testing.T) {
 		]
 	}`, moduleBinPath)
 
-	// no size_gb specified
+	// size_gb NOT specified
 	config4 := fmt.Sprintf(`
 	{
 		"components": [
@@ -278,7 +279,7 @@ func TestModuleConfiguration(t *testing.T) {
 		]
 	}`, moduleBinPath)
 
-	// no cam_props specified
+	// cam_props NOT specified
 	config5 := fmt.Sprintf(`
 	{
 		"components": [
@@ -340,7 +341,7 @@ func TestModuleConfiguration(t *testing.T) {
 		]
 	}`, moduleBinPath)
 
-	// no data_manager specified
+	// dat_manager NOT specified
 	config6 := fmt.Sprintf(`
 {
     "components": [
