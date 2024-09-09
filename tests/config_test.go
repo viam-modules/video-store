@@ -343,55 +343,55 @@ func TestModuleConfiguration(t *testing.T) {
 
 	// dat_manager NOT specified
 	config6 := fmt.Sprintf(`
-{
-    "components": [
-        {
-            "name": "video-store-1",
-            "namespace": "rdk",
-            "type": "camera",
-            "model": "viam:video:storage",
-            "attributes": {
-                "camera": "fake-cam-1",
-                "storage": {
-                    "size_gb": 10,
-                    "segment_seconds": 30,
-                    "upload_path": "/tmp",
-                    "storage_path": "/tmp"
-                },
-                "cam_props": {
-                    "width": 1920,
-                    "height": 1080,
-                    "framerate": 30
-                },
-                "video": {
-                    "codec": "h264",
-                    "bitrate": 1000000,
-                    "preset": "ultrafast",
-                    "format": "mp4"
-                },
-                "sync": "sync-service"
-            },
-            "depends_on": [
-                "fake-cam-1"
-            ]
-        },
-        {
-            "name": "fake-cam-1",
-            "namespace": "rdk",
-            "type": "camera",
-            "model": "fake",
-            "attributes": {}
-        }
-    ],
-    "modules": [
-        {
-            "type": "local",
-            "name": "video-storage",
-            "executable_path": "%s",
-            "log_level": "debug"
-        }
-    ]
-}`, moduleBinPath)
+	{
+		"components": [
+			{
+				"name": "video-store-1",
+				"namespace": "rdk",
+				"type": "camera",
+				"model": "viam:video:storage",
+				"attributes": {
+					"camera": "fake-cam-1",
+					"storage": {
+						"size_gb": 10,
+						"segment_seconds": 30,
+						"upload_path": "/tmp",
+						"storage_path": "/tmp"
+					},
+					"cam_props": {
+						"width": 1920,
+						"height": 1080,
+						"framerate": 30
+					},
+					"video": {
+						"codec": "h264",
+						"bitrate": 1000000,
+						"preset": "ultrafast",
+						"format": "mp4"
+					},
+					"sync": "sync-service"
+				},
+				"depends_on": [
+					"fake-cam-1"
+				]
+			},
+			{
+				"name": "fake-cam-1",
+				"namespace": "rdk",
+				"type": "camera",
+				"model": "fake",
+				"attributes": {}
+			}
+		],
+		"modules": [
+			{
+				"type": "local",
+				"name": "video-storage",
+				"executable_path": "%s",
+				"log_level": "debug"
+			}
+		]
+	}`, moduleBinPath)
 
 	t.Run("Valid Configuration Successful", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
