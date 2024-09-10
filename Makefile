@@ -40,7 +40,7 @@ CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 GOFLAGS := -buildvcs=false
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
-.PHONY: lint tool-install test
+.PHONY: lint tool-install test clean
 
 $(BIN_OUTPUT_PATH)/video-store: *.go cam/*.go $(FFMPEG_BUILD)
 	go mod tidy
@@ -72,3 +72,8 @@ lint: tool-install $(FFMPEG_BUILD)
 test: $(BIN_OUTPUT_PATH)/video-store
 	git lfs pull
 	go test -v ./tests/
+
+clean:
+	rm -rf $(BIN_OUTPUT_PATH)
+	rm -rf FFmpeg
+	git clean -fxd
