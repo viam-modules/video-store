@@ -155,23 +155,24 @@ func newvideostore(
 
 	// Create encoder to handle encoding of frames.
 	// TODO(seanp): Forcing h264 for now until h265 is supported.
-	if parseCodecType(newConf.Video.Codec) != codecH264 {
-		newConf.Video.Codec = defaultVideoCodec.String()
+	codec := defaultVideoCodec
+	bitrate := defaultVideoBitrate
+	preset := defaultVideoPreset
+	format := defaultVideoFormat
+	if newConf.Video.Bitrate != 0 {
+		bitrate = newConf.Video.Bitrate
 	}
-	if newConf.Video.Bitrate == 0 {
-		newConf.Video.Bitrate = defaultVideoBitrate
+	if newConf.Video.Preset != "" {
+		preset = newConf.Video.Preset
 	}
-	if newConf.Video.Preset == "" {
-		newConf.Video.Preset = defaultVideoPreset
-	}
-	if newConf.Video.Format == "" {
-		newConf.Video.Format = defaultVideoFormat
+	if newConf.Video.Format != "" {
+		format = newConf.Video.Format
 	}
 	vs.enc, err = newEncoder(
 		logger,
-		parseCodecType(newConf.Video.Codec),
-		newConf.Video.Bitrate,
-		newConf.Video.Preset,
+		codec,
+		bitrate,
+		preset,
 		newConf.Properties.Width,
 		newConf.Properties.Height,
 		newConf.Properties.Framerate,
@@ -181,14 +182,18 @@ func newvideostore(
 	}
 
 	// Create segmenter to handle segmentation of video stream into clips.
-	if newConf.Storage.SegmentSeconds == 0 {
-		newConf.Storage.SegmentSeconds = defaultSegmentSeconds
+	sizeGB := newConf.Storage.SizeGB
+	segmentSeconds := defaultSegmentSeconds
+	uploadPath := filepath.Join(getHomeDir(), defaultUploadPath, vs.name.Name)
+	storagePath := filepath.Join(getHomeDir(), defaultStoragePath, vs.name.Name)
+	if newConf.Storage.SegmentSeconds != 0 {
+		segmentSeconds = newConf.Storage.SegmentSeconds
 	}
-	if newConf.Storage.UploadPath == "" {
-		newConf.Storage.UploadPath = filepath.Join(getHomeDir(), defaultUploadPath, vs.name.Name)
+	if newConf.Storage.UploadPath != "" {
+		uploadPath = newConf.Storage.UploadPath
 	}
-	if newConf.Storage.StoragePath == "" {
-		newConf.Storage.StoragePath = filepath.Join(getHomeDir(), defaultStoragePath, vs.name.Name)
+	if newConf.Storage.StoragePath != "" {
+		storagePath = newConf.Storage.StoragePath
 	}
 
 	// Check for data_manager service dependency.
@@ -215,16 +220,17 @@ func newvideostore(
 	vs.seg, err = newSegmenter(
 		logger,
 		vs.enc,
-		newConf.Storage.SizeGB,
-		newConf.Storage.SegmentSeconds,
-		newConf.Storage.StoragePath,
+		sizeGB,
+		segmentSeconds,
+		storagePath,
+		format,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create concater to handle concatenation of video clips when requested.
-	vs.uploadPath = newConf.Storage.UploadPath
+	vs.uploadPath = uploadPath
 	err = createDir(vs.uploadPath)
 	if err != nil {
 		return nil, err

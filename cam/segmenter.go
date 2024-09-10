@@ -39,6 +39,7 @@ func newSegmenter(
 	storageSize int,
 	clipLength int,
 	storagePath string,
+	format string,
 ) (*segmenter, error) {
 	s := &segmenter{
 		logger:  logger,
@@ -83,7 +84,7 @@ func newSegmenter(
 	}
 
 	segmentLengthCStr := C.CString(fmt.Sprintf("%d", clipLength))
-	segmentFormatCStr := C.CString("mp4")
+	segmentFormatCStr := C.CString(format)
 	resetTimestampsCStr := C.CString("1")
 	breakNonKeyFramesCStr := C.CString("1")
 	strftimeCStr := C.CString("1")
