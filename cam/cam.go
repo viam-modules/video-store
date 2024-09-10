@@ -235,7 +235,13 @@ func newvideostore(
 	if err != nil {
 		return nil, err
 	}
-	vs.conc, err = newConcater(logger, vs.storagePath, vs.uploadPath, vs.name.Name, newConf.Storage.SegmentSeconds)
+	vs.conc, err = newConcater(
+		logger,
+		vs.storagePath,
+		vs.uploadPath,
+		vs.name.Name,
+		segmentSeconds,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +335,7 @@ func (vs *videostore) processFrames(ctx context.Context) {
 			return
 		default:
 		}
-		frame, _, err := vs.stream.Next(ctx)
+		frame, release, err := vs.stream.Next(ctx)
 		if err != nil {
 			vs.logger.Error("failed to get frame from camera", err)
 			return
@@ -344,7 +350,7 @@ func (vs *videostore) processFrames(ctx context.Context) {
 			vs.logger.Error("failed to encode frame", err)
 			return
 		}
-		// segment frame
+		release() // Release the frame back to the stream after encoding.
 		err = vs.seg.writeEncodedFrame(encoded, pts, dts)
 		if err != nil {
 			vs.logger.Error("failed to segment frame", err)
