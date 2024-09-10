@@ -318,11 +318,7 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 }
 
 func (vs *videostore) Properties(ctx context.Context) (camera.Properties, error) {
-	p, err := vs.cam.Properties(ctx)
-	if err == nil {
-		p.SupportsPCD = false
-	}
-	return p, err
+	return camera.Properties{}, nil
 }
 
 // processFrames reads frames from the camera, encodes, and writes to the segmenter
