@@ -34,7 +34,6 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-protocol=crypto \
                --enable-bsf=h264_mp4toannexb
 
-# TODO(seanp): cleanup libx264 static link.
 CGO_LDFLAGS := "-L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -l:libjpeg.a /usr/lib/aarch64-linux-gnu/libx264.a -lz"
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 GOFLAGS := -buildvcs=false
