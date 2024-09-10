@@ -410,8 +410,9 @@ func TestModuleConfiguration(t *testing.T) {
 		r, err := setupViamServer(timeoutCtx, config2)
 		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
-		_, err = camera.FromRobot(r, videoStoreComponentName)
+		cam, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, cam, test.ShouldBeNil)
 	})
 
 	// no storage specified
@@ -421,8 +422,9 @@ func TestModuleConfiguration(t *testing.T) {
 		r, err := setupViamServer(timeoutCtx, config3)
 		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
-		_, err = camera.FromRobot(r, videoStoreComponentName)
+		cam, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, cam, test.ShouldBeNil)
 	})
 
 	t.Run("Fails Configuration No SizeGB", func(t *testing.T) {
@@ -431,8 +433,9 @@ func TestModuleConfiguration(t *testing.T) {
 		r, err := setupViamServer(timeoutCtx, config4)
 		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
-		_, err = camera.FromRobot(r, videoStoreComponentName)
+		cam, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, cam, test.ShouldBeNil)
 	})
 
 	t.Run("Fails Configuration No CamProps", func(t *testing.T) {
@@ -441,8 +444,9 @@ func TestModuleConfiguration(t *testing.T) {
 		r, err := setupViamServer(timeoutCtx, config5)
 		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
-		_, err = camera.FromRobot(r, videoStoreComponentName)
+		cam, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, cam, test.ShouldBeNil)
 	})
 
 	t.Run("Fails Configuration No DataManager", func(t *testing.T) {
@@ -451,7 +455,8 @@ func TestModuleConfiguration(t *testing.T) {
 		r, err := setupViamServer(timeoutCtx, config6)
 		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
-		_, err = camera.FromRobot(r, videoStoreComponentName)
+		cam, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, cam, test.ShouldBeNil)
 	})
 }
