@@ -89,6 +89,28 @@ type Config struct {
 	Properties cameraProperties `json:"cam_props"`
 }
 
+// Validate validates the configuration for the video storage camera component.
+func (cfg *Config) Validate(path string) ([]string, error) {
+	if cfg.Camera == "" {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
+	}
+	if cfg.Storage == (storage{}) {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "storage")
+	}
+	if cfg.Storage.SizeGB == 0 {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "size_gb")
+	}
+	if cfg.Sync == "" {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "sync")
+	}
+	// TODO(seanp): Remove once camera properties are returned from camera component.
+	if cfg.Properties == (cameraProperties{}) {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "cam_props")
+	}
+
+	return []string{cfg.Camera}, nil
+}
+
 func init() {
 	resource.RegisterComponent(
 		camera.API,
@@ -216,28 +238,6 @@ func newvideostore(
 	vs.workers = utils.NewBackgroundStoppableWorkers(vs.processFrames, vs.deleter)
 
 	return vs, nil
-}
-
-// Validate validates the configuration for the video storage camera component.
-func (cfg *Config) Validate(path string) ([]string, error) {
-	if cfg.Camera == "" {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
-	}
-	if cfg.Storage == (storage{}) {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "storage")
-	}
-	if cfg.Storage.SizeGB == 0 {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "size_gb")
-	}
-	if cfg.Sync == "" {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "sync")
-	}
-	// TODO(seanp): Remove once camera properties are returned from camera component.
-	if cfg.Properties == (cameraProperties{}) {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "cam_props")
-	}
-
-	return []string{cfg.Camera}, nil
 }
 
 func (vs *videostore) Name() resource.Name {
