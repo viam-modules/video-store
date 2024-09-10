@@ -317,7 +317,7 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 	}
 }
 
-func (vs *videostore) Properties(ctx context.Context) (camera.Properties, error) {
+func (vs *videostore) Properties(_ context.Context) (camera.Properties, error) {
 	return camera.Properties{}, nil
 }
 
