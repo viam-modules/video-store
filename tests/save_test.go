@@ -125,7 +125,7 @@ func TestSaveDoCommand(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to execute save command: %v", err)
 		}
-		filename, ok := res["file"].(string)
+		filename, ok := res["filename"].(string)
 		if !ok {
 			t.Fatalf("failed to parse filename from response: %v", res)
 		}

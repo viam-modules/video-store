@@ -268,8 +268,8 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		}
 		uploadFileName := filepath.Base(uploadFilePath)
 		return map[string]interface{}{
-			"command": "save",
-			"file":    uploadFileName,
+			"command":  "save",
+			"filename": uploadFileName,
 		}, nil
 	case "fetch":
 		vs.logger.Debug("fetch command received")
