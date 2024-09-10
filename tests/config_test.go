@@ -413,6 +413,7 @@ func TestModuleConfiguration(t *testing.T) {
 		cam, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, cam, test.ShouldBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "camera")
 	})
 
 	// no storage specified
@@ -425,6 +426,7 @@ func TestModuleConfiguration(t *testing.T) {
 		cam, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, cam, test.ShouldBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "storage")
 	})
 
 	t.Run("Fails Configuration No SizeGB", func(t *testing.T) {
@@ -436,6 +438,7 @@ func TestModuleConfiguration(t *testing.T) {
 		cam, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, cam, test.ShouldBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "size_gb")
 	})
 
 	t.Run("Fails Configuration No CamProps", func(t *testing.T) {
@@ -447,6 +450,7 @@ func TestModuleConfiguration(t *testing.T) {
 		cam, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, cam, test.ShouldBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "cam_props")
 	})
 
 	t.Run("Fails Configuration No DataManager", func(t *testing.T) {
@@ -458,5 +462,6 @@ func TestModuleConfiguration(t *testing.T) {
 		cam, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, cam, test.ShouldBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "sync")
 	})
 }
