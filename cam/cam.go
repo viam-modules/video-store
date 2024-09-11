@@ -35,6 +35,7 @@ const (
 
 	maxGRPCSize     = 1024 * 1024 * 32 // bytes
 	deleterInterval = 10               // minutes
+	retryInterval   = 1                // seconds
 	tempPath        = "/tmp"
 )
 
@@ -334,7 +335,8 @@ func (vs *videostore) processFrames(ctx context.Context) {
 		frame, release, err := vs.stream.Next(ctx)
 		if err != nil {
 			vs.logger.Error("failed to get frame from camera", err)
-			return
+			time.Sleep(retryInterval * time.Second)
+			continue
 		}
 		lazyImage, ok := frame.(*rimage.LazyEncodedImage)
 		if !ok {
