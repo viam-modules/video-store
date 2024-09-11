@@ -1,8 +1,6 @@
 # Video Storage
 The `video-store` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and saves the output as video files on disk. You can then upload video slices to the cloud using the [save](#save) command, or request the video bytes directly using the [fetch](#fetch) command.
 
-> **Note:** This component is a work in progress and is not yet fully implemented.
-
 ## Configure your `video-store` component
 
 Fill in the attributes as applicable to the component, according to the template below.
@@ -62,11 +60,11 @@ Make sure to configure a [Data Manager Service](https://docs.viam.com/services/d
 
 ## DoCommands API
 
-## From/To
+### From/To
 
 The `From` and `To` timestamps are used to specify the start and end times for video clips. These timestamps must be provided in a specific datetime format to ensure proper parsing and formatting.
 
-### Datetime Format
+#### Datetime Format
 
 The datetime format used is: `YYYY-MM-DD_HH-MM-SS`
 
@@ -77,7 +75,7 @@ The datetime format used is: `YYYY-MM-DD_HH-MM-SS`
 - `MM`: Minutes (e.g., 30)
 - `SS`: Seconds (e.g., 45)
 
-### Datetime Example
+#### Datetime Example
 
 - `2024-01-15_14-30-45` represents January 15, 2024, at 2:30:45 PM.
 
