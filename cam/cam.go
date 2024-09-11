@@ -217,7 +217,7 @@ func newvideostore(
 		return nil, fmt.Errorf("sync service %s not found", newConf.Sync)
 	}
 
-	vs.storagePath = newConf.Storage.StoragePath
+	vs.storagePath = storagePath
 	vs.seg, err = newSegmenter(
 		logger,
 		vs.enc,
