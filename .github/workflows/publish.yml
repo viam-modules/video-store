@@ -1,0 +1,43 @@
+name: Build & publish module to registry
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runs-on: ubuntu-latest
+          - platform: linux/arm64
+            runs-on: buildjet-8vcpu-ubuntu-2204-arm
+    
+    runs-on: ${{ matrix.runs-on }}
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21.13
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libx264-dev
+
+    - name: Build and package
+      run: make module
+
+    - name: Upload video-store module to registry
+      uses: viamrobotics/upload-module@main
+      with:
+        meta-path: meta.json
+        module-path: module.tar.gz
+        platform: ${{ matrix.platform }}
+        version: ${{ github.ref_name }}
+        key-id: ${{ secrets.VIAM_DEV_API_KEY_ID }}
+        key-value: ${{ secrets.VIAM_DEV_API_KEY }}
