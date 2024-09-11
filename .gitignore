@@ -3,3 +3,4 @@ FFmpeg
 .env
 *.DS_Store
 bin
+module.tar.gz
