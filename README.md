@@ -1,8 +1,6 @@
 # Video Storage
 The `video-store` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and saves the output as video files on disk. You can then upload video slices to the cloud using the [save](#save) command, or request the video bytes directly using the [fetch](#fetch) command.
 
-> **Note:** This component is a work in progress and is not yet fully implemented.
-
 ## Configure your `video-store` component
 
 Fill in the attributes as applicable to the component, according to the template below.
@@ -60,9 +58,30 @@ Make sure to configure a [Data Manager Service](https://docs.viam.com/services/d
     }
 ```
 
-## Do Commands
+## DoCommands API
+
+### From/To
+
+The `From` and `To` timestamps are used to specify the start and end times for video clips. These timestamps must be provided in a specific datetime format to ensure proper parsing and formatting.
+
+#### Datetime Format
+
+The datetime format used is: `YYYY-MM-DD_HH-MM-SS`
+
+- `YYYY`: Year (e.g., 2023)
+- `MM`: Month (e.g., 01 for January)
+- `DD`: Day (e.g., 15)
+- `HH`: Hour in 24-hour format (e.g., 14 for 2 PM)
+- `MM`: Minutes (e.g., 30)
+- `SS`: Seconds (e.g., 45)
+
+#### Datetime Example
+
+- `2024-01-15_14-30-45` represents January 15, 2024, at 2:30:45 PM.
 
 ### `save`
+
+The save command retreives video from local storage and, uploads the clip to the cloud.
 
 #### Save Request
 ```json
@@ -83,6 +102,8 @@ Make sure to configure a [Data Manager Service](https://docs.viam.com/services/d
 ```
 
 ### `fetch`
+
+The fetch command retrieves video from local storage, and sends the bytes back to the client.
 
 #### Fetch Request
 ```json
