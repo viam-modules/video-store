@@ -173,8 +173,9 @@ func (c *concater) concat(from, to time.Time, metadata, path string) (string, er
 		return "", fmt.Errorf("failed to write header: %s", ffmpegError(ret))
 	}
 
-	// Iterate through each packet in the input context and write it to the output context.
-	// TODO(seanp): We can hopefully optimize this by copying input segments entirely instead of packet by packet.
+	// Adjust the PTS, DTS, and duration correctly for each packet.
+	// TODO(seanp): We can hopefully optimize this by copying input segments entirely
+	// instead of packet by packet.
 	packet := C.av_packet_alloc()
 	defer C.av_packet_free(&packet)
 	for {
@@ -187,13 +188,11 @@ func (c *concater) concat(from, to time.Time, metadata, path string) (string, er
 		if ret < 0 {
 			return "", fmt.Errorf("failed to read frame: %s", ffmpegError(ret))
 		}
-		// Adjust the PTS, DTS, and duration correctly for each packet.
 		// Can have multiple streams, so need to adjust each packet based on the
+		// stream it belongs to.
 		inputStreamsBase := unsafe.Pointer(inputCtx.streams)
 		inputStreamOffset := uintptr(packet.stream_index) * unsafe.Sizeof(inputCtx.streams)
 		inStream := *(**C.AVStream)(unsafe.Pointer(uintptr(inputStreamsBase) + inputStreamOffset))
-
-		// Calculate the output stream pointer safely
 		outputStreamsBase := unsafe.Pointer(outputCtx.streams)
 		outputStreamOffset := uintptr(packet.stream_index) * unsafe.Sizeof(outputCtx.streams)
 		outStream := *(**C.AVStream)(unsafe.Pointer(uintptr(outputStreamsBase) + outputStreamOffset))
