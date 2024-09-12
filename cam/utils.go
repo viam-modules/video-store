@@ -188,28 +188,13 @@ func getSortedFiles(path string) ([]string, error) {
 // extractDateTimeFromFilename extracts the date and time from the filename.
 func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
-	parts := strings.Split(baseName, "_")
-	if len(parts) < 2 {
-		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
-	}
-	datePart := parts[0]
-	timePart := strings.TrimSuffix(parts[1], filepath.Ext(parts[1]))
-	dateTimeStr := datePart + "_" + timePart
-	return parseDateTimeString(dateTimeStr)
+	dateTimeStr := strings.TrimSuffix(baseName, filepath.Ext(baseName))
+	return time.Parse(time.RFC3339, dateTimeStr)
 }
 
-// parseDateTimeString parses a date and time string in the format "2006-01-02_15-04-05".
-// Returns a time.Time object and an error if the string is not in the correct format.
-func parseDateTimeString(datetime string) (time.Time, error) {
-	dateTime, err := time.Parse("2006-01-02_15-04-05", datetime)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return dateTime, nil
-}
-
+// formatDateTimeToString formats the date and time to a string in RFC3339 format.
 func formatDateTimeToString(dateTime time.Time) string {
-	return dateTime.Format("2006-01-02_15-04-05")
+	return dateTime.Format(time.RFC3339)
 }
 
 // matchStorageToRange returns a list of files that fall within the provided time range.
@@ -280,7 +265,7 @@ func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, 
 	if !ok {
 		return time.Time{}, time.Time{}, "", false, errors.New("from timestamp not found")
 	}
-	from, err := parseDateTimeString(fromStr)
+	from, err := time.Parse(time.RFC3339, fromStr)
 	if err != nil {
 		return time.Time{}, time.Time{}, "", false, err
 	}
@@ -288,7 +273,7 @@ func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, 
 	if !ok {
 		return time.Time{}, time.Time{}, "", false, errors.New("to timestamp not found")
 	}
-	to, err := parseDateTimeString(toStr)
+	to, err := time.Parse(time.RFC3339, toStr)
 	if err != nil {
 		return time.Time{}, time.Time{}, "", false, err
 	}
@@ -312,7 +297,7 @@ func validateFetchCommand(command map[string]interface{}) (time.Time, time.Time,
 	if !ok {
 		return time.Time{}, time.Time{}, errors.New("from timestamp not found")
 	}
-	from, err := parseDateTimeString(fromStr)
+	from, err := time.Parse(time.RFC3339, fromStr)
 	if err != nil {
 		return time.Time{}, time.Time{}, err
 	}
@@ -320,7 +305,7 @@ func validateFetchCommand(command map[string]interface{}) (time.Time, time.Time,
 	if !ok {
 		return time.Time{}, time.Time{}, errors.New("to timestamp not found")
 	}
-	to, err := parseDateTimeString(toStr)
+	to, err := time.Parse(time.RFC3339, toStr)
 	if err != nil {
 		return time.Time{}, time.Time{}, err
 	}

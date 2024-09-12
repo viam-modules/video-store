@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	outputPattern = "%Y-%m-%d_%H-%M-%S.mp4"
+	outputPattern = "%Y-%m-%dT%H:%M:%SZ.mp4"
 )
 
 type segmenter struct {
