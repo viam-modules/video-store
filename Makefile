@@ -70,6 +70,7 @@ lint: tool-install $(FFMPEG_BUILD)
 
 test: $(BIN_OUTPUT_PATH)/video-store
 	git lfs pull
+	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
 	go test -v ./tests/
 
 module: $(BIN_OUTPUT_PATH)/video-store
