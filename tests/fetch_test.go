@@ -16,6 +16,10 @@ func TestFetchDoCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get absolute path: %v", err)
 	}
+	fullModuleBinPath, err := getModuleBinPath()
+	if err != nil {
+		t.Fatalf("Failed to get module bin path: %v", err)
+	}
 
 	config1 := fmt.Sprintf(`
 	{
@@ -81,7 +85,7 @@ func TestFetchDoCommand(t *testing.T) {
 				"log_level": "debug"
 			}
 		]
-	}`, videoStoreComponentName, testUploadPath, storagePath, moduleBinPath)
+	}`, videoStoreComponentName, testUploadPath, storagePath, fullModuleBinPath)
 
 	// Valid time range. Under grpc limit.
 	fetchCmd1 := map[string]interface{}{

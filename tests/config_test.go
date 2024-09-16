@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -18,7 +20,7 @@ import (
 )
 
 const (
-	moduleBinPath           = "/host/bin/linux-arm64/video-store"
+	moduleBinPath           = "bin/linux-arm64/video-store"
 	videoStoreComponentName = "video-store-1"
 	testStoragePath         = "/tmp/video-storage"
 	testUploadPath          = "/tmp/video-upload"
@@ -39,7 +41,21 @@ func setupViamServer(ctx context.Context, configStr string) (robot.Robot, error)
 	return r, nil
 }
 
+func getModuleBinPath() (string, error) {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	fullModuleBinPath := filepath.Join(currentDir, "..", moduleBinPath)
+	return fullModuleBinPath, nil
+}
+
 func TestModuleConfiguration(t *testing.T) {
+	fullModuleBinPath, err := getModuleBinPath()
+	if err != nil {
+		t.Fatalf("Failed to get module binary path: %v", err)
+	}
+
 	// Full configuration
 	config1 := fmt.Sprintf(`
 	{
@@ -105,7 +121,7 @@ func TestModuleConfiguration(t *testing.T) {
 				"log_level": "debug"
 			}
 		]
-	}`, videoStoreComponentName, testStoragePath, testUploadPath, moduleBinPath)
+	}`, videoStoreComponentName, testStoragePath, testUploadPath, fullModuleBinPath)
 
 	// no camera specified
 	config2 := fmt.Sprintf(`
@@ -150,7 +166,7 @@ func TestModuleConfiguration(t *testing.T) {
                 "log_level": "debug"
             }
         ]
-    }`, moduleBinPath)
+    }`, fullModuleBinPath)
 
 	// Storage NOT specified
 	config3 := fmt.Sprintf(`
@@ -211,7 +227,7 @@ func TestModuleConfiguration(t *testing.T) {
 				"log_level": "debug"
 			}
 		]
-	}`, moduleBinPath)
+	}`, fullModuleBinPath)
 
 	// size_gb NOT specified
 	config4 := fmt.Sprintf(`
@@ -277,7 +293,7 @@ func TestModuleConfiguration(t *testing.T) {
 				"log_level": "debug"
 			}
 		]
-	}`, moduleBinPath)
+	}`, fullModuleBinPath)
 
 	// cam_props NOT specified
 	config5 := fmt.Sprintf(`
@@ -339,7 +355,7 @@ func TestModuleConfiguration(t *testing.T) {
 				"log_level": "debug"
 			}
 		]
-	}`, moduleBinPath)
+	}`, fullModuleBinPath)
 
 	// dat_manager NOT specified
 	config6 := fmt.Sprintf(`
@@ -391,7 +407,7 @@ func TestModuleConfiguration(t *testing.T) {
 				"log_level": "debug"
 			}
 		]
-	}`, moduleBinPath)
+	}`, fullModuleBinPath)
 
 	t.Run("Valid Configuration Successful", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)

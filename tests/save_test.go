@@ -12,11 +12,14 @@ import (
 )
 
 func TestSaveDoCommand(t *testing.T) {
-	// Create absolute path to the test storage dir
 	storageRelativePath := "./video-storage"
 	storagePath, err := filepath.Abs(storageRelativePath)
 	if err != nil {
 		t.Fatalf("Failed to get absolute path: %v", err)
+	}
+	fullModuleBinPath, err := getModuleBinPath()
+	if err != nil {
+		t.Fatalf("Failed to get module bin path: %v", err)
 	}
 
 	config1 := fmt.Sprintf(`
@@ -83,7 +86,7 @@ func TestSaveDoCommand(t *testing.T) {
 				"log_level": "debug"
 			}
 		]
-	}`, videoStoreComponentName, testUploadPath, storagePath, moduleBinPath)
+	}`, videoStoreComponentName, testUploadPath, storagePath, fullModuleBinPath)
 
 	// Valid time range
 	saveCmd1 := map[string]interface{}{
