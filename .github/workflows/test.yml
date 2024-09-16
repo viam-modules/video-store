@@ -16,7 +16,15 @@ on:
 
 jobs:
   tests:
-    runs-on: buildjet-8vcpu-ubuntu-2204-arm
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runs-on: ubuntu-latest
+          - platform: linux/arm64
+            runs-on: buildjet-8vcpu-ubuntu-2204-arm
+
+    runs-on: ${{ matrix.runs-on }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
