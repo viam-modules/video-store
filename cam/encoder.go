@@ -160,34 +160,43 @@ func (e *encoder) close() {
 	C.avcodec_free_context(&e.codecCtx)
 }
 
-// imageToYUV422 extracts unpadded yuv4222 bytes from iamge.Image.
-// TODO(seanp): Make this fast by finding a smarter way to remove padding
-// without iterating over every pixel.
+// imageToYUV422 extracts unpadded YUV422 bytes from image.Image.
+// This uses a row-wise copy of the Y, U, and V planes.
 func imageToYUV422(img image.Image) ([]byte, error) {
 	ycbcrImg, ok := img.(*image.YCbCr)
 	if !ok {
 		return nil, fmt.Errorf("expected type *image.YCbCr, got %s", reflect.TypeOf(img))
 	}
-	ySize := ycbcrImg.Rect.Dx() * ycbcrImg.Rect.Dy()
-	uSize := ySize / 2
-	vSize := ySize / 2
-	rawYUV := make([]byte, ySize+uSize+vSize)
-	yIndex := 0
-	uIndex := ySize
-	vIndex := ySize + uSize
-	for y := 0; y < ycbcrImg.Rect.Dy(); y++ {
-		for x := 0; x < ycbcrImg.Rect.Dx(); x++ {
-			yOff := y*ycbcrImg.YStride + x
-			cOff := (y/2)*ycbcrImg.CStride + (x / 2)
-			rawYUV[yIndex] = ycbcrImg.Y[yOff]
-			yIndex++
-			if x%2 == 0 {
-				rawYUV[uIndex] = ycbcrImg.Cb[cOff]
-				rawYUV[vIndex] = ycbcrImg.Cr[cOff]
-				uIndex++
-				vIndex++
-			}
-		}
+
+	rect := ycbcrImg.Rect
+	width := rect.Dx()
+	height := rect.Dy()
+
+	// Ensure width is even for YUV422 format
+	if width%2 != 0 {
+		return nil, fmt.Errorf("image width must be even for YUV422 format, got width=%d", width)
 	}
+
+	ySize := width * height
+	halfWidth := width / 2
+	uSize := halfWidth * height
+	vSize := uSize
+
+	rawYUV := make([]byte, ySize+uSize+vSize)
+
+	for y := 0; y < height; y++ {
+		ySrcStart := ycbcrImg.YOffset(rect.Min.X, rect.Min.Y+y)
+		yDstStart := y * width
+		copy(rawYUV[yDstStart:yDstStart+width], ycbcrImg.Y[ySrcStart:ySrcStart+width])
+	}
+
+	for y := 0; y < height; y++ {
+		cSrcStart := ycbcrImg.COffset(rect.Min.X, rect.Min.Y+y)
+		uDstStart := y * halfWidth
+		vDstStart := y * halfWidth
+		copy(rawYUV[ySize+uDstStart:ySize+uDstStart+halfWidth], ycbcrImg.Cb[cSrcStart:cSrcStart+halfWidth])
+		copy(rawYUV[ySize+uSize+vDstStart:ySize+uSize+vDstStart+halfWidth], ycbcrImg.Cr[cSrcStart:cSrcStart+halfWidth])
+	}
+
 	return rawYUV, nil
 }
