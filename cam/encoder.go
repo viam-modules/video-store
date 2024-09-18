@@ -186,14 +186,12 @@ func imageToYUV422(img image.Image) ([]byte, error) {
 
 	for y := 0; y < height; y++ {
 		ySrcStart := ycbcrImg.YOffset(rect.Min.X, rect.Min.Y+y)
-		yDstStart := y * width
-		copy(rawYUV[yDstStart:yDstStart+width], ycbcrImg.Y[ySrcStart:ySrcStart+width])
-	}
-
-	for y := 0; y < height; y++ {
 		cSrcStart := ycbcrImg.COffset(rect.Min.X, rect.Min.Y+y)
+		yDstStart := y * width
 		uDstStart := y * halfWidth
 		vDstStart := y * halfWidth
+
+		copy(rawYUV[yDstStart:yDstStart+width], ycbcrImg.Y[ySrcStart:ySrcStart+width])
 		copy(rawYUV[ySize+uDstStart:ySize+uDstStart+halfWidth], ycbcrImg.Cb[cSrcStart:cSrcStart+halfWidth])
 		copy(rawYUV[ySize+uSize+vDstStart:ySize+uSize+vDstStart+halfWidth], ycbcrImg.Cr[cSrcStart:cSrcStart+halfWidth])
 	}
