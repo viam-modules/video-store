@@ -72,6 +72,7 @@ test: $(BIN_OUTPUT_PATH)/video-store
 	git lfs pull
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
 	go test -v ./tests/
+	rm bin/video-store
 
 module: $(BIN_OUTPUT_PATH)/video-store
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
