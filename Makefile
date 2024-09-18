@@ -34,7 +34,20 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-protocol=crypto \
                --enable-bsf=h264_mp4toannexb
 
-CGO_LDFLAGS := "-L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -l:libjpeg.a -l:libx264.a -lz"
+ifeq ($(SOURCE_OS),darwin)
+    ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
+        brew install x264
+    endif
+endif
+
+CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lz
+ifeq ($(SOURCE_OS),linux)
+	CGO_LDFLAGS += -l:libjpeg.a -l:libx264.a
+endif
+ifeq ($(SOURCE_OS),darwin)
+	CGO_LDFLAGS += $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a -liconv
+endif
+
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 GOFLAGS := -buildvcs=false
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
@@ -43,7 +56,7 @@ export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 $(BIN_OUTPUT_PATH)/video-store: *.go cam/*.go $(FFMPEG_BUILD)
 	go mod tidy
-	CGO_LDFLAGS=$(CGO_LDFLAGS) CGO_CFLAGS=$(CGO_CFLAGS) go build -o $(BIN_OUTPUT_PATH)/video-store main.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -o $(BIN_OUTPUT_PATH)/video-store main.go
 
 $(FFMPEG_VERSION_PLATFORM):
 	git clone https://github.com/FFmpeg/FFmpeg.git --depth 1 --branch $(FFMPEG_TAG) $(FFMPEG_VERSION_PLATFORM)
