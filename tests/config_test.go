@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	moduleBinPath           = "bin/linux-arm64/video-store"
+	moduleBinPath           = "bin/video-store"
 	videoStoreComponentName = "video-store-1"
 	testStoragePath         = "/tmp/video-storage"
 	testUploadPath          = "/tmp/video-upload"

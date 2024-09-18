@@ -34,7 +34,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-protocol=crypto \
                --enable-bsf=h264_mp4toannexb
 
-CGO_LDFLAGS := "-L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -l:libjpeg.a /usr/lib/aarch64-linux-gnu/libx264.a -lz"
+CGO_LDFLAGS := "-L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -l:libjpeg.a -l:libx264.a -lz"
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 GOFLAGS := -buildvcs=false
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
@@ -70,7 +70,9 @@ lint: tool-install $(FFMPEG_BUILD)
 
 test: $(BIN_OUTPUT_PATH)/video-store
 	git lfs pull
+	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
 	go test -v ./tests/
+	rm bin/video-store
 
 module: $(BIN_OUTPUT_PATH)/video-store
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
