@@ -42,7 +42,7 @@ endif
 
 ifeq ($(SOURCE_OS),linux)
 ifeq ($(shell dpkg -l | grep -w x264 > /dev/null; echo $$?), 1)
-    sudo apt update && sudo apt install -y libx264-dev
+	sudo apt update && sudo apt install -y libx264-dev
 endif
 endif
 
