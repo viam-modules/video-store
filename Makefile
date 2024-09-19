@@ -34,18 +34,6 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-protocol=crypto \
                --enable-bsf=h264_mp4toannexb
 
-ifeq ($(SOURCE_OS),darwin)
-ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
-	brew install x264
-endif
-endif
-
-ifeq ($(SOURCE_OS),linux)
-ifeq ($(shell dpkg -l | grep -w x264 > /dev/null; echo $$?), 1)
-	sudo apt update && sudo apt install -y libx264-dev
-endif
-endif
-
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lz
 ifeq ($(SOURCE_OS),linux)
 	CGO_LDFLAGS += -l:libjpeg.a -l:libx264.a
@@ -85,7 +73,6 @@ tool-install:
 lint: tool-install $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
-
 
 test: $(BIN_OUTPUT_PATH)/video-store
 	git lfs pull
