@@ -36,7 +36,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 
 ifeq ($(SOURCE_OS),darwin)
 ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
-    brew install x264
+	brew install x264
 endif
 endif
 
