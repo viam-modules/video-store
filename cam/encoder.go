@@ -49,7 +49,7 @@ func newEncoder(
 		return nil, errors.New("failed to allocate codec context")
 	}
 
-	enc.codecCtx.bit_rate = C.long(bitrate)
+	enc.codecCtx.bit_rate = C.int64_t(bitrate)
 	enc.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV422P
 	enc.codecCtx.time_base = C.AVRational{num: 1, den: C.int(framerate)}
 	enc.codecCtx.gop_size = C.int(framerate)
