@@ -35,9 +35,15 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-bsf=h264_mp4toannexb
 
 ifeq ($(SOURCE_OS),darwin)
-    ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
-        brew install x264
-    endif
+ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
+    brew install x264
+endif
+endif
+
+ifeq ($(SOURCE_OS),linux)
+ifeq ($(shell dpkg -l | grep -w x264 > /dev/null; echo $$?), 1)
+	sudo apt update && sudo apt install -y libx264-dev
+endif
 endif
 
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lz
@@ -82,6 +88,17 @@ lint: tool-install $(FFMPEG_BUILD)
 
 
 test: $(BIN_OUTPUT_PATH)/video-store
+# check if git-lfs is installed
+ifeq ($(shell command -v git-lfs 2>/dev/null),)
+	$(info git-lfs not found, installing...)
+	ifeq ($(SOURCE_OS),linux)
+		sudo apt-get update && sudo apt-get install -y git-lfs
+	endif
+	ifeq ($(SOURCE_OS),darwin)
+		brew install git-lfs
+		endif
+		git lfs install
+endif
 	git lfs pull
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
 	go test -v ./tests/
