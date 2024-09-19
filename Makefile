@@ -65,6 +65,11 @@ ifeq ($(SOURCE_ARCH),amd64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
 endif
 endif
+ifeq ($(SOURCE_OS),darwin)
+ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
+	brew update && brew install x264
+endif
+endif
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
 
 tool-install:
