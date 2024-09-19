@@ -58,6 +58,9 @@ $(FFMPEG_VERSION_PLATFORM):
 $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
 # Only need nasm to build assembly kernels for amd64 targets.
 ifeq ($(SOURCE_OS),linux)
+ifeq ($(shell dpkg -l | grep -w x264 > /dev/null; echo $$?), 1)
+	sudo apt update && sudo apt install -y libx264-dev
+endif
 ifeq ($(SOURCE_ARCH),amd64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
 endif
