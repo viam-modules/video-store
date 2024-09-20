@@ -275,31 +275,35 @@ func validateTimeRange(files []string, start, end time.Time) error {
 }
 
 // validateSaveCommand validates the save command params and checks for valid time format.
-func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, string, error) {
+func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, string, bool, error) {
 	fromStr, ok := command["from"].(string)
 	if !ok {
-		return time.Time{}, time.Time{}, "", errors.New("from timestamp not found")
+		return time.Time{}, time.Time{}, "", false, errors.New("from timestamp not found")
 	}
 	from, err := parseDateTimeString(fromStr)
 	if err != nil {
-		return time.Time{}, time.Time{}, "", err
+		return time.Time{}, time.Time{}, "", false, err
 	}
 	toStr, ok := command["to"].(string)
 	if !ok {
-		return time.Time{}, time.Time{}, "", errors.New("to timestamp not found")
+		return time.Time{}, time.Time{}, "", false, errors.New("to timestamp not found")
 	}
 	to, err := parseDateTimeString(toStr)
 	if err != nil {
-		return time.Time{}, time.Time{}, "", err
+		return time.Time{}, time.Time{}, "", false, err
 	}
 	if from.After(to) {
-		return time.Time{}, time.Time{}, "", errors.New("from timestamp is after to timestamp")
+		return time.Time{}, time.Time{}, "", false, errors.New("from timestamp is after to timestamp")
 	}
 	metadata, ok := command["metadata"].(string)
 	if !ok {
 		metadata = ""
 	}
-	return from, to, metadata, nil
+	async, ok := command["async"].(bool)
+	if !ok {
+		async = false
+	}
+	return from, to, metadata, async, nil
 }
 
 // validateFetchCommand validates the fetch command params and checks for valid time format.

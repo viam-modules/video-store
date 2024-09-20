@@ -270,9 +270,22 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 	// The response contains the name of the uploaded file.
 	case "save":
 		vs.logger.Debug("save command received")
-		from, to, metadata, err := validateSaveCommand(command)
+		from, to, metadata, async, err := validateSaveCommand(command)
 		if err != nil {
 			return nil, err
+		}
+		if async {
+			go func() {
+				time.Sleep(vs.conc.segmentDur)
+				_, err := vs.conc.concat(from, to, metadata, vs.uploadPath)
+				if err != nil {
+					vs.logger.Error("failed to concat files ", err)
+				}
+			}()
+			return map[string]interface{}{
+				"command": "save",
+				"status":  "async",
+			}, nil
 		}
 		uploadFilePath, err := vs.conc.concat(from, to, metadata, vs.uploadPath)
 		if err != nil {
