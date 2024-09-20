@@ -274,7 +274,10 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		if err != nil {
 			return nil, err
 		}
+		uploadFilePath := generateOutputFilename(vs.name.Name, formatDateTimeToString(from), metadata, vs.uploadPath)
+		uploadFileName := filepath.Base(uploadFilePath)
 		if async {
+			vs.logger.Debug("save command is async")
 			go func() {
 				time.Sleep(vs.conc.segmentDur)
 				_, err := vs.conc.concat(from, to, metadata, vs.uploadPath)
@@ -283,16 +286,16 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 				}
 			}()
 			return map[string]interface{}{
-				"command": "save",
-				"status":  "async",
+				"command":  "save",
+				"filename": uploadFileName,
+				"status":   "async",
 			}, nil
 		}
-		uploadFilePath, err := vs.conc.concat(from, to, metadata, vs.uploadPath)
+		_, err = vs.conc.concat(from, to, metadata, vs.uploadPath)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err
 		}
-		uploadFileName := filepath.Base(uploadFilePath)
 		return map[string]interface{}{
 			"command":  "save",
 			"filename": uploadFileName,
