@@ -15,40 +15,31 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/google/uuid"
 	"go.viam.com/rdk/logging"
 )
 
 const (
-	conactTextFileName = "concat.txt"
+	conactTxtFileName = "concat_%s.txt"
+	concatTxtDir      = "/tmp"
 )
 
 type concater struct {
 	logger      logging.Logger
 	storagePath string
 	uploadPath  string
-	camName     string
 	segmentDur  time.Duration
-	concatFile  *os.File
 }
 
 func newConcater(
 	logger logging.Logger,
-	storagePath, uploadPath, camName string,
+	storagePath, uploadPath string,
 	segmentSeconds int,
 ) (*concater, error) {
-	concatPath := filepath.Join(getHomeDir(), ".viam", conactTextFileName)
-	logger.Debugf("concatPath: %s", concatPath)
-	concatFile, err := os.Create(concatPath)
-	if err != nil {
-		logger.Error("failed to create concat file", err)
-		return nil, err
-	}
 	return &concater{
 		logger:      logger,
 		storagePath: storagePath,
 		uploadPath:  uploadPath,
-		concatFile:  concatFile,
-		camName:     camName,
 		segmentDur:  time.Duration(segmentSeconds) * time.Second,
 	}, nil
 }
@@ -74,23 +65,25 @@ func (c *concater) concat(from, to time.Time, path string) error {
 		return errors.New("no matching video data to save")
 	}
 
-	// Clear the concat file and write the matching files list to it.
-	c.concatFile.Truncate(0)
-	c.concatFile.Seek(0, 0)
+	concatFilePath := generateConcatFilePath()
+	concatTxtFile, err := os.Create(concatFilePath)
+	if err != nil {
+		return err
+	}
 	for _, file := range matchingFiles {
-		_, err := c.concatFile.WriteString(file + "\n")
+		_, err := concatTxtFile.WriteString(file + "\n")
 		if err != nil {
 			return err
 		}
 	}
 
-	concatFilePath := C.CString(c.concatFile.Name())
-	concatStr := C.CString("concat")
+	concatFilePathCStr := C.CString(concatFilePath)
+	concatCStr := C.CString("concat")
 	defer func() {
-		C.free(unsafe.Pointer(concatFilePath))
-		C.free(unsafe.Pointer(concatStr))
+		C.free(unsafe.Pointer(concatFilePathCStr))
+		C.free(unsafe.Pointer(concatCStr))
 	}()
-	inputFormat := C.av_find_input_format(concatStr)
+	inputFormat := C.av_find_input_format(concatCStr)
 	if inputFormat == nil {
 		return errors.New("failed to find input format")
 	}
@@ -113,7 +106,7 @@ func (c *concater) concat(from, to time.Time, path string) error {
 	if ret < 0 {
 		return fmt.Errorf("failed to set option: %s", ffmpegError(ret))
 	}
-	ret = C.avformat_open_input(&inputCtx, concatFilePath, inputFormat, &options)
+	ret = C.avformat_open_input(&inputCtx, concatFilePathCStr, inputFormat, &options)
 	if ret < 0 {
 		return fmt.Errorf("failed to open input format: %s", ffmpegError(ret))
 	}
@@ -205,16 +198,18 @@ func (c *concater) concat(from, to time.Time, path string) error {
 		return fmt.Errorf("failed to write trailer: %s", ffmpegError(ret))
 	}
 
+	// Delete tmp concat txt file
+	if err := os.Remove(concatFilePath); err != nil {
+		c.logger.Error("failed to remove concat file", err)
+	}
+
 	return nil
 }
 
-// close closes the concater and removes the concat file.
-// Do not need to clean up FFmpeg resources as they are handled in the concat function.
-func (c *concater) close() {
-	if err := c.concatFile.Close(); err != nil {
-		c.logger.Error("failed to close concat file", err)
-	}
-	if err := os.Remove(c.concatFile.Name()); err != nil {
-		c.logger.Error("failed to remove concat file", err)
-	}
+// generateConcatFileName generates a unique file name for the concatenated video.
+func generateConcatFilePath() string {
+	uniqueID := uuid.New().String()
+	fileName := fmt.Sprintf(conactTxtFileName, uniqueID)
+	filePath := filepath.Join(concatTxtDir, fileName)
+	return filePath
 }

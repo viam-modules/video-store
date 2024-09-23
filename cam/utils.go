@@ -331,7 +331,7 @@ func validateFetchCommand(command map[string]interface{}) (time.Time, time.Time,
 }
 
 // generateOutputFilename generates the output filename for the video file.
-func generateOutputFilename(camName, fromStr, metadata, path string) string {
+func generateOutputFilePath(camName, fromStr, metadata, path string) string {
 	var outputFilename string
 	if metadata == "" {
 		outputFilename = fmt.Sprintf("%s_%s.%s", camName, fromStr, defaultVideoFormat)

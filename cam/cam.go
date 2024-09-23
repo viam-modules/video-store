@@ -240,7 +240,6 @@ func newvideostore(
 		logger,
 		vs.storagePath,
 		vs.uploadPath,
-		vs.name.Name,
 		segmentSeconds,
 	)
 	if err != nil {
@@ -274,7 +273,7 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		if err != nil {
 			return nil, err
 		}
-		uploadFilePath := generateOutputFilename(vs.name.Name, formatDateTimeToString(from), metadata, vs.uploadPath)
+		uploadFilePath := generateOutputFilePath(vs.name.Name, formatDateTimeToString(from), metadata, vs.uploadPath)
 		uploadFileName := filepath.Base(uploadFilePath)
 		if async {
 			vs.logger.Debug("save command is async")
@@ -307,7 +306,7 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		if err != nil {
 			return nil, err
 		}
-		fetchFilePath := generateOutputFilename(vs.name.Name, formatDateTimeToString(from), "", tempPath)
+		fetchFilePath := generateOutputFilePath(vs.name.Name, formatDateTimeToString(from), "", tempPath)
 		err = vs.conc.concat(from, to, tempPath)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
@@ -405,7 +404,6 @@ func (vs *videostore) Close(ctx context.Context) error {
 	vs.workers.Stop()
 	vs.enc.close()
 	vs.seg.close()
-	vs.conc.close()
 	return nil
 }
 
