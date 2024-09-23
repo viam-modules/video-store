@@ -311,7 +311,7 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 			return nil, err
 		}
 		fetchFilePath := generateOutputFilePath(vs.name.Name, formatDateTimeToString(from), "", tempPath)
-		err = vs.conc.concat(from, to, tempPath)
+		err = vs.conc.concat(from, to, fetchFilePath)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err

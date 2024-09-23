@@ -36,12 +36,17 @@ func newConcater(
 	storagePath, uploadPath string,
 	segmentSeconds int,
 ) (*concater, error) {
-	return &concater{
+	c := &concater{
 		logger:      logger,
 		storagePath: storagePath,
 		uploadPath:  uploadPath,
 		segmentDur:  time.Duration(segmentSeconds) * time.Second,
-	}, nil
+	}
+	err := c.cleanupConcatTxtFiles()
+	if err != nil {
+		c.logger.Error("failed to cleanup concat txt files", err)
+	}
+	return c, nil
 }
 
 // concat takes in from and to timestamps and concates the video files between them.
@@ -207,7 +212,25 @@ func (c *concater) concat(from, to time.Time, path string) error {
 	return nil
 }
 
-// generateConcatFileName generates a unique file name for concat txt reference file.
+// cleanupConcatTxtFiles cleans up the concat txt files in the tmp directory.
+// This is precautionary to ensure that no dangling files are left behind if the
+// module is closes during a concat operation.
+func (c *concater) cleanupConcatTxtFiles() error {
+	pattern := fmt.Sprintf(conactTxtFilePattern, "*")
+	files, err := filepath.Glob(filepath.Join(concatTxtDir, pattern))
+	if err != nil {
+		c.logger.Error("failed to list files in /tmp", err)
+		return err
+	}
+	for _, file := range files {
+		if err := os.Remove(file); err != nil {
+			c.logger.Error("failed to remove file", err)
+		}
+	}
+	return nil
+}
+
+// generateConcatFilePath generates a unique file name for concat txt reference file.
 // This allows multiple concats to be done concurrently without conflicts.
 func generateConcatFilePath() string {
 	uniqueID := uuid.New().String()
