@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	conactTxtFileName = "concat_%s.txt"
-	concatTxtDir      = "/tmp"
+	conactTxtFilePattern = "concat_%s.txt"
+	concatTxtDir         = "/tmp"
 )
 
 type concater struct {
@@ -65,6 +65,7 @@ func (c *concater) concat(from, to time.Time, path string) error {
 		return errors.New("no matching video data to save")
 	}
 
+	// Create a temporary file to store the list of files to concatenate.
 	concatFilePath := generateConcatFilePath()
 	concatTxtFile, err := os.Create(concatFilePath)
 	if err != nil {
@@ -206,10 +207,11 @@ func (c *concater) concat(from, to time.Time, path string) error {
 	return nil
 }
 
-// generateConcatFileName generates a unique file name for the concatenated video.
+// generateConcatFileName generates a unique file name for concat txt reference file.
+// This allows multiple concats to be done concurrently without conflicts.
 func generateConcatFilePath() string {
 	uniqueID := uuid.New().String()
-	fileName := fmt.Sprintf(conactTxtFileName, uniqueID)
+	fileName := fmt.Sprintf(conactTxtFilePattern, uniqueID)
 	filePath := filepath.Join(concatTxtDir, fileName)
 	return filePath
 }
