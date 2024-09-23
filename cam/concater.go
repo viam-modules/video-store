@@ -55,23 +55,23 @@ func newConcater(
 
 // concat takes in from and to timestamps and concates the video files between them.
 // returns the path to the concated video file.
-func (c *concater) concat(from, to time.Time, metadata, path string) (string, error) {
+func (c *concater) concat(from, to time.Time, path string) error {
 	// Find the storage files that match the concat query.
 	storageFiles, err := getSortedFiles(c.storagePath)
 	if err != nil {
 		c.logger.Error("failed to get sorted files", err)
-		return "", err
+		return err
 	}
 	if len(storageFiles) == 0 {
-		return "", errors.New("no video data in storage")
+		return errors.New("no video data in storage")
 	}
 	err = validateTimeRange(storageFiles, from, to)
 	if err != nil {
-		return "", err
+		return err
 	}
 	matchingFiles := matchStorageToRange(storageFiles, from, to, c.segmentDur)
 	if len(matchingFiles) == 0 {
-		return "", errors.New("no matching video data to save")
+		return errors.New("no matching video data to save")
 	}
 
 	// Clear the concat file and write the matching files list to it.
@@ -80,7 +80,7 @@ func (c *concater) concat(from, to time.Time, metadata, path string) (string, er
 	for _, file := range matchingFiles {
 		_, err := c.concatFile.WriteString(file + "\n")
 		if err != nil {
-			return "", err
+			return err
 		}
 	}
 
@@ -92,7 +92,7 @@ func (c *concater) concat(from, to time.Time, metadata, path string) (string, er
 	}()
 	inputFormat := C.av_find_input_format(concatStr)
 	if inputFormat == nil {
-		return "", errors.New("failed to find input format")
+		return errors.New("failed to find input format")
 	}
 
 	// Open the input format context with the concat demuxer. This block sets up
@@ -111,28 +111,20 @@ func (c *concater) concat(from, to time.Time, metadata, path string) (string, er
 	}()
 	ret := C.av_dict_set(&options, safeStr, safeValStr, 0)
 	if ret < 0 {
-		return "", fmt.Errorf("failed to set option: %s", ffmpegError(ret))
+		return fmt.Errorf("failed to set option: %s", ffmpegError(ret))
 	}
 	ret = C.avformat_open_input(&inputCtx, concatFilePath, inputFormat, &options)
 	if ret < 0 {
-		return "", fmt.Errorf("failed to open input format: %s", ffmpegError(ret))
+		return fmt.Errorf("failed to open input format: %s", ffmpegError(ret))
 	}
 	ret = C.avformat_find_stream_info(inputCtx, nil)
 	if ret < 0 {
-		return "", fmt.Errorf("failed to find stream info: %s", ffmpegError(ret))
+		return fmt.Errorf("failed to find stream info: %s", ffmpegError(ret))
 	}
 
 	// Open the output format context and write the header. This block sets up the
 	// output format context to write the concatenated video data to a new file.
-	var outputFilename string
-	fromStr := formatDateTimeToString(from)
-	if metadata == "" {
-		outputFilename = fmt.Sprintf("%s_%s.%s", c.camName, fromStr, defaultVideoFormat)
-	} else {
-		outputFilename = fmt.Sprintf("%s_%s_%s.%s", c.camName, fromStr, metadata, defaultVideoFormat)
-	}
-	outputPath := filepath.Join(path, outputFilename)
-	outputPathCStr := C.CString(outputPath)
+	outputPathCStr := C.CString(path)
 	var outputCtx *C.AVFormatContext
 	defer func() {
 		C.free(unsafe.Pointer(outputPathCStr))
@@ -142,7 +134,7 @@ func (c *concater) concat(from, to time.Time, metadata, path string) (string, er
 
 	ret = C.avformat_alloc_output_context2(&outputCtx, nil, nil, outputPathCStr)
 	if ret < 0 {
-		return "", fmt.Errorf("failed to allocate output context: %s", ffmpegError(ret))
+		return fmt.Errorf("failed to allocate output context: %s", ffmpegError(ret))
 	}
 
 	// Copy codec info from input to output context. This is necessary to ensure
@@ -153,11 +145,11 @@ func (c *concater) concat(from, to time.Time, metadata, path string) (string, er
 				uintptr(i)*unsafe.Sizeof(inputCtx.streams)))
 		outStream := C.avformat_new_stream(outputCtx, nil)
 		if outStream == nil {
-			return "", fmt.Errorf("failed to allocate stream")
+			return fmt.Errorf("failed to allocate stream")
 		}
 		ret := C.avcodec_parameters_copy(outStream.codecpar, inStream.codecpar)
 		if ret < 0 {
-			return "", fmt.Errorf("failed to copy codec parameters: %s", ffmpegError(ret))
+			return fmt.Errorf("failed to copy codec parameters: %s", ffmpegError(ret))
 		}
 		// Let ffmpeg handle the codec tag for us.
 		outStream.codecpar.codec_tag = 0
@@ -166,11 +158,11 @@ func (c *concater) concat(from, to time.Time, metadata, path string) (string, er
 	// Open the output file and write the header.
 	ret = C.avio_open(&outputCtx.pb, outputPathCStr, C.AVIO_FLAG_WRITE)
 	if ret < 0 {
-		return "", fmt.Errorf("failed to open output file: %s", ffmpegError(ret))
+		return fmt.Errorf("failed to open output file: %s", ffmpegError(ret))
 	}
 	ret = C.avformat_write_header(outputCtx, nil)
 	if ret < 0 {
-		return "", fmt.Errorf("failed to write header: %s", ffmpegError(ret))
+		return fmt.Errorf("failed to write header: %s", ffmpegError(ret))
 	}
 
 	// Adjust the PTS, DTS, and duration correctly for each packet.
@@ -186,7 +178,7 @@ func (c *concater) concat(from, to time.Time, metadata, path string) (string, er
 		}
 		// Any error other than EOF is a problem.
 		if ret < 0 {
-			return "", fmt.Errorf("failed to read frame: %s", ffmpegError(ret))
+			return fmt.Errorf("failed to read frame: %s", ffmpegError(ret))
 		}
 		// Can have multiple streams, so need to adjust each packet based on the
 		// stream it belongs to.
@@ -203,17 +195,17 @@ func (c *concater) concat(from, to time.Time, metadata, path string) (string, er
 		packet.pos = -1
 		ret = C.av_interleaved_write_frame(outputCtx, packet)
 		if ret < 0 {
-			return "", fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
+			return fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
 		}
 	}
 
 	// Write the trailer, close the output file, and free context memory.
 	ret = C.av_write_trailer(outputCtx)
 	if ret < 0 {
-		return "", fmt.Errorf("failed to write trailer: %s", ffmpegError(ret))
+		return fmt.Errorf("failed to write trailer: %s", ffmpegError(ret))
 	}
 
-	return outputPath, nil
+	return nil
 }
 
 // close closes the concater and removes the concat file.

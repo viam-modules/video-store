@@ -280,7 +280,7 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 			vs.logger.Debug("save command is async")
 			go func() {
 				time.Sleep(vs.conc.segmentDur)
-				_, err := vs.conc.concat(from, to, metadata, vs.uploadPath)
+				err = vs.conc.concat(from, to, uploadFilePath)
 				if err != nil {
 					vs.logger.Error("failed to concat files ", err)
 				}
@@ -291,7 +291,7 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 				"status":   "async",
 			}, nil
 		}
-		_, err = vs.conc.concat(from, to, metadata, vs.uploadPath)
+		err = vs.conc.concat(from, to, uploadFilePath)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err
@@ -302,26 +302,29 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		}, nil
 	case "fetch":
 		vs.logger.Debug("fetch command received")
+
 		from, to, err := validateFetchCommand(command)
 		if err != nil {
 			return nil, err
 		}
-		tmpFilePath, err := vs.conc.concat(from, to, "", tempPath)
+		fetchFilePath := generateOutputFilename(vs.name.Name, formatDateTimeToString(from), "", tempPath)
+		err = vs.conc.concat(from, to, tempPath)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err
 		}
-		videoSize, err := getFileSize(tmpFilePath)
+		videoSize, err := getFileSize(fetchFilePath)
 		if err != nil {
 			return nil, err
 		}
 		if videoSize > maxGRPCSize {
 			return nil, errors.New("video file size exceeds max grpc size")
 		}
-		videoBytes, err := readVideoFile(tmpFilePath)
+		videoBytes, err := readVideoFile(fetchFilePath)
 		if err != nil {
 			return nil, err
 		}
+		// TODO(seanp): Delete the temp file after reading the bytes.
 		vs.logger.Debug("video bytes: ", len(videoBytes))
 		// TODO(seanp): Do we need to encode the video bytes to base64?
 		videoBytesBase64 := base64.StdEncoding.EncodeToString(videoBytes)
