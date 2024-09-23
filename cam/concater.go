@@ -214,7 +214,7 @@ func (c *concater) concat(from, to time.Time, path string) error {
 
 // cleanupConcatTxtFiles cleans up the concat txt files in the tmp directory.
 // This is precautionary to ensure that no dangling files are left behind if the
-// module is closes during a concat operation.
+// module is closed during a concat operation.
 func (c *concater) cleanupConcatTxtFiles() error {
 	pattern := fmt.Sprintf(conactTxtFilePattern, "*")
 	files, err := filepath.Glob(filepath.Join(concatTxtDir, pattern))
@@ -231,7 +231,7 @@ func (c *concater) cleanupConcatTxtFiles() error {
 }
 
 // generateConcatFilePath generates a unique file name for concat txt reference file.
-// This allows multiple concats to be done concurrently without conflicts.
+// This allows multiple concats to be run concurrently without conflicts.
 func generateConcatFilePath() string {
 	uniqueID := uuid.New().String()
 	fileName := fmt.Sprintf(conactTxtFilePattern, uniqueID)

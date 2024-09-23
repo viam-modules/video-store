@@ -280,7 +280,7 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		// is written to storage before concatenation.
 		// TODO: (seanp) Optimize this to immediately run as soon as the current segment is completed.
 		if async {
-			vs.logger.Debug("run save command asynchronously")
+			vs.logger.Debug("running save command asynchronously")
 			go func() {
 				time.Sleep(vs.conc.segmentDur)
 				err = vs.conc.concat(from, to, uploadFilePath)
@@ -305,7 +305,6 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		}, nil
 	case "fetch":
 		vs.logger.Debug("fetch command received")
-
 		from, to, err := validateFetchCommand(command)
 		if err != nil {
 			return nil, err
@@ -327,7 +326,6 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		if err != nil {
 			return nil, err
 		}
-		// TODO(seanp): Delete the temp file after reading the bytes.
 		vs.logger.Debug("video bytes: ", len(videoBytes))
 		// TODO(seanp): Do we need to encode the video bytes to base64?
 		videoBytesBase64 := base64.StdEncoding.EncodeToString(videoBytes)
