@@ -278,7 +278,7 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		// Async save command will run the concat operation in the background.
 		// It waits for the segment duration before running to ensure the last segment
 		// is written to storage before concatenation.
-		// TODO: (seanp) Optimize this to immediately run once the last segment is written.
+		// TODO: (seanp) Optimize this to immediately run as soon as the current segment is completed.
 		if async {
 			vs.logger.Debug("run save command asynchronously")
 			go func() {

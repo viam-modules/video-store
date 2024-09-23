@@ -112,6 +112,15 @@ func TestSaveDoCommand(t *testing.T) {
 		"metadata": "test-metadata",
 	}
 
+	// Valid async save
+	saveCmd4 := map[string]interface{}{
+		"command":  "save",
+		"from":     "2024-09-06_15-00-33",
+		"to":       "2024-09-06_15-01-33",
+		"metadata": "test-metadata",
+		"async":    true,
+	}
+
 	t.Run("Test Save DoCommand Valid Range", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
@@ -173,6 +182,28 @@ func TestSaveDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, saveCmd3)
 		if err == nil {
 			t.Fatalf("expected error for invalid datetime format")
+		}
+	})
+
+	t.Run("Test Save DoCommand Async", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config1)
+		if err != nil {
+			t.Fatalf("failed to setup viam server: %v", err)
+		}
+		defer r.Close(timeoutCtx)
+		vs, err := camera.FromRobot(r, videoStoreComponentName)
+		if err != nil {
+			t.Fatalf("failed to get video store component: %v", err)
+		}
+		res, err := vs.DoCommand(timeoutCtx, saveCmd4)
+		if err != nil {
+			t.Fatalf("failed to execute save command: %v", err)
+		}
+		_, ok := res["filename"].(string)
+		if !ok {
+			t.Fatalf("failed to parse filename from response: %v", res)
 		}
 	})
 }
