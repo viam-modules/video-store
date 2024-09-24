@@ -279,7 +279,8 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 		// It waits for the segment duration before running to ensure the last segment
 		// is written to storage before concatenation.
 		// TODO: (seanp) Optimize this to immediately run as soon as the current segment is completed.
-		if async {
+		switch async {
+		case true:
 			vs.logger.Debug("running save command asynchronously")
 			go func() {
 				time.Sleep(vs.conc.segmentDur)
@@ -293,16 +294,17 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 				"filename": uploadFileName,
 				"status":   "async",
 			}, nil
+		default:
+			err = vs.conc.concat(from, to, uploadFilePath)
+			if err != nil {
+				vs.logger.Error("failed to concat files ", err)
+				return nil, err
+			}
+			return map[string]interface{}{
+				"command":  "save",
+				"filename": uploadFileName,
+			}, nil
 		}
-		err = vs.conc.concat(from, to, uploadFilePath)
-		if err != nil {
-			vs.logger.Error("failed to concat files ", err)
-			return nil, err
-		}
-		return map[string]interface{}{
-			"command":  "save",
-			"filename": uploadFileName,
-		}, nil
 	case "fetch":
 		vs.logger.Debug("fetch command received")
 		from, to, err := validateFetchCommand(command)
