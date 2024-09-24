@@ -103,7 +103,7 @@ The async save command performs the same operation as the save command, but does
   "from": <start_timestamp>, [required]
   "to": <end_timestamp>, [required]
   "metadata": <arbitrary_metadata_string>, [optional]
-  "async": true [required]
+  "async": true [optional]
 }
 ```
 

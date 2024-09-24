@@ -3,6 +3,7 @@ package videostore
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -204,6 +205,31 @@ func TestSaveDoCommand(t *testing.T) {
 		_, ok := res["filename"].(string)
 		if !ok {
 			t.Fatalf("failed to parse filename from response: %v", res)
+		}
+	})
+
+	t.Run("Test leftover concat txt files are cleaned up", func(t *testing.T) {
+		leftoverConcatTxtPath := filepath.Join("/tmp", "concat_test1.txt")
+		file, err := os.Create(leftoverConcatTxtPath)
+		if err != nil {
+			t.Fatalf("failed to create file: %v", err)
+		}
+		file.Close()
+		if _, err := os.Stat(leftoverConcatTxtPath); os.IsNotExist(err) {
+			t.Fatalf("file does not exist: %v", err)
+		}
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config1)
+		if err != nil {
+			t.Fatalf("failed to setup viam server: %v", err)
+		}
+		_, err = camera.FromRobot(r, videoStoreComponentName)
+		if err != nil {
+			t.Fatalf("failed to get video store component: %v", err)
+		}
+		if _, err := os.Stat(leftoverConcatTxtPath); !os.IsNotExist(err) {
+			t.Fatalf("file still exists: %v", err)
 		}
 	})
 }
