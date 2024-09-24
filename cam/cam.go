@@ -404,14 +404,14 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 	defer timer.Stop()
 	select {
 	case <-timer.C:
-		vs.logger.Debugf("running async save command for %s", path)
+		vs.logger.Debugf("executing concat for %s", path)
 		err := vs.conc.concat(from, to, path)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 		}
 		return
 	case <-ctx.Done():
-		vs.logger.Error("AsyncSave operation cancelled or timed out")
+		vs.logger.Error("asyncSave operation cancelled or timed out")
 		return
 	}
 }
