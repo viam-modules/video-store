@@ -66,18 +66,19 @@ The `From` and `To` timestamps are used to specify the start and end times for v
 
 #### Datetime Format
 
-The datetime format used is: `YYYY-MM-DD_HH-MM-SS`
+The datetime format used is ISO 8601: `YYYY-MM-DDTHH:MM:SS`
 
 - `YYYY`: Year (e.g., 2023)
 - `MM`: Month (e.g., 01 for January)
 - `DD`: Day (e.g., 15)
+- `T`: Literal character 'T' separating date and time
 - `HH`: Hour in 24-hour format (e.g., 14 for 2 PM)
 - `MM`: Minutes (e.g., 30)
 - `SS`: Seconds (e.g., 45)
 
 #### Datetime Example
 
-- `2024-01-15_14-30-45` represents January 15, 2024, at 2:30:45 PM.
+- `2024-01-15T14:30:45` represents January 15, 2024, at 2:30:45 PM.
 
 ### `save`
 
