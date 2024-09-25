@@ -22,11 +22,13 @@ import (
 type codecType int
 
 const (
-	// CodecUnknown represents an unknown codec type.
+	// datetimePattern for ISO 8601 format.
+	dateTimePattern = "2006-01-02T15:04:05"
+	// codecUnknown represents an unknown codec type.
 	codecUnknown codecType = iota
-	// CodecH264 represents the H.264 codec type.
+	// codecH264 represents the H.264 codec type.
 	codecH264
-	// CodecH265 represents the H.265 codec type.
+	// codecH265 represents the H.265 codec type.
 	codecH265
 )
 
@@ -189,12 +191,22 @@ func getSortedFiles(path string) ([]string, error) {
 func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
 	dateTimeStr := strings.TrimSuffix(baseName, filepath.Ext(baseName))
-	return time.Parse(time.RFC3339, dateTimeStr)
+	return time.Parse(dateTimePattern, dateTimeStr)
 }
 
 // formatDateTimeToString formats the date and time to a string in RFC3339 format.
 func formatDateTimeToString(dateTime time.Time) string {
-	return dateTime.Format(time.RFC3339)
+	return dateTime.Format(dateTimePattern)
+}
+
+// parseDateTimeString parses a date and time string in the format "2006-01-02_15-04-05".
+// Returns a time.Time object and an error if the string is not in the correct format.
+func parseDateTimeString(datetime string) (time.Time, error) {
+	dateTime, err := time.Parse(dateTimePattern, datetime)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return dateTime, nil
 }
 
 // matchStorageToRange returns a list of files that fall within the provided time range.
@@ -233,7 +245,6 @@ func matchStorageToRange(files []string, start, end time.Time, duration time.Dur
 			}
 		}
 	}
-
 	return matchedFiles
 }
 
@@ -265,7 +276,7 @@ func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, 
 	if !ok {
 		return time.Time{}, time.Time{}, "", false, errors.New("from timestamp not found")
 	}
-	from, err := time.Parse(time.RFC3339, fromStr)
+	from, err := parseDateTimeString(fromStr)
 	if err != nil {
 		return time.Time{}, time.Time{}, "", false, err
 	}
@@ -273,7 +284,7 @@ func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, 
 	if !ok {
 		return time.Time{}, time.Time{}, "", false, errors.New("to timestamp not found")
 	}
-	to, err := time.Parse(time.RFC3339, toStr)
+	to, err := parseDateTimeString(toStr)
 	if err != nil {
 		return time.Time{}, time.Time{}, "", false, err
 	}
@@ -297,7 +308,7 @@ func validateFetchCommand(command map[string]interface{}) (time.Time, time.Time,
 	if !ok {
 		return time.Time{}, time.Time{}, errors.New("from timestamp not found")
 	}
-	from, err := time.Parse(time.RFC3339, fromStr)
+	from, err := parseDateTimeString(fromStr)
 	if err != nil {
 		return time.Time{}, time.Time{}, err
 	}
@@ -305,7 +316,7 @@ func validateFetchCommand(command map[string]interface{}) (time.Time, time.Time,
 	if !ok {
 		return time.Time{}, time.Time{}, errors.New("to timestamp not found")
 	}
-	to, err := time.Parse(time.RFC3339, toStr)
+	to, err := parseDateTimeString(toStr)
 	if err != nil {
 		return time.Time{}, time.Time{}, err
 	}
