@@ -36,6 +36,7 @@ const (
 	maxGRPCSize     = 1024 * 1024 * 32 // bytes
 	deleterInterval = 10               // minutes
 	retryInterval   = 1                // seconds
+	asyncTimeout    = 60               // seconds
 	tempPath        = "/tmp"
 )
 
@@ -240,7 +241,6 @@ func newvideostore(
 		logger,
 		vs.storagePath,
 		vs.uploadPath,
-		vs.name.Name,
 		segmentSeconds,
 	)
 	if err != nil {
@@ -270,39 +270,54 @@ func (vs *videostore) DoCommand(_ context.Context, command map[string]interface{
 	// The response contains the name of the uploaded file.
 	case "save":
 		vs.logger.Debug("save command received")
-		from, to, metadata, err := validateSaveCommand(command)
+		from, to, metadata, async, err := validateSaveCommand(command)
 		if err != nil {
 			return nil, err
 		}
-		uploadFilePath, err := vs.conc.concat(from, to, metadata, vs.uploadPath)
-		if err != nil {
-			vs.logger.Error("failed to concat files ", err)
-			return nil, err
-		}
+		uploadFilePath := generateOutputFilePath(vs.name.Name, formatDateTimeToString(from), metadata, vs.uploadPath)
 		uploadFileName := filepath.Base(uploadFilePath)
-		return map[string]interface{}{
-			"command":  "save",
-			"filename": uploadFileName,
-		}, nil
+		switch async {
+		case true:
+			vs.logger.Debug("running save command asynchronously")
+			vs.workers.Add(func(ctx context.Context) {
+				vs.asyncSave(ctx, from, to, uploadFilePath)
+			})
+			return map[string]interface{}{
+				"command":  "save",
+				"filename": uploadFileName,
+				"status":   "async",
+			}, nil
+		default:
+			err = vs.conc.concat(from, to, uploadFilePath)
+			if err != nil {
+				vs.logger.Error("failed to concat files ", err)
+				return nil, err
+			}
+			return map[string]interface{}{
+				"command":  "save",
+				"filename": uploadFileName,
+			}, nil
+		}
 	case "fetch":
 		vs.logger.Debug("fetch command received")
 		from, to, err := validateFetchCommand(command)
 		if err != nil {
 			return nil, err
 		}
-		tmpFilePath, err := vs.conc.concat(from, to, "", tempPath)
+		fetchFilePath := generateOutputFilePath(vs.name.Name, formatDateTimeToString(from), "", tempPath)
+		err = vs.conc.concat(from, to, fetchFilePath)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 			return nil, err
 		}
-		videoSize, err := getFileSize(tmpFilePath)
+		videoSize, err := getFileSize(fetchFilePath)
 		if err != nil {
 			return nil, err
 		}
 		if videoSize > maxGRPCSize {
 			return nil, errors.New("video file size exceeds max grpc size")
 		}
-		videoBytes, err := readVideoFile(tmpFilePath)
+		videoBytes, err := readVideoFile(fetchFilePath)
 		if err != nil {
 			return nil, err
 		}
@@ -377,6 +392,30 @@ func (vs *videostore) deleter(ctx context.Context) {
 	}
 }
 
+// asyncSave command will run the concat operation in the background.
+// It waits for the segment duration before running to ensure the last segment
+// is written to storage before concatenation.
+// TODO: (seanp) Optimize this to immediately run as soon as the current segment is completed.
+func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path string) {
+	totalTimeout := time.Duration(asyncTimeout)*time.Second + vs.conc.segmentDur
+	ctx, cancel := context.WithTimeout(ctx, totalTimeout)
+	defer cancel()
+	timer := time.NewTimer(vs.conc.segmentDur)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		vs.logger.Debugf("executing concat for %s", path)
+		err := vs.conc.concat(from, to, path)
+		if err != nil {
+			vs.logger.Error("failed to concat files ", err)
+		}
+		return
+	case <-ctx.Done():
+		vs.logger.Error("asyncSave operation cancelled or timed out")
+		return
+	}
+}
+
 // Close closes the video storage camera component.
 func (vs *videostore) Close(ctx context.Context) error {
 	err := vs.stream.Close(ctx)
@@ -386,7 +425,6 @@ func (vs *videostore) Close(ctx context.Context) error {
 	vs.workers.Stop()
 	vs.enc.close()
 	vs.seg.close()
-	vs.conc.close()
 	return nil
 }
 
