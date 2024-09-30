@@ -202,14 +202,13 @@ func TestSaveDoCommand(t *testing.T) {
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldBeNil)
-		// Wait for the video segment to be created.
+		// Wait for the first video segment to be created.
 		time.Sleep(10 * time.Second)
 		now := time.Now()
 		fromTime := now.Add(-5 * time.Second)
 		toTime := now
 		fromTimeStr := fromTime.Format("2006-01-02_15-04-05")
 		toTimeStr := toTime.Format("2006-01-02_15-04-05")
-		fmt.Printf("from: %s, to: %s\n", fromTimeStr, toTimeStr)
 		saveCmdNow := map[string]interface{}{
 			"command":  "save",
 			"from":     fromTimeStr,
