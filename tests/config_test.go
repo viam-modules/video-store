@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ const (
 )
 
 func setupViamServer(ctx context.Context, configStr string) (robot.Robot, error) {
+	cleanVideoStoreDir()
 	logger := logging.NewLogger("video-store-module")
 	cfg, err := config.FromReader(ctx, "default.json", bytes.NewReader([]byte(configStr)), logger)
 	if err != nil {
@@ -48,6 +50,31 @@ func getModuleBinPath() (string, error) {
 	}
 	fullModuleBinPath := filepath.Join(currentDir, "..", moduleBinPath)
 	return fullModuleBinPath, nil
+}
+
+func cleanVideoStoreDir() error {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	videoStoreDir := filepath.Join(currentDir, "video-storage")
+	err = os.Chdir(videoStoreDir)
+	if err != nil {
+		return err
+	}
+	defer os.Chdir(currentDir) // Ensure we change back to the original directory
+	cmd := exec.Command("git", "clean", "-fdx")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func testVideoPlayback(t *testing.T, videoPath string) {
+	_, err := os.Stat(videoPath)
+	test.That(t, err, test.ShouldBeNil)
+	cmd := exec.Command("ffmpeg", "-v", "error", "-i", videoPath, "-f", "null", "-")
+	err = cmd.Run()
+	test.That(t, err, test.ShouldBeNil)
 }
 
 func TestModuleConfiguration(t *testing.T) {
@@ -75,8 +102,8 @@ func TestModuleConfiguration(t *testing.T) {
 						"storage_path": "%s"
 					},
 					"cam_props": {
-						"width": 1920,
-						"height": 1080,
+						"width": 1280,
+						"height": 720,
 						"framerate": 30
 					},
 					"video": {
@@ -181,8 +208,8 @@ func TestModuleConfiguration(t *testing.T) {
 					"camera": "fake-cam-1",
 					"sync": "data_manager-1",
 					"cam_props": {
-						"width": 1920,
-						"height": 1080,
+						"width": 1280,
+						"height": 720,
 						"framerate": 30
 					},
 					"video": {
@@ -247,8 +274,8 @@ func TestModuleConfiguration(t *testing.T) {
 						"storage_path": "/tmp/video-storage"
 					},
 					"cam_props": {
-						"width": 1920,
-						"height": 1080,
+						"width": 1280,
+						"height": 720,
 						"framerate": 30
 					},
 					"video": {
@@ -375,8 +402,8 @@ func TestModuleConfiguration(t *testing.T) {
 						"storage_path": "/tmp"
 					},
 					"cam_props": {
-						"width": 1920,
-						"height": 1080,
+						"width": 1280,
+						"height": 720,
 						"framerate": 30
 					},
 					"video": {

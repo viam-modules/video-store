@@ -83,6 +83,14 @@ lint: tool-install $(FFMPEG_BUILD)
 	CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
 test: $(BIN_OUTPUT_PATH)/video-store
+ifeq ($(shell which ffmpeg > /dev/null 2>&1; echo $$?), 1)
+ifeq ($(SOURCE_OS),linux)
+	sudo apt update && sudo apt install -y ffmpeg
+endif
+ifeq ($(SOURCE_OS),darwin)
+	brew update && brew install ffmpeg
+endif
+endif
 	git lfs pull
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
 	go test -v ./tests/
