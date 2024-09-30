@@ -69,6 +69,14 @@ func cleanVideoStoreDir() error {
 	return cmd.Run()
 }
 
+func testVideoPlayback(t *testing.T, videoPath string) {
+	_, err := os.Stat(videoPath)
+	test.That(t, err, test.ShouldBeNil)
+	cmd := exec.Command("ffmpeg", "-v", "error", "-i", videoPath, "-f", "null", "-")
+	err = cmd.Run()
+	test.That(t, err, test.ShouldBeNil)
+}
+
 func TestModuleConfiguration(t *testing.T) {
 	fullModuleBinPath, err := getModuleBinPath()
 	if err != nil {

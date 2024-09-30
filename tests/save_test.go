@@ -136,6 +136,8 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, ok, test.ShouldBeTrue)
 		test.That(t, filename, test.ShouldContainSubstring, "test-metadata")
 		test.That(t, filename, test.ShouldContainSubstring, "2024-09-06_15-00-33")
+		filePath := filepath.Join(testUploadPath, filename)
+		testVideoPlayback(t, filePath)
 	})
 
 	t.Run("Test Save DoCommand Invalid Range", func(t *testing.T) {
@@ -228,5 +230,6 @@ func TestSaveDoCommand(t *testing.T) {
 		concatPath := filepath.Join(testUploadPath, filename)
 		_, err = os.Stat(concatPath)
 		test.That(t, err, test.ShouldBeNil)
+		testVideoPlayback(t, concatPath)
 	})
 }
