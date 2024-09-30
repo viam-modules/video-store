@@ -36,13 +36,13 @@ func TestSaveDoCommand(t *testing.T) {
 					"sync": "data_manager-1",
 					"storage": {
 						"size_gb": 10,
-						"segment_seconds": 30,
+						"segment_seconds": 10,
 						"upload_path": "%s",
 						"storage_path": "%s"
 					},
 					"cam_props": {
-						"width": 1920,
-						"height": 1080,
+						"width": 1280,
+						"height": 720,
 						"framerate": 30
 					},
 					"video": {
@@ -187,9 +187,45 @@ func TestSaveDoCommand(t *testing.T) {
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
 		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
 		_, err = camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldBeNil)
 		_, err = os.Stat(leftoverConcatTxtPath)
 		test.That(t, os.IsNotExist(err), test.ShouldBeTrue)
+	})
+
+	t.Run("Test Async Save DoCommand from most recent video segment", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config1)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		vs, err := camera.FromRobot(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
+		// Wait for the video segment to be created.
+		time.Sleep(10 * time.Second)
+		now := time.Now()
+		fromTime := now.Add(-5 * time.Second)
+		toTime := now
+		fromTimeStr := fromTime.Format("2006-01-02_15-04-05")
+		toTimeStr := toTime.Format("2006-01-02_15-04-05")
+		fmt.Printf("from: %s, to: %s\n", fromTimeStr, toTimeStr)
+		saveCmdNow := map[string]interface{}{
+			"command":  "save",
+			"from":     fromTimeStr,
+			"to":       toTimeStr,
+			"metadata": "test-metadata",
+			"async":    true,
+		}
+		res, err := vs.DoCommand(timeoutCtx, saveCmdNow)
+		test.That(t, err, test.ShouldBeNil)
+		_, ok := res["filename"].(string)
+		test.That(t, ok, test.ShouldBeTrue)
+		// Wait for async save to complete.
+		time.Sleep(15 * time.Second)
+		filename := fmt.Sprintf("%s_%s_%s.mp4", videoStoreComponentName, fromTimeStr, "test-metadata")
+		concatPath := filepath.Join(testUploadPath, filename)
+		_, err = os.Stat(concatPath)
+		test.That(t, err, test.ShouldBeNil)
 	})
 }
