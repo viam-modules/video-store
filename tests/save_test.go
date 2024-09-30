@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"go.viam.com/rdk/components/camera"
+	"go.viam.com/test"
 )
 
 func TestSaveDoCommand(t *testing.T) {
@@ -126,110 +126,70 @@ func TestSaveDoCommand(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
-		if err != nil {
-			t.Fatalf("failed to setup viam server: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
-		if err != nil {
-			t.Fatalf("failed to get video store component: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		res, err := vs.DoCommand(timeoutCtx, saveCmd1)
-		if err != nil {
-			t.Fatalf("failed to execute save command: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		filename, ok := res["filename"].(string)
-		if !ok {
-			t.Fatalf("failed to parse filename from response: %v", res)
-		}
-		if !strings.Contains(filename, "test-metadata") {
-			t.Fatalf("metadata not found in filename: %v", filename)
-		}
-		if !strings.Contains(filename, "2024-09-06_15-00-33") {
-			t.Fatalf("from timestamp not found in filename: %v", filename)
-		}
+		test.That(t, ok, test.ShouldBeTrue)
+		test.That(t, filename, test.ShouldContainSubstring, "test-metadata")
+		test.That(t, filename, test.ShouldContainSubstring, "2024-09-06_15-00-33")
 	})
 
 	t.Run("Test Save DoCommand Invalid Range", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
-		if err != nil {
-			t.Fatalf("failed to setup viam server: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
-		if err != nil {
-			t.Fatalf("failed to get video store component: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		_, err = vs.DoCommand(timeoutCtx, saveCmd2)
-		if err == nil {
-			t.Fatalf("expected error for invalid time range")
-		}
+		test.That(t, err, test.ShouldNotBeNil)
 	})
 
 	t.Run("Test Save DoCommand Invalid Datetime Format", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
-		if err != nil {
-			t.Fatalf("failed to setup viam server: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
-		if err != nil {
-			t.Fatalf("failed to get video store component: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		_, err = vs.DoCommand(timeoutCtx, saveCmd3)
-		if err == nil {
-			t.Fatalf("expected error for invalid datetime format")
-		}
+		test.That(t, err, test.ShouldNotBeNil)
 	})
 
 	t.Run("Test Save DoCommand Async", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
-		if err != nil {
-			t.Fatalf("failed to setup viam server: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
-		if err != nil {
-			t.Fatalf("failed to get video store component: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		res, err := vs.DoCommand(timeoutCtx, saveCmd4)
-		if err != nil {
-			t.Fatalf("failed to execute save command: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		_, ok := res["filename"].(string)
-		if !ok {
-			t.Fatalf("failed to parse filename from response: %v", res)
-		}
+		test.That(t, ok, test.ShouldBeTrue)
 	})
 
 	t.Run("Test leftover concat txt files are cleaned up", func(t *testing.T) {
 		leftoverConcatTxtPath := filepath.Join("/tmp", "concat_test1.txt")
 		file, err := os.Create(leftoverConcatTxtPath)
-		if err != nil {
-			t.Fatalf("failed to create file: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		file.Close()
-		if _, err := os.Stat(leftoverConcatTxtPath); os.IsNotExist(err) {
-			t.Fatalf("file does not exist: %v", err)
-		}
+		_, err = os.Stat(leftoverConcatTxtPath)
+		test.That(t, os.IsNotExist(err), test.ShouldBeFalse)
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
-		if err != nil {
-			t.Fatalf("failed to setup viam server: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		_, err = camera.FromRobot(r, videoStoreComponentName)
-		if err != nil {
-			t.Fatalf("failed to get video store component: %v", err)
-		}
-		if _, err := os.Stat(leftoverConcatTxtPath); !os.IsNotExist(err) {
-			t.Fatalf("file still exists: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
+		_, err = os.Stat(leftoverConcatTxtPath)
+		test.That(t, os.IsNotExist(err), test.ShouldBeTrue)
 	})
 }
