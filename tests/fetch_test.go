@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.viam.com/rdk/components/camera"
+	"go.viam.com/test"
 )
 
 func TestFetchDoCommand(t *testing.T) {
@@ -119,78 +120,50 @@ func TestFetchDoCommand(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
-		if err != nil {
-			t.Fatalf("failed to setup viam server: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
-		if err != nil {
-			t.Fatalf("failed to get video store component: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		res, err := vs.DoCommand(timeoutCtx, fetchCmd1)
-		if err != nil {
-			t.Fatalf("failed to execute fetch command: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		video, ok := res["video"].(string)
-		if !ok {
-			t.Fatalf("failed to parse video from response: %v", res)
-		}
-		if video == "" {
-			t.Fatalf("video not found in response: %v", res)
-		}
+		test.That(t, ok, test.ShouldBeTrue)
+		test.That(t, video, test.ShouldNotBeEmpty)
 	})
 
 	t.Run("Test Fetch DoCommand Valid Time Range Over GRPC Limit.", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
-		if err != nil {
-			t.Fatalf("failed to setup viam server: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
-		if err != nil {
-			t.Fatalf("failed to get video store component: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd2)
-		if err == nil {
-			t.Fatalf("expected error but got nil")
-		}
+		test.That(t, err, test.ShouldNotBeNil)
 	})
 
 	t.Run("Test Fetch DoCommand Invalid Time Range.", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
-		if err != nil {
-			t.Fatalf("failed to setup viam server: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
-		if err != nil {
-			t.Fatalf("failed to get video store component: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd3)
-		if err == nil {
-			t.Fatalf("expected error for invalid time range")
-		}
+		test.That(t, err, test.ShouldNotBeNil)
 	})
 
 	t.Run("Test Fetch DoCommand Invalid Datetime Format.", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
-		if err != nil {
-			t.Fatalf("failed to setup viam server: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
-		if err != nil {
-			t.Fatalf("failed to get video store component: %v", err)
-		}
+		test.That(t, err, test.ShouldBeNil)
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd4)
-		if err == nil {
-			t.Fatalf("expected error for invalid datetime format")
-		}
+		test.That(t, err, test.ShouldNotBeNil)
 	})
 }
