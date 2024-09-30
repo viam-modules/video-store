@@ -148,6 +148,7 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		_, err = vs.DoCommand(timeoutCtx, saveCmd2)
 		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "range")
 	})
 
 	t.Run("Test Save DoCommand Invalid Datetime Format", func(t *testing.T) {
@@ -160,6 +161,7 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		_, err = vs.DoCommand(timeoutCtx, saveCmd3)
 		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "parsing time")
 	})
 
 	t.Run("Test Save DoCommand Async", func(t *testing.T) {

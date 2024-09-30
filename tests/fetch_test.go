@@ -141,6 +141,7 @@ func TestFetchDoCommand(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd2)
 		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "grpc")
 	})
 
 	t.Run("Test Fetch DoCommand Invalid Time Range.", func(t *testing.T) {
@@ -153,6 +154,7 @@ func TestFetchDoCommand(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd3)
 		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "range")
 	})
 
 	t.Run("Test Fetch DoCommand Invalid Datetime Format.", func(t *testing.T) {
@@ -165,5 +167,6 @@ func TestFetchDoCommand(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd4)
 		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "parsing time")
 	})
 }
