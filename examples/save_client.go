@@ -2,7 +2,7 @@
 This example domenstrates calling async save command on video-store resource. To setup:
 - You need to have a robot running with video-store component.
 - Ensure you have a .env file with the necessary credentials and secrets.
-- run example script `go run save_client.go`
+- Run example script `go run save_client.go`
 */
 
 package main
@@ -25,12 +25,14 @@ func main() {
 
 	err := godotenv.Load()
 	if err != nil {
-		logger.Fatalf("Error loading .env file")
+		logger.Fatal("Please make sure you add a .env file with the necessary credentials and secrets.")
 	}
-
 	robotAddress := os.Getenv("ROBOT_ADDRESS")
 	apiKeyID := os.Getenv("API_KEY_ID")
 	apiKey := os.Getenv("API_KEY")
+	if robotAddress == "" || apiKeyID == "" || apiKey == "" {
+		logger.Fatal("Missing required environment variables: ROBOT_ADDRESS, API_KEY_ID, or API_KEY.")
+	}
 
 	machine, err := client.New(
 		context.Background(),
@@ -46,7 +48,6 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-
 	defer machine.Close(context.Background())
 	logger.Info("Resources:")
 	logger.Info(machine.ResourceNames())
@@ -63,6 +64,7 @@ func main() {
 	}
 	logger.Infof("video-store Properties return value: %+v", videoStoreReturnValue)
 
+	// Save clip of random duration every 30 seconds
 	for {
 		now := time.Now()
 		rand.Seed(uint64(time.Now().UnixNano()))
