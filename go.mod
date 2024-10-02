@@ -9,6 +9,7 @@ require (
 	github.com/fullstorydev/grpcurl v1.8.6
 	github.com/golangci/golangci-lint v1.54.0
 	github.com/google/uuid v1.6.0
+	github.com/joho/godotenv v1.5.1
 	github.com/rhysd/actionlint v1.6.24
 	go.viam.com/rdk v0.40.0
 	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2
