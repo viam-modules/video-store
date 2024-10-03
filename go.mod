@@ -14,6 +14,7 @@ require (
 	go.viam.com/rdk v0.40.0
 	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2
 	go.viam.com/utils v0.1.98
+	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc
 	golang.org/x/mobile v0.0.0-20240112133503-c713f31d574b
 	golang.org/x/tools v0.22.0
 	gotest.tools/gotestsum v1.10.0
@@ -306,7 +307,6 @@ require (
 	go.viam.com/api v0.1.336 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/crypto v0.24.0 // indirect
-	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
 	golang.org/x/exp/typeparams v0.0.0-20230224173230-c95f2b4c22f2 // indirect
 	golang.org/x/image v0.19.0 // indirect
 	golang.org/x/mod v0.18.0 // indirect
