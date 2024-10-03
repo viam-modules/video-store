@@ -31,7 +31,7 @@ const (
 	defaultVideoFormat    = "mp4"
 	defaultUploadPath     = ".viam/capture/video-upload"
 	defaultStoragePath    = ".viam/video-storage"
-	defaultLogLevel       = "info"
+	defaultLogLevel       = "error"
 
 	maxGRPCSize     = 1024 * 1024 * 32 // bytes
 	deleterInterval = 10               // minutes
