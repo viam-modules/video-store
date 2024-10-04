@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"math/rand"
 	"os"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/robot/client"
 	"go.viam.com/utils/rpc"
-	"golang.org/x/exp/rand"
 )
 
 func main() {

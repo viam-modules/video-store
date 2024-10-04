@@ -60,8 +60,11 @@ func newEncoder(
 	enc.codecCtx.max_b_frames = 0
 	presetCStr := C.CString(preset)
 	tuneCStr := C.CString("zerolatency")
+	forceKeyFramesExpr := fmt.Sprintf("expr:gte(t,n_forced*%d)", framerate)
+	forceKeyFramesCStr := C.CString(forceKeyFramesExpr)
 	defer C.free(unsafe.Pointer(presetCStr))
 	defer C.free(unsafe.Pointer(tuneCStr))
+	defer C.free(unsafe.Pointer(forceKeyFramesCStr))
 
 	// The user can set the preset and tune for the encoder. This affects the
 	// encoding speed and quality. See https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -73,6 +76,10 @@ func newEncoder(
 		return nil, fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
 	}
 	ret = C.av_dict_set(&opts, C.CString("tune"), tuneCStr, 0)
+	if ret < 0 {
+		return nil, fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
+	}
+	ret = C.av_dict_set(&opts, C.CString("force_key_frames"), forceKeyFramesCStr, 0)
 	if ret < 0 {
 		return nil, fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
 	}
