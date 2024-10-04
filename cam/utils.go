@@ -169,20 +169,24 @@ func getSortedFiles(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var filePaths []string
+	var validFilePaths []string
 	for _, file := range files {
-		filePaths = append(filePaths, filepath.Join(path, file.Name()))
+		filePath := filepath.Join(path, file.Name())
+		_, err := extractDateTimeFromFilename(filePath)
+		if err == nil {
+			validFilePaths = append(validFilePaths, filePath)
+		}
 	}
-	sort.Slice(filePaths, func(i, j int) bool {
-		timeI, errI := extractDateTimeFromFilename(filePaths[i])
-		timeJ, errJ := extractDateTimeFromFilename(filePaths[j])
+	sort.Slice(validFilePaths, func(i, j int) bool {
+		timeI, errI := extractDateTimeFromFilename(validFilePaths[i])
+		timeJ, errJ := extractDateTimeFromFilename(validFilePaths[j])
 		if errI != nil || errJ != nil {
 			return false
 		}
 		return timeI.Before(timeJ)
 	})
 
-	return filePaths, nil
+	return validFilePaths, nil
 }
 
 // extractDateTimeFromFilename extracts the date and time from the filename.
