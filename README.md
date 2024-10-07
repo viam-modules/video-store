@@ -136,6 +136,10 @@ The save command retreives video from local storage, concatenates and trims unde
 
 The async save command performs the same operation as the save command, but does not wait for the operation to complete. Use this command when you want to save video slices that include the current in-progress video storage segment. It will wait for the current segment to finish recording before saving the video slice.
 
+> [!NOTE]
+> The async save command does not support future timestamps. The `from` timestamp must be in the past.
+> and the `to` timestamp must be the current time or in the past.
+
 ```json
 {
   "command": "save",
