@@ -187,18 +187,34 @@ The fetch command retrieves video from local storage, and sends the bytes direct
 
 ### Building
 
+The [Makefile](./Makefile) supports building for the following platforms:
+
 | Platform       | Architecture |
 |----------------|--------------|
 | `linux`        | `arm64`      |
 | `linux`        | `amd64`      |
 | `darwin`       | `arm64`      |
 
+To build for linux/arm64, run the following commands:
 ```
 canon -arch arm64
 make
 ```
 
+To build for linux/amd64, run the following commands:
+```
+canon -arch amd64
+make
+```
+
+To build for darwin/arm64, run the following command on a Mac with an M series chip:
+```
+make
+```
+
 ### Testing
+
+Run [tests](./tests) to ensure the module is functioning as expected with the following command:
 
 ```
 make test
