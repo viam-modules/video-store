@@ -182,3 +182,36 @@ The fetch command retrieves video from local storage, and sends the bytes direct
   "video": <video_bytes>
 }
 ```
+
+## Local Development
+
+### Building
+
+| Platform       | Architecture |
+|----------------|--------------|
+| `linux`        | `arm64`      |
+| `linux`        | `amd64`      |
+| `darwin`       | `arm64`      |
+
+```
+canon -arch arm64
+make
+```
+
+### Testing
+
+```
+make test
+```
+
+### Linting
+
+```
+make lint
+```
+
+### Package module
+  
+```
+make module
+```
