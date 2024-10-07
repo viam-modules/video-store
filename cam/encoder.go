@@ -52,7 +52,6 @@ func newEncoder(
 	enc.codecCtx.bit_rate = C.int64_t(bitrate)
 	enc.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV422P
 	enc.codecCtx.time_base = C.AVRational{num: 1, den: C.int(framerate)}
-	enc.codecCtx.gop_size = C.int(framerate)
 	enc.codecCtx.width = C.int(width)
 	enc.codecCtx.height = C.int(height)
 
@@ -60,11 +59,8 @@ func newEncoder(
 	enc.codecCtx.max_b_frames = 0
 	presetCStr := C.CString(preset)
 	tuneCStr := C.CString("zerolatency")
-	forceKeyFramesExpr := fmt.Sprintf("expr:gte(t,n_forced*%d)", framerate)
-	forceKeyFramesCStr := C.CString(forceKeyFramesExpr)
 	defer C.free(unsafe.Pointer(presetCStr))
 	defer C.free(unsafe.Pointer(tuneCStr))
-	defer C.free(unsafe.Pointer(forceKeyFramesCStr))
 
 	// The user can set the preset and tune for the encoder. This affects the
 	// encoding speed and quality. See https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -76,10 +72,6 @@ func newEncoder(
 		return nil, fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
 	}
 	ret = C.av_dict_set(&opts, C.CString("tune"), tuneCStr, 0)
-	if ret < 0 {
-		return nil, fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
-	}
-	ret = C.av_dict_set(&opts, C.CString("force_key_frames"), forceKeyFramesCStr, 0)
 	if ret < 0 {
 		return nil, fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
 	}
@@ -134,6 +126,18 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 	// TODO(seanp): What happens to playback if frame is dropped?
 	e.srcFrame.pts = C.int64_t(e.frameCount)
 	e.srcFrame.pkt_dts = e.srcFrame.pts
+
+	// Manually force keyframes every second, removing the need to rely on
+	// gop_size or other encoder settings. This is necessary for the segmenter
+	// to split the video files at keyframe boundaries.
+	if e.frameCount%int64(e.codecCtx.time_base.den) == 0 {
+		e.srcFrame.key_frame = 1
+		e.srcFrame.pict_type = C.AV_PICTURE_TYPE_I
+	} else {
+		e.srcFrame.key_frame = 0
+		e.srcFrame.pict_type = C.AV_PICTURE_TYPE_NONE
+	}
+
 	ret := C.avcodec_send_frame(e.codecCtx, e.srcFrame)
 	if ret < 0 {
 		return nil, 0, 0, fmt.Errorf("avcodec_send_frame: %s", ffmpegError(ret))
