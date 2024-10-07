@@ -6,7 +6,6 @@ The `video-store` module brings security camera functionality to your smart mach
 > [!NOTE]  
 > For more information, see [Configure a Machine](https://docs.viam.com/manage/configuration/).
 
-
 ### Attributes
 
 | Attribute       | Sub-Attribute     | Type    | Inclusion | Description                                                                                       |
@@ -28,7 +27,7 @@ The `video-store` module brings security camera functionality to your smart mach
 |                 | `height`          | integer | required  | Height of the source camera frames in pixels.                                                     |
 |                 | `framerate`       | integer | required  | Number of frames per second provided by the source camera.                                        |
 
-### Example Configuration:
+### Example Configuration
 
 ```json
     {
