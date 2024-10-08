@@ -2,6 +2,34 @@
 
 The `video-store` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and saves the output as video files on disk. You can then upload video slices to the cloud using the [save](#save) command, or request the video bytes directly using the [fetch](#fetch) command.
 
+## Requirements
+
+### Configure a Data Manager Service
+
+Make sure to configure a [Data Manager Service](https://docs.viam.com/services/data/cloud-sync/) to upload video files to the cloud when saving video slices.
+
+Navigate to the [**CONFIGURE** tab](https://docs.viam.com/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in [the Viam app](https://app.viam.com/). [Add data-management to your machine](https://docs.viam.com/configure/#services).
+
+> [!NOTE]
+> The `additional_sync_paths` attribute must include the custom path specified in the `upload_path` attribute of the `video-store` component if it is not under `~/.viam/capture`.
+
+```json
+    {
+      "name": <data_manager_service_name>,
+      "namespace": "rdk",
+      "type": "data_manager",
+      "attributes": {
+        "tags": [],
+        "additional_sync_paths": [
+          <custom_path_to_upload_video_files>
+        ],
+        "capture_disabled": true,
+        "sync_interval_mins": <sync_interval_minutes>,
+        "capture_dir": ""
+      }
+    }
+```
+
 ## Configure your `video-store` component
 
 Navigate to the [**CONFIGURE** tab](https://docs.viam.com/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in [the Viam app](https://app.viam.com/).
@@ -11,18 +39,19 @@ On the new component panel, copy and paste the following attribute template into
 
 ```json
 {
-  "camera": "<source-camera-name>"
-        "sync": "<data-manager-service-name>",
-        "storage": {
-            "segment_seconds": <int>,
-            "size_gb": <int>,
-        },
-        "cam_props": {
-            "width": <int>,
-            "height": <int>,
-            "framerate": <int>
-        }
+  "camera": "<source-camera-name>",
+  "sync": "<data-manager-service-name>",
+  "storage": {
+    "segment_seconds": <int>,
+    "size_gb": <int>,
+  },
+  "cam_props": {
+    "width": <int>,
+    "height": <int>,
+    "framerate": <int>
+  }
 }
+```
 > For more information, see [Configure a Machine](https://docs.viam.com/manage/configuration/).
 
 ### Attributes
@@ -49,53 +78,29 @@ On the new component panel, copy and paste the following attribute template into
 ### Example Configuration
 
 ```json
-    {
-      "name": "video-store",
-      "namespace": "rdk",
-      "type": "camera",
-      "model": "viam:video:storage",
-      "attributes": {
-        "camera": "wc-cam"
-        "sync": "data-manager",
-        "storage": {
-            "segment_seconds": 10,
-            "size_gb": 50,
-        },
-        "cam_props": {
-            "width": 640,
-            "height": 480,
-            "framerate": 25
-        }
-      },
-      "depends_on": [
-        "wc-cam",
-        "data-manager"
-      ]
+{
+  "name": "video-store",
+  "namespace": "rdk",
+  "type": "camera",
+  "model": "viam:video:storage",
+  "attributes": {
+    "camera": "wc-cam"
+    "sync": "data-manager",
+    "storage": {
+      "segment_seconds": 10,
+      "size_gb": 50,
+    },
+    "cam_props": {
+      "width": 640,
+      "height": 480,
+      "framerate": 25
     }
-```
-
-### Configure a Data Manager Service
-
-Make sure to configure a [Data Manager Service](https://docs.viam.com/services/data/cloud-sync/) to upload video files to the cloud when saving video slices.
-
-> [!NOTE]
-> The `additional_sync_paths` attribute must include the custom path specified in the `upload_path` attribute of the `video-store` component if it is not under `~/.viam/capture`.
-
-```json
-    {
-      "name": <data_manager_service_name>,
-      "namespace": "rdk",
-      "type": "data_manager",
-      "attributes": {
-        "tags": [],
-        "additional_sync_paths": [
-          <custom_path_to_upload_video_files>
-        ],
-        "capture_disabled": true,
-        "sync_interval_mins": <sync_interval_minutes>,
-        "capture_dir": ""
-      }
-    }
+  },
+  "depends_on": [
+    "wc-cam",
+    "data-manager"
+  ]
+}
 ```
 
 ## DoCommand API
@@ -119,7 +124,7 @@ The datetime format used is: `YYYY-MM-DD_HH-MM-SS`
 
 - `2024-01-15_14-30-45` represents January 15, 2024, at 2:30:45 PM.
 
-### `save`
+### `Save`
 
 The save command retreives video from local storage, concatenates and trims underlying storage segments based on time range, and uploads the clip to the cloud.
 
@@ -176,7 +181,7 @@ The async save command performs the same operation as the save command, but does
 }
 ```
 
-### `fetch`
+### `Fetch`
 
 The fetch command retrieves video from local storage, and sends the bytes directly back to the client.
 
