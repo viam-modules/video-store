@@ -4,7 +4,25 @@ The `video-store` module brings security camera functionality to your smart mach
 
 ## Configure your `video-store` component
 
-> [!NOTE]  
+Navigate to the [**CONFIGURE** tab](https://docs.viam.com/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in [the Viam app](https://app.viam.com/).
+[Add camera / video-store to your machine](https://docs.viam.com/configure/#components).
+
+On the new component panel, copy and paste the following attribute template into your camera’s attributes field:
+
+```json
+{
+  "camera": "<source-camera-name>"
+        "sync": "<data-manager-service-name>",
+        "storage": {
+            "segment_seconds": <int>,
+            "size_gb": <int>,
+        },
+        "cam_props": {
+            "width": <int>,
+            "height": <int>,
+            "framerate": <int>
+        }
+}
 > For more information, see [Configure a Machine](https://docs.viam.com/manage/configuration/).
 
 ### Attributes
