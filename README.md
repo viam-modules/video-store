@@ -58,7 +58,7 @@ The `video-store` module brings security camera functionality to your smart mach
 
 ### Configure a Data Manager Service
 
-Make sure to configure a [Data Manager Service](https://docs.viam.com/services/data/cloud-sync/) to uplaod video files to the cloud when saving video slices.
+Make sure to configure a [Data Manager Service](https://docs.viam.com/services/data/cloud-sync/) to upload video files to the cloud when saving video slices.
 
 > [!NOTE]
 > The `additional_sync_paths` attribute must include the custom path specified in the `upload_path` attribute of the `video-store` component if it is not under `~/.viam/capture`.
