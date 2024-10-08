@@ -1,4 +1,5 @@
-# [`video-store` module](https://app.viam.com/module/viam/video-store)
+# [`video-store` camera](https://app.viam.com/module/viam/video-store)
+
 The `video-store` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and saves the output as video files on disk. You can then upload video slices to the cloud using the [save](#save) command, or request the video bytes directly using the [fetch](#fetch) command.
 
 ## Configure your `video-store` component
