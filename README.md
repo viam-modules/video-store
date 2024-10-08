@@ -155,7 +155,7 @@ The async save command performs the same operation as the save command, but does
 
 > [!NOTE]
 > The async save command does not support future timestamps. The `from` timestamp must be in the past.
-> and the `to` timestamp must be the current time or in the past.
+> The `to` timestamp must be the current time or in the past.
 
 ```json
 {
