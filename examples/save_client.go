@@ -67,7 +67,6 @@ func main() {
 	// Save clip of random duration every 30 seconds
 	for {
 		now := time.Now()
-		rand.Seed(uint64(time.Now().UnixNano()))
 		randomSeconds := rand.Intn(56) + 5 // 5 to 60 seconds
 		from := now.Add(-time.Duration(randomSeconds) * time.Second)
 		nowStr := now.Format("2006-01-02_15-04-05")
