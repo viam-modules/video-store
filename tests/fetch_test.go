@@ -14,13 +14,9 @@ import (
 func TestFetchDoCommand(t *testing.T) {
 	storageRelativePath := "./video-storage"
 	storagePath, err := filepath.Abs(storageRelativePath)
-	if err != nil {
-		t.Fatalf("Failed to get absolute path: %v", err)
-	}
+	test.That(t, err, test.ShouldBeNil)
 	fullModuleBinPath, err := getModuleBinPath()
-	if err != nil {
-		t.Fatalf("Failed to get module bin path: %v", err)
-	}
+	test.That(t, err, test.ShouldBeNil)
 
 	config1 := fmt.Sprintf(`
 	{
