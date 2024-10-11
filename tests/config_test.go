@@ -79,9 +79,7 @@ func testVideoPlayback(t *testing.T, videoPath string) {
 
 func TestModuleConfiguration(t *testing.T) {
 	fullModuleBinPath, err := getModuleBinPath()
-	if err != nil {
-		t.Fatalf("Failed to get module binary path: %v", err)
-	}
+	test.That(t, err, test.ShouldBeNil)
 
 	// Full configuration
 	config1 := fmt.Sprintf(`
