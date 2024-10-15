@@ -1,5 +1,5 @@
 /*
-This example domenstrates calling async save command on video-store resource. To setup:
+This example demonstrates calling async save command on video-store resource. To setup:
 - You need to have a robot running with video-store component.
 - Ensure you have a .env file with the necessary credentials and secrets.
 - Run example script `go run save_client.go`
