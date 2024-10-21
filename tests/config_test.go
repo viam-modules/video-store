@@ -63,7 +63,7 @@ func cleanVideoStoreDir() error {
 		return err
 	}
 	defer os.Chdir(currentDir) // Ensure we change back to the original directory
-	cmd := exec.Command("git", "clean", "-fdx")
+	cmd := exec.Command("artifact", "clean")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
