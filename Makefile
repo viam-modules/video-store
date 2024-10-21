@@ -45,6 +45,7 @@ endif
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 GOFLAGS := -buildvcs=false
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
+export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 .PHONY: lint tool-install test clean module
 
@@ -91,7 +92,10 @@ ifeq ($(SOURCE_OS),darwin)
 	brew update && brew install ffmpeg
 endif
 endif
-	git lfs pull
+ifeq ($(shell which artifact > /dev/null 2>&1; echo $$?), 1)
+	go install go.viam.com/utils/artifact/cmd/artifact@latest
+endif
+	artifact pull
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
 	go test -v ./tests/
 	rm bin/video-store

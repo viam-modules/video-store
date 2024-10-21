@@ -12,7 +12,7 @@ import (
 )
 
 func TestFetchDoCommand(t *testing.T) {
-	storageRelativePath := "./video-storage"
+	storageRelativePath := "../.artifact/data"
 	storagePath, err := filepath.Abs(storageRelativePath)
 	test.That(t, err, test.ShouldBeNil)
 	fullModuleBinPath, err := getModuleBinPath()
