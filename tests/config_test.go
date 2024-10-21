@@ -25,6 +25,7 @@ const (
 	videoStoreComponentName = "video-store-1"
 	testStoragePath         = "/tmp/video-storage"
 	testUploadPath          = "/tmp/video-upload"
+	artifactStoragePath     = "../.artifact/data"
 )
 
 func setupViamServer(ctx context.Context, configStr string) (robot.Robot, error) {
