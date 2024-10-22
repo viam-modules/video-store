@@ -58,7 +58,7 @@ func cleanVideoStoreDir() error {
 	if err != nil {
 		return err
 	}
-	videoStoreDir := filepath.Join(currentDir, "../.artifact/data")
+	videoStoreDir := filepath.Join(currentDir, artifactStoragePath)
 	err = os.Chdir(videoStoreDir)
 	if err != nil {
 		return err
