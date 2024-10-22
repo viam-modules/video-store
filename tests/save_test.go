@@ -13,8 +13,7 @@ import (
 )
 
 func TestSaveDoCommand(t *testing.T) {
-	storageRelativePath := "./video-storage"
-	storagePath, err := filepath.Abs(storageRelativePath)
+	storagePath, err := filepath.Abs(artifactStoragePath)
 	test.That(t, err, test.ShouldBeNil)
 	fullModuleBinPath, err := getModuleBinPath()
 	test.That(t, err, test.ShouldBeNil)

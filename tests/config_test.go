@@ -25,6 +25,7 @@ const (
 	videoStoreComponentName = "video-store-1"
 	testStoragePath         = "/tmp/video-storage"
 	testUploadPath          = "/tmp/video-upload"
+	artifactStoragePath     = "../.artifact/data"
 )
 
 func setupViamServer(ctx context.Context, configStr string) (robot.Robot, error) {
@@ -57,13 +58,13 @@ func cleanVideoStoreDir() error {
 	if err != nil {
 		return err
 	}
-	videoStoreDir := filepath.Join(currentDir, "video-storage")
+	videoStoreDir := filepath.Join(currentDir, artifactStoragePath)
 	err = os.Chdir(videoStoreDir)
 	if err != nil {
 		return err
 	}
 	defer os.Chdir(currentDir) // Ensure we change back to the original directory
-	cmd := exec.Command("git", "clean", "-fdx")
+	cmd := exec.Command("artifact", "clean")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
