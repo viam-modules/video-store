@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"image"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"go.viam.com/rdk/components/camera"
@@ -47,10 +49,10 @@ type videostore struct {
 	conf   *Config
 	logger logging.Logger
 
-	cam    camera.Camera
-	stream gostream.VideoStream
-
-	workers *utils.StoppableWorkers
+	cam         camera.Camera
+	stream      gostream.VideoStream
+	latestFrame atomic.Pointer[image.Image]
+	workers     *utils.StoppableWorkers
 
 	enc  *encoder
 	seg  *segmenter
@@ -248,7 +250,7 @@ func newvideostore(
 	}
 
 	// Start workers to process frames and clean up storage.
-	vs.workers = utils.NewBackgroundStoppableWorkers(vs.processFrames, vs.deleter)
+	vs.workers = utils.NewBackgroundStoppableWorkers(vs.fetchFrames, vs.processFrames, vs.deleter)
 
 	return vs, nil
 }
@@ -337,10 +339,10 @@ func (vs *videostore) Properties(_ context.Context) (camera.Properties, error) {
 	return camera.Properties{}, nil
 }
 
-// processFrames reads frames from the camera, encodes, and writes to the segmenter
-// which chunks video stream into clip files inside the storage directory.
-// TODO(seanp): Should this be throttled to a certain FPS?
-func (vs *videostore) processFrames(ctx context.Context) {
+// fetchFrames reads frames from the camera and stores the decoded image
+// in the latestFrame atomic pointer. This routine runs as fast as possible
+// to keep the latest frame up to date.
+func (vs *videostore) fetchFrames(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -349,7 +351,7 @@ func (vs *videostore) processFrames(ctx context.Context) {
 		}
 		frame, release, err := vs.stream.Next(ctx)
 		if err != nil {
-			vs.logger.Error("failed to get frame from camera", err)
+			vs.logger.Warn("failed to get frame from camera", err)
 			time.Sleep(retryInterval * time.Second)
 			continue
 		}
@@ -358,16 +360,38 @@ func (vs *videostore) processFrames(ctx context.Context) {
 			vs.logger.Error("frame is not of type *rimage.LazyEncodedImage")
 			return
 		}
-		encoded, pts, dts, err := vs.enc.encode(lazyImage.DecodedImage())
-		if err != nil {
-			vs.logger.Error("failed to encode frame", err)
+		decodedImage := lazyImage.DecodedImage()
+		vs.latestFrame.Store(&decodedImage)
+		release() // Release the frame back to the stream after decoding.
+	}
+}
+
+// processFrames grabs the latest frame, encodes, and writes to the segmenter
+// which chunks video stream into clip files inside the storage directory.
+func (vs *videostore) processFrames(ctx context.Context) {
+	frameInterval := time.Second / time.Duration(vs.conf.Properties.Framerate)
+	ticker := time.NewTicker(frameInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
 			return
-		}
-		release() // Release the frame back to the stream after encoding.
-		err = vs.seg.writeEncodedFrame(encoded, pts, dts)
-		if err != nil {
-			vs.logger.Error("failed to segment frame", err)
-			return
+		case <-ticker.C:
+			latestFrame := vs.latestFrame.Load()
+			if latestFrame == nil {
+				vs.logger.Debug("latest frame is not available yet")
+				continue
+			}
+			encoded, pts, dts, err := vs.enc.encode(*latestFrame)
+			if err != nil {
+				vs.logger.Error("failed to encode frame", err)
+				return
+			}
+			err = vs.seg.writeEncodedFrame(encoded, pts, dts)
+			if err != nil {
+				vs.logger.Error("failed to segment frame", err)
+				return
+			}
 		}
 	}
 }
