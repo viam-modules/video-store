@@ -17,6 +17,7 @@ import (
 	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/rimage"
+	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
 
@@ -50,7 +51,6 @@ type videostore struct {
 	logger logging.Logger
 
 	cam         camera.Camera
-	stream      gostream.VideoStream
 	latestFrame atomic.Pointer[image.Image]
 	workers     *utils.StoppableWorkers
 
@@ -143,12 +143,6 @@ func newvideostore(
 
 	// Source camera that provides the frames to be processed.
 	vs.cam, err = camera.FromDependencies(deps, newConf.Camera)
-	if err != nil {
-		return nil, err
-	}
-
-	var errHandlers []gostream.ErrorHandler
-	vs.stream, err = vs.cam.Stream(ctx, errHandlers...)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +343,7 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 			return
 		default:
 		}
-		frame, release, err := vs.stream.Next(ctx)
+		frame, err := camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, vs.cam)
 		if err != nil {
 			vs.logger.Warn("failed to get frame from camera", err)
 			time.Sleep(retryInterval * time.Second)
@@ -362,7 +356,6 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 		}
 		decodedImage := lazyImage.DecodedImage()
 		vs.latestFrame.Store(&decodedImage)
-		release() // Release the frame back to the stream after decoding.
 	}
 }
 
@@ -442,10 +435,6 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 
 // Close closes the video storage camera component.
 func (vs *videostore) Close(ctx context.Context) error {
-	err := vs.stream.Close(ctx)
-	if err != nil {
-		vs.logger.Error("failed to close stream", err)
-	}
 	vs.workers.Stop()
 	vs.enc.close()
 	vs.seg.close()
@@ -455,6 +444,10 @@ func (vs *videostore) Close(ctx context.Context) error {
 // Unimplemented methods for the video storage camera component.
 func (vs *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (vs *videostore) Image(ctx context.Context, mimeType string, extra map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+	return nil, camera.ImageMetadata{}, errors.New("not implemented")
 }
 
 func (vs *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
