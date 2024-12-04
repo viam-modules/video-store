@@ -195,7 +195,7 @@ func imageToYUV422(img image.Image) ([]byte, error) {
 
 	rawYUV := make([]byte, ySize+uSize+vSize)
 
-	for y := 0; y < height; y++ {
+	for y := range make([]int, height) {
 		ySrcStart := ycbcrImg.YOffset(rect.Min.X, rect.Min.Y+y)
 		cSrcStart := ycbcrImg.COffset(rect.Min.X, rect.Min.Y+y)
 		yDstStart := y * width

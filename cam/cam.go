@@ -125,7 +125,7 @@ func init() {
 }
 
 func newvideostore(
-	ctx context.Context,
+	_ context.Context,
 	deps resource.Dependencies,
 	conf resource.Config,
 	logger logging.Logger,
@@ -434,7 +434,7 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 }
 
 // Close closes the video storage camera component.
-func (vs *videostore) Close(ctx context.Context) error {
+func (vs *videostore) Close(_ context.Context) error {
 	vs.workers.Stop()
 	vs.enc.close()
 	vs.seg.close()
@@ -446,7 +446,7 @@ func (vs *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gos
 	return nil, errors.New("not implemented")
 }
 
-func (vs *videostore) Image(ctx context.Context, mimeType string, extra map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+func (vs *videostore) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
 	return nil, camera.ImageMetadata{}, errors.New("not implemented")
 }
 
