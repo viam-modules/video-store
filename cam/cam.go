@@ -22,7 +22,7 @@ import (
 )
 
 // Model is the model for the video storage camera component.
-var Model = resource.ModelNamespace("sean").WithFamily("video").WithModel("storage")
+var Model = resource.ModelNamespace("viam").WithFamily("video").WithModel("storage")
 
 const (
 	// Default values for the video storage camera component.

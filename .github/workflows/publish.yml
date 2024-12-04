@@ -3,8 +3,6 @@ name: Build & publish module to registry
 on:
   release:
     types: [published]
-  pull_request:
-    types: [opened, synchronize, reopened]
 
 jobs:
   publish:
@@ -13,7 +11,7 @@ jobs:
     - uses: actions/checkout@v3
     - uses: viamrobotics/build-action@v1
       with:
-        version: 0.0.1
-        ref: ${{ github.event.pull_request.head.sha }}
-        key-id: ${{ secrets.SEAN_VIAM_API_KEY_ID }}
-        key-value: ${{ secrets.SEAN_VIAM_API_KEY }}
+        version: ${{ github.ref_name }}
+        ref: ${{ github.sha }}
+        key-id: ${{ secrets.VIAM_DEV_API_KEY_ID }}
+        key-value: ${{ secrets.VIAM_DEV_API_KEY }}
