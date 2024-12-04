@@ -138,7 +138,7 @@ func (c *concater) concat(from, to time.Time, path string) error {
 
 	// Copy codec info from input to output context. This is necessary to ensure
 	// we do not decode and re-encode the video data.
-	for i := range make([]int, int(inputCtx.nb_streams)) {
+	for i := range int(inputCtx.nb_streams) {
 		inStream := *(**C.AVStream)(
 			unsafe.Pointer(uintptr(unsafe.Pointer(inputCtx.streams)) +
 				uintptr(i)*unsafe.Sizeof(inputCtx.streams)))
