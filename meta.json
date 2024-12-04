@@ -1,6 +1,6 @@
 {
   "module_id": "viam:video-store",
-  "visibility": "private",
+  "visibility": "public",
   "url": "https://github.com/viam-modules/video-store",
   "description": "Golang module for video storage and retrieval from a camera",
   "models": [
