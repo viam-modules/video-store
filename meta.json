@@ -1,13 +1,18 @@
 {
-  "module_id": "viam:video-store",
-  "visibility": "public",
+  "module_id": "sean:video-store",
+  "visibility": "private",
   "url": "https://github.com/viam-modules/video-store",
   "description": "Golang module for video storage and retrieval from a camera",
   "models": [
       {
           "api": "rdk:component:camera",
-          "model": "viam:video:storage"
+          "model": "sean:video:storage"
       }
   ],
+  "build": {
+    "build": "make module",
+    "path": "module.tar.gz",
+    "arch" : ["darwin/arm64", "linux/arm64", "linux/amd64"]
+  },
   "entrypoint": "bin/video-store"
 }
