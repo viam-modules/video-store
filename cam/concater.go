@@ -144,7 +144,7 @@ func (c *concater) concat(from, to time.Time, path string) error {
 				uintptr(i)*unsafe.Sizeof(inputCtx.streams)))
 		outStream := C.avformat_new_stream(outputCtx, nil)
 		if outStream == nil {
-			return fmt.Errorf("failed to allocate stream")
+			return errors.New("failed to allocate stream")
 		}
 		ret := C.avcodec_parameters_copy(outStream.codecpar, inStream.codecpar)
 		if ret < 0 {
