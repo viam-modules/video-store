@@ -15,23 +15,20 @@ func main() {
 	utils.ContextualMain(mainWithArgs, logging.NewLogger("video-store-module"))
 }
 
-func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
-	module, err := module.NewModuleFromArgs(ctx, logger)
+func mainWithArgs(ctx context.Context, _ []string, _ logging.Logger) error {
+	module, err := module.NewModuleFromArgs(ctx)
 	if err != nil {
 		return err
 	}
-
 	err = module.AddModelFromRegistry(ctx, camera.API, videostore.Model)
 	if err != nil {
 		return err
 	}
-
 	err = module.Start(ctx)
 	defer module.Close(ctx)
 	if err != nil {
 		return err
 	}
-
 	<-ctx.Done()
 	return nil
 }

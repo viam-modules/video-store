@@ -18,6 +18,10 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
+const (
+	subsampleFactor = 2
+)
+
 type encoder struct {
 	logger     logging.Logger
 	codecCtx   *C.AVCodecContext
@@ -106,8 +110,8 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 	}
 
 	ySize := frame.Bounds().Dx() * frame.Bounds().Dy()
-	uSize := (frame.Bounds().Dx() / 2) * frame.Bounds().Dy()
-	vSize := (frame.Bounds().Dx() / 2) * frame.Bounds().Dy()
+	uSize := (frame.Bounds().Dx() / subsampleFactor) * frame.Bounds().Dy()
+	vSize := (frame.Bounds().Dx() / subsampleFactor) * frame.Bounds().Dy()
 	yPlane := C.CBytes(yuv[:ySize])
 	uPlane := C.CBytes(yuv[ySize : ySize+uSize])
 	vPlane := C.CBytes(yuv[ySize+uSize : ySize+uSize+vSize])
@@ -118,8 +122,8 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 	e.srcFrame.data[1] = (*C.uint8_t)(uPlane)
 	e.srcFrame.data[2] = (*C.uint8_t)(vPlane)
 	e.srcFrame.linesize[0] = C.int(frame.Bounds().Dx())
-	e.srcFrame.linesize[1] = C.int(frame.Bounds().Dx() / 2)
-	e.srcFrame.linesize[2] = C.int(frame.Bounds().Dx() / 2)
+	e.srcFrame.linesize[1] = C.int(frame.Bounds().Dx() / subsampleFactor)
+	e.srcFrame.linesize[2] = C.int(frame.Bounds().Dx() / subsampleFactor)
 
 	// Both PTS and DTS times are equal frameCount multiplied by the time_base.
 	// This assumes that the processFrame routine is running at the source framerate.
@@ -189,13 +193,13 @@ func imageToYUV422(img image.Image) ([]byte, error) {
 	}
 
 	ySize := width * height
-	halfWidth := width / 2
+	halfWidth := width / subsampleFactor
 	uSize := halfWidth * height
 	vSize := uSize
 
 	rawYUV := make([]byte, ySize+uSize+vSize)
 
-	for y := 0; y < height; y++ {
+	for y := range height {
 		ySrcStart := ycbcrImg.YOffset(rect.Min.X, rect.Min.Y+y)
 		cSrcStart := ycbcrImg.COffset(rect.Min.X, rect.Min.Y+y)
 		yDstStart := y * width

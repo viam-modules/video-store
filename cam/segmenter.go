@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"unsafe"
 
 	"go.viam.com/rdk/logging"
@@ -21,6 +22,7 @@ import (
 
 const (
 	outputPattern = "%Y-%m-%d_%H-%M-%S.mp4"
+	gigabyte      = 1024 * 1024 * 1024
 )
 
 type segmenter struct {
@@ -45,7 +47,7 @@ func newSegmenter(
 		logger:  logger,
 		encoder: enc,
 	}
-	s.maxStorageSize = int64(storageSize) * 1024 * 1024 * 1024
+	s.maxStorageSize = int64(storageSize) * gigabyte
 
 	s.storagePath = storagePath
 	err := createDir(s.storagePath)
@@ -83,7 +85,7 @@ func newSegmenter(
 		return nil, fmt.Errorf("failed to copy codec parameters %s", ffmpegError(ret))
 	}
 
-	segmentLengthCStr := C.CString(fmt.Sprintf("%d", clipLength))
+	segmentLengthCStr := C.CString(strconv.Itoa(clipLength))
 	segmentFormatCStr := C.CString(format)
 	resetTimestampsCStr := C.CString("1")
 	breakNonKeyFramesCStr := C.CString("1")

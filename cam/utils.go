@@ -78,8 +78,9 @@ func lookupCodecTypeByID(codecID C.enum_AVCodecID) codecType {
 
 // ffmpegError returns a string representation of the ffmpeg error code.
 func ffmpegError(ret C.int) string {
-	var errbuf [256]C.char
-	C.av_strerror(ret, &errbuf[0], 256)
+	const errbufSize = 256
+	var errbuf [errbufSize]C.char
+	C.av_strerror(ret, &errbuf[0], errbufSize)
 	if errbuf[0] == 0 {
 		return "unknown ffmpeg error"
 	}
@@ -118,8 +119,9 @@ func getHomeDir() string {
 
 // createDir creates a directory at the provided path if it does not exist.
 func createDir(path string) error {
+	const dirPermissions = 0o755
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err := os.MkdirAll(path, 0o755)
+		err := os.MkdirAll(path, dirPermissions)
 		if err != nil {
 			return err
 		}
@@ -191,9 +193,10 @@ func getSortedFiles(path string) ([]string, error) {
 
 // extractDateTimeFromFilename extracts the date and time from the filename.
 func extractDateTimeFromFilename(filePath string) (time.Time, error) {
+	const minParts = 2
 	baseName := filepath.Base(filePath)
 	parts := strings.Split(baseName, "_")
-	if len(parts) < 2 {
+	if len(parts) < minParts {
 		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
 	}
 	datePart := parts[0]
