@@ -3,6 +3,8 @@ name: Build & publish module to registry
 on:
   release:
     types: [published]
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
   publish:
