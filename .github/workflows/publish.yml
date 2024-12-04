@@ -14,6 +14,6 @@ jobs:
     - uses: viamrobotics/build-action@v1
       with:
         version: 0.0.1
-        ref: ${{ github.sha }}
+        ref: ${{ github.event.pull_request.head.sha }}
         key-id: ${{ secrets.SEAN_VIAM_API_KEY_ID }}
         key-value: ${{ secrets.SEAN_VIAM_API_KEY }}
