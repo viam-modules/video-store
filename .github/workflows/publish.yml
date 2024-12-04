@@ -17,4 +17,3 @@ jobs:
         ref: ${{ github.sha }}
         key-id: ${{ secrets.SEAN_VIAM_API_KEY_ID }}
         key-value: ${{ secrets.SEAN_VIAM_API_KEY }}
-        token: ${{ github.token }}
