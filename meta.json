@@ -1,7 +1,7 @@
 {
   "module_id": "sean:video-store",
   "visibility": "private",
-  "url": "https://github.com/viam-modules/video-store",
+  "url": "https://github.com/seanavery/video-store",
   "description": "Golang module for video storage and retrieval from a camera",
   "models": [
       {
