@@ -3,6 +3,10 @@ package main
 
 import (
 	"context"
+	"log"
+	"net/http"
+
+	_ "net/http/pprof"
 
 	videostore "github.com/viam-modules/video-store/cam"
 	"go.viam.com/rdk/components/camera"
@@ -12,6 +16,9 @@ import (
 )
 
 func main() {
+	go func() {
+		log.Println(http.ListenAndServe("0.0.0.0:6061", nil))
+	}()
 	utils.ContextualMain(mainWithArgs, logging.NewLogger("video-store-module"))
 }
 
