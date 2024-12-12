@@ -5,9 +5,16 @@ TARGET_ARCH ?= $(SOURCE_ARCH)
 normalize_arch = $(if $(filter aarch64,$(1)),arm64,$(if $(filter x86_64,$(1)),amd64,$(1)))
 SOURCE_ARCH := $(call normalize_arch,$(SOURCE_ARCH))
 TARGET_ARCH := $(call normalize_arch,$(TARGET_ARCH))
+PPROF_ENABLED ?= false
+BUILD_TAGS ?=
+
+ifeq ($(PPROF_ENABLED),true)
+    BUILD_TAGS := $(BUILD_TAGS) pprof
+endif
 
 BIN_OUTPUT_PATH = bin/$(TARGET_OS)-$(TARGET_ARCH)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
+BUILD_TAG_FILE := .build_tags
 
 FFMPEG_TAG ?= n6.1
 FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
@@ -47,11 +54,17 @@ GOFLAGS := -buildvcs=false
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 export PATH := $(PATH):$(shell go env GOPATH)/bin
 
-.PHONY: lint tool-install test clean module
+.PHONY: lint tool-install test clean module build build-pprof
 
-$(BIN_OUTPUT_PATH)/video-store: *.go cam/*.go $(FFMPEG_BUILD)
+build: $(BIN_OUTPUT_PATH)/video-store
+
+build-pprof:
+	$(MAKE) build PPROF_ENABLED=true
+
+$(BIN_OUTPUT_PATH)/video-store: *.go cam/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
 	go mod tidy
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -o $(BIN_OUTPUT_PATH)/video-store main.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store main.go
+	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
 
 $(FFMPEG_VERSION_PLATFORM):
 	git clone https://github.com/FFmpeg/FFmpeg.git --depth 1 --branch $(FFMPEG_TAG) $(FFMPEG_VERSION_PLATFORM)
@@ -72,6 +85,10 @@ ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
 endif
 endif
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
+
+# Force rebuild if BUILD_TAGS change
+$(BUILD_TAG_FILE):
+	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
@@ -107,5 +124,6 @@ module: $(BIN_OUTPUT_PATH)/video-store
 
 clean:
 	rm -rf $(BIN_OUTPUT_PATH)
+	rm -f $(BUILD_TAG_FILE)
 	rm -rf FFmpeg
 	git clean -fxd
