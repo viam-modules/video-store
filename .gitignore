@@ -4,3 +4,4 @@ FFmpeg
 *.DS_Store
 bin
 module.tar.gz
+.build_tags
