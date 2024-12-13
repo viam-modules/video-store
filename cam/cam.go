@@ -337,25 +337,28 @@ func (vs *videostore) Properties(_ context.Context) (camera.Properties, error) {
 // in the latestFrame atomic pointer. This routine runs as fast as possible
 // to keep the latest frame up to date.
 func (vs *videostore) fetchFrames(ctx context.Context) {
+	frameInterval := time.Second / time.Duration(vs.conf.Properties.Framerate)
+	ticker := time.NewTicker(frameInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-ticker.C:
+			frame, err := camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, vs.cam)
+			if err != nil {
+				vs.logger.Warn("failed to get frame from camera", err)
+				time.Sleep(retryInterval * time.Second)
+				continue
+			}
+			lazyImage, ok := frame.(*rimage.LazyEncodedImage)
+			if !ok {
+				vs.logger.Error("frame is not of type *rimage.LazyEncodedImage")
+				return
+			}
+			decodedImage := lazyImage.DecodedImage()
+			vs.latestFrame.Store(&decodedImage)
 		}
-		frame, err := camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, vs.cam)
-		if err != nil {
-			vs.logger.Warn("failed to get frame from camera", err)
-			time.Sleep(retryInterval * time.Second)
-			continue
-		}
-		lazyImage, ok := frame.(*rimage.LazyEncodedImage)
-		if !ok {
-			vs.logger.Error("frame is not of type *rimage.LazyEncodedImage")
-			return
-		}
-		decodedImage := lazyImage.DecodedImage()
-		vs.latestFrame.Store(&decodedImage)
 	}
 }
 
