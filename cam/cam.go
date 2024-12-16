@@ -452,7 +452,6 @@ func (vs *videostore) Image(_ context.Context, _ string, _ map[string]interface{
 	// Return a single empty byte to satisfy the Image method
 	// avoiding errors from the RenderFrame GRPC call.
 	return []byte{0}, camera.ImageMetadata{}, nil
-
 }
 
 func (vs *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
