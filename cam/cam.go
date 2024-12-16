@@ -449,7 +449,10 @@ func (vs *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gos
 }
 
 func (vs *videostore) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
-	return nil, camera.ImageMetadata{}, errors.New("not implemented")
+	// Return a single empty byte to satisfy the Image method
+	// avoiding errors from the RenderFrame GRPC call.
+	return []byte{0}, camera.ImageMetadata{}, nil
+
 }
 
 func (vs *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
