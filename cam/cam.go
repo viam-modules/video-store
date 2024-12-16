@@ -333,9 +333,8 @@ func (vs *videostore) Properties(_ context.Context) (camera.Properties, error) {
 	return camera.Properties{}, nil
 }
 
-// fetchFrames reads frames from the camera and stores the decoded image
-// in the latestFrame atomic pointer. This routine runs as fast as possible
-// to keep the latest frame up to date.
+// fetchFrames reads frames from the camera at the framerate interval
+// and stores the decoded image in the latestFrame atomic pointer.
 func (vs *videostore) fetchFrames(ctx context.Context) {
 	frameInterval := time.Second / time.Duration(vs.conf.Properties.Framerate)
 	ticker := time.NewTicker(frameInterval)
