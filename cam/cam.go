@@ -173,13 +173,14 @@ func newvideostore(
 		for range make([]struct{}, numFetchFrameAttempts) {
 			frame, err := camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, vs.cam)
 			if err != nil {
-				vs.logger.Warn("failed to get and decode frame from camera, retrying...", err)
+				vs.logger.Warn("failed to get and decode frame from camera, retrying. Error: ", err)
 				time.Sleep(retryInterval * time.Second)
 				continue
 			}
 			bounds := frame.Bounds()
 			newConf.Properties.Width = bounds.Dx()
 			newConf.Properties.Height = bounds.Dy()
+			vs.logger.Infof("received frame width and height: %d, %d", newConf.Properties.Width, newConf.Properties.Height)
 			break
 		}
 	}

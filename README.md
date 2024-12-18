@@ -52,6 +52,9 @@ On the new component panel, copy and paste the following attribute template into
   }
 }
 ```
+
+Additionally, make sure to add your configured data manager service to the `depends_on` array of your `video-store` component.
+
 > For more information, see [Configure a Machine](https://docs.viam.com/manage/configuration/).
 
 ### Attributes
