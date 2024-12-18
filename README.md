@@ -71,9 +71,9 @@ On the new component panel, copy and paste the following attribute template into
 |                 | `bitrate`         | integer | optional  | Throughput of encoder in bits per second. Higher for better quality video, and lower for better storage efficiency. |
 |                 | `preset`          | string  | optional  | Name of codec video preset to use. See [here](https://trac.ffmpeg.org/wiki/Encode/H.264#a2.Chooseapresetandtune) for preset options.                                                                |
 | `cam_props`     |                   | object  | required  |                                                                                                   |
-|                 | `width`           | integer | required  | Width of the source camera frames in pixels.                                                      |
-|                 | `height`          | integer | required  | Height of the source camera frames in pixels.                                                     |
-|                 | `framerate`       | integer | required  | Number of frames per second provided by the source camera.                                        |
+|                 | `width`           | integer | optional  | Width of the source camera frames in pixels. If unspecified, will try to autodetect by fetching a frame from the source camera.                                                    |
+|                 | `height`          | integer | optional  | Height of the source camera frames in pixels. If unspecified, will try to autodetect by fetching a frame from the source camera.                                                     |
+|                 | `framerate`       | integer | required  | Number of frames per second provided by the source camera. Unlike width and height, this is a required attribute, and cannot be autodetected.                                                                            |
 
 ### Example Configuration
 

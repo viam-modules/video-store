@@ -36,11 +36,12 @@ const (
 	defaultStoragePath    = ".viam/video-storage"
 	defaultLogLevel       = "error"
 
-	maxGRPCSize     = 1024 * 1024 * 32 // bytes
-	deleterInterval = 10               // minutes
-	retryInterval   = 1                // seconds
-	asyncTimeout    = 60               // seconds
-	tempPath        = "/tmp"
+	maxGRPCSize           = 1024 * 1024 * 32 // bytes
+	deleterInterval       = 10               // minutes
+	retryInterval         = 1                // seconds
+	asyncTimeout          = 60               // seconds
+	numFetchFrameAttempts = 3                // iterations
+	tempPath              = "/tmp"
 )
 
 type videostore struct {
@@ -125,7 +126,7 @@ func init() {
 }
 
 func newvideostore(
-	_ context.Context,
+	ctx context.Context,
 	deps resource.Dependencies,
 	conf resource.Config,
 	logger logging.Logger,
@@ -166,6 +167,26 @@ func newvideostore(
 	if newConf.Video.Format != "" {
 		format = newConf.Video.Format
 	}
+
+	if newConf.Properties.Width == 0 && newConf.Properties.Height == 0 {
+		vs.logger.Info("received unspecified frame width and height, fetching frame to get dimensions")
+		for range make([]struct{}, numFetchFrameAttempts) {
+			frame, err := camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, vs.cam)
+			if err != nil {
+				vs.logger.Warn("failed to get and decode frame from camera, retrying...", err)
+				time.Sleep(retryInterval * time.Second)
+				continue
+			}
+			bounds := frame.Bounds()
+			newConf.Properties.Width = bounds.Dx()
+			newConf.Properties.Height = bounds.Dy()
+			break
+		}
+	}
+	if newConf.Properties.Width == 0 && newConf.Properties.Height == 0 {
+		return nil, fmt.Errorf("failed to get source camera width and height after %d attempts", numFetchFrameAttempts)
+	}
+
 	vs.enc, err = newEncoder(
 		logger,
 		codec,
