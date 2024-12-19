@@ -76,7 +76,7 @@ Additionally, make sure to add your configured data manager service to the `depe
 | `cam_props`     |                   | object  | required  |                                                                                                   |
 |                 | `width`           | integer | optional  | Width of the source camera frames in pixels. If unspecified, will try to autodetect by fetching a frame from the source camera.                                                    |
 |                 | `height`          | integer | optional  | Height of the source camera frames in pixels. If unspecified, will try to autodetect by fetching a frame from the source camera.                                                     |
-|                 | `framerate`       | integer | required  | Number of frames per second provided by the source camera. Unlike width and height, this is a required attribute, and cannot be autodetected.                                                                            |
+|                 | `framerate`       | integer | optional  | Number of frames per second provided by the source camera. Default is 20.                                                                            |
 
 ### Example Configuration
 

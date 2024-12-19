@@ -483,16 +483,14 @@ func TestModuleConfiguration(t *testing.T) {
 		test.That(t, err.Error(), test.ShouldContainSubstring, "size_gb")
 	})
 
-	t.Run("Fails Configuration No CamProps", func(t *testing.T) {
+	t.Run("No CamProps succeeds with defaults", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config5)
 		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
-		cam, err := camera.FromRobot(r, videoStoreComponentName)
-		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, cam, test.ShouldBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "cam_props")
+		_, err = camera.FromRobot(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
 	})
 
 	t.Run("Fails Configuration No DataManager", func(t *testing.T) {

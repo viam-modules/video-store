@@ -26,6 +26,7 @@ var Model = resource.ModelNamespace("viam").WithFamily("video").WithModel("stora
 
 const (
 	// Default values for the video storage camera component.
+	defaultFramerate      = 20 // frames per second
 	defaultSegmentSeconds = 30 // seconds
 	defaultStorageSize    = 10 // GB
 	defaultVideoCodec     = codecH264
@@ -108,10 +109,6 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Sync == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "sync")
 	}
-	// TODO(seanp): Remove once camera properties are returned from camera component.
-	if cfg.Properties == (cameraProperties{}) {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "cam_props")
-	}
 
 	return []string{cfg.Camera}, nil
 }
@@ -186,6 +183,10 @@ func newvideostore(
 	}
 	if newConf.Properties.Width == 0 && newConf.Properties.Height == 0 {
 		return nil, fmt.Errorf("failed to get source camera width and height after %d attempts", numFetchFrameAttempts)
+	}
+
+	if newConf.Properties.Framerate == 0 {
+		newConf.Properties.Framerate = defaultFramerate
 	}
 
 	vs.enc, err = newEncoder(
