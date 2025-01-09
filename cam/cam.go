@@ -55,6 +55,7 @@ type videostore struct {
 	cam         camera.Camera
 	latestFrame atomic.Pointer[image.Image]
 	workers     *utils.StoppableWorkers
+	framerate   int
 
 	enc  *encoder
 	seg  *segmenter
@@ -78,21 +79,22 @@ type video struct {
 	Format  string `json:"format,omitempty"`
 }
 
-type cameraProperties struct {
-	Width     int `json:"width"`
-	Height    int `json:"height"`
-	Framerate int `json:"framerate"`
-}
+// type cameraProperties struct {
+// 	Width     int `json:"width"`
+// 	Height    int `json:"height"`
+// 	Framerate int `json:"framerate"`
+// }
 
 // Config is the configuration for the video storage camera component.
 type Config struct {
-	Camera  string  `json:"camera"`
-	Sync    string  `json:"sync"`
-	Storage storage `json:"storage"`
-	Video   video   `json:"video,omitempty"`
+	Camera    string  `json:"camera"`
+	Sync      string  `json:"sync"`
+	Storage   storage `json:"storage"`
+	Video     video   `json:"video,omitempty"`
+	Framerate int     `json:"framerate,omitempty"`
 
-	// TODO(seanp): Remove once camera properties are returned from camera component.
-	Properties cameraProperties `json:"cam_props"`
+	// // TODO(seanp): Remove once camera properties are returned from camera component.
+	// Properties cameraProperties `json:"cam_props"`
 }
 
 // Validate validates the configuration for the video storage camera component.
@@ -155,6 +157,7 @@ func newvideostore(
 	bitrate := defaultVideoBitrate
 	preset := defaultVideoPreset
 	format := defaultVideoFormat
+	vs.framerate = defaultFramerate
 	if newConf.Video.Bitrate != 0 {
 		bitrate = newConf.Video.Bitrate
 	}
@@ -164,39 +167,41 @@ func newvideostore(
 	if newConf.Video.Format != "" {
 		format = newConf.Video.Format
 	}
-
-	if newConf.Properties.Width == 0 && newConf.Properties.Height == 0 {
-		vs.logger.Info("received unspecified frame width and height, fetching frame to get dimensions")
-		for range make([]struct{}, numFetchFrameAttempts) {
-			frame, err := camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, vs.cam)
-			if err != nil {
-				vs.logger.Warn("failed to get and decode frame from camera, retrying. Error: ", err)
-				time.Sleep(retryInterval * time.Second)
-				continue
-			}
-			bounds := frame.Bounds()
-			newConf.Properties.Width = bounds.Dx()
-			newConf.Properties.Height = bounds.Dy()
-			vs.logger.Infof("received frame width and height: %d, %d", newConf.Properties.Width, newConf.Properties.Height)
-			break
-		}
-	}
-	if newConf.Properties.Width == 0 && newConf.Properties.Height == 0 {
-		return nil, fmt.Errorf("failed to get source camera width and height after %d attempts", numFetchFrameAttempts)
+	if newConf.Framerate != 0 {
+		vs.framerate = newConf.Framerate
 	}
 
-	if newConf.Properties.Framerate == 0 {
-		newConf.Properties.Framerate = defaultFramerate
-	}
+	// if newConf.Properties.Width == 0 && newConf.Properties.Height == 0 {
+	// 	vs.logger.Info("received unspecified frame width and height, fetching frame to get dimensions")
+	// 	for range make([]struct{}, numFetchFrameAttempts) {
+	// 		frame, err := camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, vs.cam)
+	// 		if err != nil {
+	// 			vs.logger.Warn("failed to get and decode frame from camera, retrying. Error: ", err)
+	// 			time.Sleep(retryInterval * time.Second)
+	// 			continue
+	// 		}
+	// 		bounds := frame.Bounds()
+	// 		newConf.Properties.Width = bounds.Dx()
+	// 		newConf.Properties.Height = bounds.Dy()
+	// 		vs.logger.Infof("received frame width and height: %d, %d", newConf.Properties.Width, newConf.Properties.Height)
+	// 		break
+	// 	}
+	// }
+	// if newConf.Properties.Width == 0 && newConf.Properties.Height == 0 {
+	// 	return nil, fmt.Errorf("failed to get source camera width and height after %d attempts", numFetchFrameAttempts)
+	// }
 
+	// if newConf.Properties.Framerate == 0 {
+	// 	newConf.Properties.Framerate = defaultFramerate
+	// }
+
+	vs.logger.Info("about to create encoder")
 	vs.enc, err = newEncoder(
 		logger,
 		codec,
 		bitrate,
 		preset,
-		newConf.Properties.Width,
-		newConf.Properties.Height,
-		newConf.Properties.Framerate,
+		vs.framerate,
 	)
 	if err != nil {
 		return nil, err
@@ -238,15 +243,16 @@ func newvideostore(
 	}
 
 	vs.storagePath = storagePath
+	vs.logger.Info("about to create segmenter")
 	vs.seg, err = newSegmenter(
 		logger,
-		vs.enc,
 		sizeGB,
 		segmentSeconds,
 		storagePath,
 		format,
 	)
 	if err != nil {
+		vs.logger.Info("failed to create segmenter !!!")
 		return nil, err
 	}
 
@@ -256,6 +262,7 @@ func newvideostore(
 	if err != nil {
 		return nil, err
 	}
+	vs.logger.Info("about to create concater")
 	vs.conc, err = newConcater(
 		logger,
 		vs.storagePath,
@@ -359,7 +366,7 @@ func (vs *videostore) Properties(_ context.Context) (camera.Properties, error) {
 // fetchFrames reads frames from the camera at the framerate interval
 // and stores the decoded image in the latestFrame atomic pointer.
 func (vs *videostore) fetchFrames(ctx context.Context) {
-	frameInterval := time.Second / time.Duration(vs.conf.Properties.Framerate)
+	frameInterval := time.Second / time.Duration(vs.framerate)
 	ticker := time.NewTicker(frameInterval)
 	defer ticker.Stop()
 	for {
@@ -387,7 +394,7 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 // processFrames grabs the latest frame, encodes, and writes to the segmenter
 // which chunks video stream into clip files inside the storage directory.
 func (vs *videostore) processFrames(ctx context.Context) {
-	frameInterval := time.Second / time.Duration(vs.conf.Properties.Framerate)
+	frameInterval := time.Second / time.Duration(vs.framerate)
 	ticker := time.NewTicker(frameInterval)
 	defer ticker.Stop()
 	for {
@@ -400,10 +407,18 @@ func (vs *videostore) processFrames(ctx context.Context) {
 				vs.logger.Debug("latest frame is not available yet")
 				continue
 			}
-			encoded, pts, dts, err := vs.enc.encode(*latestFrame)
+			encoded, pts, dts, reinit, err := vs.enc.encode(*latestFrame)
 			if err != nil {
 				vs.logger.Error("failed to encode frame", err)
 				return
+			}
+			if reinit {
+				vs.logger.Info("reinitializing segmenter")
+				err = vs.seg.initialize(vs.enc.codecCtx)
+				if err != nil {
+					vs.logger.Error("failed to reinitialize segmenter", err)
+					return
+				}
 			}
 			err = vs.seg.writeEncodedFrame(encoded, pts, dts)
 			if err != nil {
