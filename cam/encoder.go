@@ -32,6 +32,7 @@ type encoder struct {
 	height     int
 	bitrate    int
 	preset     string
+	videoCodec codecType
 }
 
 func newEncoder(
@@ -53,6 +54,7 @@ func newEncoder(
 		height:     0,
 		frameCount: 0,
 		preset:     preset,
+		videoCodec: videoCodec,
 	}
 
 	return enc, nil
@@ -66,7 +68,8 @@ func (e *encoder) initialize(width, height int) error {
 	if e.srcFrame != nil {
 		C.av_frame_free(&e.srcFrame)
 	}
-	codecID := lookupCodecIDByType(codecH264)
+	// codecID := lookupCodecIDByType(codecH264)
+	codecID := lookupCodecIDByType(e.videoCodec)
 	codec := C.avcodec_find_encoder(codecID)
 	if codec == nil {
 		return errors.New("codec not found")

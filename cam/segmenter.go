@@ -66,9 +66,9 @@ func (s *segmenter) initialize(codecCtx *C.AVCodecContext) error {
 		if ret < 0 {
 			s.logger.Errorf("failed to write trailer", "error", ffmpegError(ret))
 		}
+		// This will also free the stream
 		C.avformat_free_context(s.outCtx)
 	}
-	// TODO(seanp): do we need to free the stream?
 
 	// Allocate output context for segmenter. The "segment" format is a special format
 	// that allows for segmenting output files. The output pattern is a strftime pattern

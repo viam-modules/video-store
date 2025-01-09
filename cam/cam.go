@@ -116,7 +116,7 @@ func init() {
 }
 
 func newvideostore(
-	ctx context.Context,
+	_ context.Context,
 	deps resource.Dependencies,
 	conf resource.Config,
 	logger logging.Logger,
