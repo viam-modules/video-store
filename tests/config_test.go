@@ -100,11 +100,7 @@ func TestModuleConfiguration(t *testing.T) {
 						"upload_path": "%s",
 						"storage_path": "%s"
 					},
-					"cam_props": {
-						"width": 1280,
-						"height": 720,
-						"framerate": 30
-					},
+					"framerate": 30,
 					"video": {
 						"codec": "h264",
 						"bitrate": 1000000,
@@ -206,11 +202,7 @@ func TestModuleConfiguration(t *testing.T) {
 				"attributes": {
 					"camera": "fake-cam-1",
 					"sync": "data_manager-1",
-					"cam_props": {
-						"width": 1280,
-						"height": 720,
-						"framerate": 30
-					},
+					"framerate": 30,
 					"video": {
 						"codec": "h264",
 						"bitrate": 1000000,
@@ -272,11 +264,7 @@ func TestModuleConfiguration(t *testing.T) {
 						"upload_path": "/tmp/video-upload",
 						"storage_path": "/tmp/video-storage"
 					},
-					"cam_props": {
-						"width": 1280,
-						"height": 720,
-						"framerate": 30
-					},
+					"framerate": 30,
 					"video": {
 						"codec": "h264",
 						"bitrate": 1000000,
@@ -321,7 +309,7 @@ func TestModuleConfiguration(t *testing.T) {
 		]
 	}`, fullModuleBinPath)
 
-	// cam_props NOT specified
+	// framerate NOT specified
 	config5 := fmt.Sprintf(`
 	{
 		"components": [
@@ -400,11 +388,7 @@ func TestModuleConfiguration(t *testing.T) {
 						"upload_path": "/tmp",
 						"storage_path": "/tmp"
 					},
-					"cam_props": {
-						"width": 1280,
-						"height": 720,
-						"framerate": 30
-					},
+					"framerate": 30,
 					"video": {
 						"codec": "h264",
 						"bitrate": 1000000,
@@ -483,7 +467,7 @@ func TestModuleConfiguration(t *testing.T) {
 		test.That(t, err.Error(), test.ShouldContainSubstring, "size_gb")
 	})
 
-	t.Run("No CamProps succeeds with defaults", func(t *testing.T) {
+	t.Run("No framerate Succeeds", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config5)
