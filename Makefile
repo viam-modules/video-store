@@ -43,7 +43,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lz
 ifeq ($(SOURCE_OS),linux)
-	CGO_LDFLAGS += -l:libjpeg.a -l:libx264.a
+	CGO_LDFLAGS += -l:libx264.a
 endif
 ifeq ($(SOURCE_OS),darwin)
 	CGO_LDFLAGS += $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a -liconv
