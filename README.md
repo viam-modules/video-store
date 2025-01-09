@@ -44,11 +44,6 @@ On the new component panel, copy and paste the following attribute template into
   "storage": {
     "segment_seconds": <int>,
     "size_gb": <int>,
-  },
-  "cam_props": {
-    "width": <int>,
-    "height": <int>,
-    "framerate": <int>
   }
 }
 ```
@@ -73,10 +68,7 @@ Additionally, make sure to add your configured data manager service to the `depe
 |                 | `codec`           | string  | optional  | Name of video codec to use (e.g., h264).                                                         |
 |                 | `bitrate`         | integer | optional  | Throughput of encoder in bits per second. Higher for better quality video, and lower for better storage efficiency. |
 |                 | `preset`          | string  | optional  | Name of codec video preset to use. See [here](https://trac.ffmpeg.org/wiki/Encode/H.264#a2.Chooseapresetandtune) for preset options.                                                                |
-| `cam_props`     |                   | object  | optional  |                                                                                                   |
-|                 | `width`           | integer | optional  | Width of the source camera frames in pixels. If unspecified, will try to autodetect by fetching a frame from the source camera.                                                    |
-|                 | `height`          | integer | optional  | Height of the source camera frames in pixels. If unspecified, will try to autodetect by fetching a frame from the source camera.                                                     |
-|                 | `framerate`       | integer | optional  | Number of frames per second provided by the source camera. Default is 20.                                                                            |
+| `framerate`     |                   | integer | optional  | Frame rate of the video. Default value is 20 if not set.                                          |
 
 ### Example Configuration
 
@@ -92,11 +84,6 @@ Additionally, make sure to add your configured data manager service to the `depe
     "storage": {
       "segment_seconds": 10,
       "size_gb": 50,
-    },
-    "cam_props": {
-      "width": 640,
-      "height": 480,
-      "framerate": 25
     }
   },
   "depends_on": [
