@@ -64,6 +64,9 @@ func (e *encoder) initialize(width, height int) error {
 	if e.codecCtx != nil {
 		C.avcodec_close(e.codecCtx)
 		C.avcodec_free_context(&e.codecCtx)
+		// We need to reset the frame count when we reinitialize the encoder
+		// in order to ensure that keyframes are generated correctly.
+		e.frameCount = 0
 	}
 	if e.srcFrame != nil {
 		C.av_frame_free(&e.srcFrame)
