@@ -79,12 +79,6 @@ type video struct {
 	Format  string `json:"format,omitempty"`
 }
 
-// type cameraProperties struct {
-// 	Width     int `json:"width"`
-// 	Height    int `json:"height"`
-// 	Framerate int `json:"framerate"`
-// }
-
 // Config is the configuration for the video storage camera component.
 type Config struct {
 	Camera    string  `json:"camera"`
@@ -92,9 +86,6 @@ type Config struct {
 	Storage   storage `json:"storage"`
 	Video     video   `json:"video,omitempty"`
 	Framerate int     `json:"framerate,omitempty"`
-
-	// // TODO(seanp): Remove once camera properties are returned from camera component.
-	// Properties cameraProperties `json:"cam_props"`
 }
 
 // Validate validates the configuration for the video storage camera component.
@@ -171,31 +162,6 @@ func newvideostore(
 		vs.framerate = newConf.Framerate
 	}
 
-	// if newConf.Properties.Width == 0 && newConf.Properties.Height == 0 {
-	// 	vs.logger.Info("received unspecified frame width and height, fetching frame to get dimensions")
-	// 	for range make([]struct{}, numFetchFrameAttempts) {
-	// 		frame, err := camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, vs.cam)
-	// 		if err != nil {
-	// 			vs.logger.Warn("failed to get and decode frame from camera, retrying. Error: ", err)
-	// 			time.Sleep(retryInterval * time.Second)
-	// 			continue
-	// 		}
-	// 		bounds := frame.Bounds()
-	// 		newConf.Properties.Width = bounds.Dx()
-	// 		newConf.Properties.Height = bounds.Dy()
-	// 		vs.logger.Infof("received frame width and height: %d, %d", newConf.Properties.Width, newConf.Properties.Height)
-	// 		break
-	// 	}
-	// }
-	// if newConf.Properties.Width == 0 && newConf.Properties.Height == 0 {
-	// 	return nil, fmt.Errorf("failed to get source camera width and height after %d attempts", numFetchFrameAttempts)
-	// }
-
-	// if newConf.Properties.Framerate == 0 {
-	// 	newConf.Properties.Framerate = defaultFramerate
-	// }
-
-	vs.logger.Info("about to create encoder")
 	vs.enc, err = newEncoder(
 		logger,
 		codec,
@@ -243,7 +209,6 @@ func newvideostore(
 	}
 
 	vs.storagePath = storagePath
-	vs.logger.Info("about to create segmenter")
 	vs.seg, err = newSegmenter(
 		logger,
 		sizeGB,
@@ -252,7 +217,6 @@ func newvideostore(
 		format,
 	)
 	if err != nil {
-		vs.logger.Info("failed to create segmenter !!!")
 		return nil, err
 	}
 
@@ -262,7 +226,6 @@ func newvideostore(
 	if err != nil {
 		return nil, err
 	}
-	vs.logger.Info("about to create concater")
 	vs.conc, err = newConcater(
 		logger,
 		vs.storagePath,
