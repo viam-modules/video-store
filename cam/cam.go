@@ -344,7 +344,7 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 			lazyImage, ok := frame.(*rimage.LazyEncodedImage)
 			if !ok {
 				vs.logger.Error("frame is not of type *rimage.LazyEncodedImage")
-				return
+				continue
 			}
 			decodedImage := lazyImage.DecodedImage()
 			vs.latestFrame.Store(&decodedImage)
@@ -371,20 +371,23 @@ func (vs *videostore) processFrames(ctx context.Context) {
 			result, err := vs.enc.encode(*latestFrame)
 			if err != nil {
 				vs.logger.Error("failed to encode frame", err)
-				return
+				continue
 			}
 			if result.frameDimsChanged {
 				vs.logger.Info("reinitializing segmenter due to encoder refresh")
 				err = vs.seg.initialize(vs.enc.codecCtx)
 				if err != nil {
 					vs.logger.Error("failed to reinitialize segmenter", err)
-					return
+					// Hack that flags the encoder to reinitialize if segmenter fails to
+					// ensure that encoder and segmenter inits are in sync.
+					vs.enc.codecCtx = nil
+					continue
 				}
 			}
 			err = vs.seg.writeEncodedFrame(result.encodedData, result.pts, result.dts)
 			if err != nil {
 				vs.logger.Error("failed to segment frame", err)
-				return
+				continue
 			}
 		}
 	}
