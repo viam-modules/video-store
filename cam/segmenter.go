@@ -44,8 +44,13 @@ func newSegmenter(
 	storagePath string,
 	format string,
 ) (*segmenter, error) {
+	// Initialize struct without stream or output context. We will initialize
+	// these when we get the first frame or when a resize is needed.
 	s := &segmenter{
 		logger:         logger,
+		outCtx:         nil,
+		stream:         nil,
+		frameCount:     0,
 		maxStorageSize: int64(storageSize) * gigabyte,
 		clipLength:     clipLength,
 		storagePath:    storagePath,
@@ -59,7 +64,7 @@ func newSegmenter(
 	return s, nil
 }
 
-// initialize takes in a codec ctx and initializes the segmenter with the codec ctx.
+// initialize takes in a codec ctx and initializes the segmenter with the codec parameters.
 func (s *segmenter) initialize(codecCtx *C.AVCodecContext) error {
 	if s.outCtx != nil {
 		ret := C.av_write_trailer(s.outCtx)

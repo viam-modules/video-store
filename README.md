@@ -65,10 +65,10 @@ Additionally, make sure to add your configured data manager service to the `depe
 |                 | `upload_path`     | string  | optional  | Custom path to use for uploading files. If not under `~/.viam/capture`, you will need to add to `additional_sync_paths` in datamanager service configuration. |
 | `video`         |                   | object  | optional  |                                                                                                   |
 |                 | `format`          | string  | optional  | Name of video format to use (e.g., mp4).                                                          |
-|                 | `codec`           | string  | optional  | Name of video codec to use (e.g., h264).                                                         |
+|                 | `codec`           | string  | optional  | Name of video codec to use (e.g., h264).                                                          |
 |                 | `bitrate`         | integer | optional  | Throughput of encoder in bits per second. Higher for better quality video, and lower for better storage efficiency. |
 |                 | `preset`          | string  | optional  | Name of codec video preset to use. See [here](https://trac.ffmpeg.org/wiki/Encode/H.264#a2.Chooseapresetandtune) for preset options.                                                                |
-| `framerate`     |                   | integer | optional  | Frame rate of the video. Default value is 20 if not set.                                          |
+| `framerate`     |                   | integer | optional  | Frame rate of the video in frames per second. Default value is 20 if not set.                      |
 
 ### Example Configuration
 

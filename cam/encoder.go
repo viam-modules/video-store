@@ -43,7 +43,8 @@ func newEncoder(
 	framerate int,
 ) (*encoder, error) {
 	// Initialize without codec context and source frame. We will spin up
-	// the codec context and source frame when we get the first frame.
+	// the codec context and source frame when we get the first frame or when
+	// a resize is needed.
 	enc := &encoder{
 		logger:     logger,
 		codecCtx:   nil,
@@ -64,8 +65,8 @@ func (e *encoder) initialize(width, height int) error {
 	if e.codecCtx != nil {
 		C.avcodec_close(e.codecCtx)
 		C.avcodec_free_context(&e.codecCtx)
-		// We need to reset the frame count when we reinitialize the encoder
-		// in order to ensure that keyframes are generated correctly.
+		// We need to reset the frame count when reinitializing the encoder
+		// in order to ensure that keyframes intervals are generated correctly.
 		e.frameCount = 0
 	}
 	if e.srcFrame != nil {
