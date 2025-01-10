@@ -65,7 +65,7 @@ func newEncoder(
 	return enc, nil
 }
 
-func (e *encoder) initialize(width, height int) error {
+func (e *encoder) initialize(width, height int) (err error) {
 	if e.codecCtx != nil {
 		C.avcodec_close(e.codecCtx)
 		C.avcodec_free_context(&e.codecCtx)
@@ -76,6 +76,18 @@ func (e *encoder) initialize(width, height int) error {
 	if e.srcFrame != nil {
 		C.av_frame_free(&e.srcFrame)
 	}
+	// Defer cleanup in case of error. This will prevent side effects from
+	// a partially initialized encoder.
+	defer func() {
+		if err != nil {
+			if e.codecCtx != nil {
+				C.avcodec_free_context(&e.codecCtx)
+			}
+			if e.srcFrame != nil {
+				C.av_frame_free(&e.srcFrame)
+			}
+		}
+	}()
 	codecID := lookupCodecIDByType(codecH264)
 	codec := C.avcodec_find_encoder(codecID)
 	if codec == nil {
