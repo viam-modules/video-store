@@ -368,12 +368,12 @@ func (vs *videostore) processFrames(ctx context.Context) {
 				vs.logger.Debug("latest frame is not available yet")
 				continue
 			}
-			encoded, pts, dts, reinit, err := vs.enc.encode(*latestFrame)
+			encoded, pts, dts, frameDimsChanged, err := vs.enc.encode(*latestFrame)
 			if err != nil {
 				vs.logger.Error("failed to encode frame", err)
 				return
 			}
-			if reinit {
+			if frameDimsChanged {
 				vs.logger.Info("reinitializing segmenter due to encoder refresh")
 				err = vs.seg.initialize(vs.enc.codecCtx)
 				if err != nil {

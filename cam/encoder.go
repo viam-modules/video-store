@@ -124,19 +124,19 @@ func (e *encoder) initialize(width, height int) error {
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
 func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, bool, error) {
-	reinit := false
+	frameDimsChanged := false
 	dy, dx := frame.Bounds().Dy(), frame.Bounds().Dx()
 	if e.codecCtx == nil || dy != int(e.codecCtx.height) || dx != int(e.codecCtx.width) {
 		e.logger.Infof("Initializing encoder with frame dimensions %dx%d", dx, dy)
 		err := e.initialize(dx, dy)
 		if err != nil {
-			return nil, 0, 0, reinit, err
+			return nil, 0, 0, frameDimsChanged, err
 		}
-		reinit = true
+		frameDimsChanged = true
 	}
 	yuv, err := imageToYUV422(frame)
 	if err != nil {
-		return nil, 0, 0, reinit, err
+		return nil, 0, 0, frameDimsChanged, err
 	}
 
 	ySize := dx * dy
@@ -174,17 +174,17 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, bool, error) 
 
 	ret := C.avcodec_send_frame(e.codecCtx, e.srcFrame)
 	if ret < 0 {
-		return nil, 0, 0, reinit, fmt.Errorf("avcodec_send_frame: %s", ffmpegError(ret))
+		return nil, 0, 0, frameDimsChanged, fmt.Errorf("avcodec_send_frame: %s", ffmpegError(ret))
 	}
 	pkt := C.av_packet_alloc()
 	if pkt == nil {
-		return nil, 0, 0, reinit, errors.New("could not allocate packet")
+		return nil, 0, 0, frameDimsChanged, errors.New("could not allocate packet")
 	}
 	// Safe to free the packet since we copy later.
 	defer C.av_packet_free(&pkt)
 	ret = C.avcodec_receive_packet(e.codecCtx, pkt)
 	if ret < 0 {
-		return nil, 0, 0, reinit, fmt.Errorf("avcodec_receive_packet failed %s", ffmpegError(ret))
+		return nil, 0, 0, frameDimsChanged, fmt.Errorf("avcodec_receive_packet failed %s", ffmpegError(ret))
 	}
 
 	// Convert the encoded data to a Go byte slice. This is a necessary copy
@@ -196,7 +196,7 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, bool, error) 
 	e.frameCount++
 
 	// return encoded data
-	return encodedData, pts, dts, reinit, nil
+	return encodedData, pts, dts, frameDimsChanged, nil
 }
 
 func (e *encoder) close() {
