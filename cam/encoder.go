@@ -34,6 +34,13 @@ type encoder struct {
 	preset     string
 }
 
+type encodeResult struct {
+	encodedData      []byte
+	pts              int64
+	dts              int64
+	frameDimsChanged bool
+}
+
 func newEncoder(
 	logger logging.Logger,
 	bitrate int,
@@ -123,20 +130,20 @@ func (e *encoder) initialize(width, height int) error {
 // PTS is calculated based on the frame count and source framerate.
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
-func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, bool, error) {
-	frameDimsChanged := false
+func (e *encoder) encode(frame image.Image) (encodeResult, error) {
+	var result encodeResult
 	dy, dx := frame.Bounds().Dy(), frame.Bounds().Dx()
 	if e.codecCtx == nil || dy != int(e.codecCtx.height) || dx != int(e.codecCtx.width) {
 		e.logger.Infof("Initializing encoder with frame dimensions %dx%d", dx, dy)
 		err := e.initialize(dx, dy)
 		if err != nil {
-			return nil, 0, 0, frameDimsChanged, err
+			return result, err
 		}
-		frameDimsChanged = true
+		result.frameDimsChanged = true
 	}
 	yuv, err := imageToYUV422(frame)
 	if err != nil {
-		return nil, 0, 0, frameDimsChanged, err
+		return result, err
 	}
 
 	ySize := dx * dy
@@ -174,29 +181,29 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, bool, error) 
 
 	ret := C.avcodec_send_frame(e.codecCtx, e.srcFrame)
 	if ret < 0 {
-		return nil, 0, 0, frameDimsChanged, fmt.Errorf("avcodec_send_frame: %s", ffmpegError(ret))
+		return result, fmt.Errorf("avcodec_send_frame: %s", ffmpegError(ret))
 	}
 	pkt := C.av_packet_alloc()
 	if pkt == nil {
-		return nil, 0, 0, frameDimsChanged, errors.New("could not allocate packet")
+		return result, errors.New("could not allocate packet")
 	}
 	// Safe to free the packet since we copy later.
 	defer C.av_packet_free(&pkt)
 	ret = C.avcodec_receive_packet(e.codecCtx, pkt)
 	if ret < 0 {
-		return nil, 0, 0, frameDimsChanged, fmt.Errorf("avcodec_receive_packet failed %s", ffmpegError(ret))
+		return result, fmt.Errorf("avcodec_receive_packet failed %s", ffmpegError(ret))
 	}
 
 	// Convert the encoded data to a Go byte slice. This is a necessary copy
 	// to prevent dangling pointer in C memory. By copying to a Go bytes we can
 	// allow the frame to be garbage collected automatically.
-	encodedData := C.GoBytes(unsafe.Pointer(pkt.data), pkt.size)
-	pts := int64(pkt.pts)
-	dts := int64(pkt.dts)
+	result.encodedData = C.GoBytes(unsafe.Pointer(pkt.data), pkt.size)
+	result.pts = int64(pkt.pts)
+	result.dts = int64(pkt.dts)
 	e.frameCount++
 
 	// return encoded data
-	return encodedData, pts, dts, frameDimsChanged, nil
+	return result, nil
 }
 
 func (e *encoder) close() {
