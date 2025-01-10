@@ -376,7 +376,7 @@ func (vs *videostore) processFrames(ctx context.Context) {
 				return
 			}
 			if reinit {
-				vs.logger.Info("reinitializing segmenter due to encoder reinit")
+				vs.logger.Info("reinitializing segmenter due to encoder refresh")
 				err = vs.seg.initialize(vs.enc.codecCtx)
 				if err != nil {
 					vs.logger.Error("failed to reinitialize segmenter", err)

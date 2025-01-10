@@ -38,7 +38,6 @@ type segmenter struct {
 
 func newSegmenter(
 	logger logging.Logger,
-	// enc *encoder,
 	storageSize int,
 	clipLength int,
 	storagePath string,

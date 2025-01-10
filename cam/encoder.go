@@ -143,9 +143,9 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, bool, error) 
 		return nil, 0, 0, reinit, err
 	}
 
-	ySize := frame.Bounds().Dx() * frame.Bounds().Dy()
-	uSize := (frame.Bounds().Dx() / subsampleFactor) * frame.Bounds().Dy()
-	vSize := (frame.Bounds().Dx() / subsampleFactor) * frame.Bounds().Dy()
+	ySize := dx * dy
+	uSize := (dx / subsampleFactor) * dy
+	vSize := (dx / subsampleFactor) * dy
 	yPlane := C.CBytes(yuv[:ySize])
 	uPlane := C.CBytes(yuv[ySize : ySize+uSize])
 	vPlane := C.CBytes(yuv[ySize+uSize : ySize+uSize+vSize])
@@ -155,9 +155,9 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, bool, error) 
 	e.srcFrame.data[0] = (*C.uint8_t)(yPlane)
 	e.srcFrame.data[1] = (*C.uint8_t)(uPlane)
 	e.srcFrame.data[2] = (*C.uint8_t)(vPlane)
-	e.srcFrame.linesize[0] = C.int(frame.Bounds().Dx())
-	e.srcFrame.linesize[1] = C.int(frame.Bounds().Dx() / subsampleFactor)
-	e.srcFrame.linesize[2] = C.int(frame.Bounds().Dx() / subsampleFactor)
+	e.srcFrame.linesize[0] = C.int(dx)
+	e.srcFrame.linesize[1] = C.int(dx / subsampleFactor)
+	e.srcFrame.linesize[2] = C.int(dx / subsampleFactor)
 
 	// Both PTS and DTS times are equal frameCount multiplied by the time_base.
 	// This assumes that the processFrame routine is running at the source framerate.
