@@ -143,8 +143,7 @@ func newvideostore(
 	ffmppegLogLevel(logLevel)
 
 	// Create encoder to handle encoding of frames.
-	// TODO(seanp): Forcing h264 for now until h265 is supported.
-	codec := defaultVideoCodec
+	// TODO(seanp): Ignoring codec and using h264 for now until h265 is supported.
 	bitrate := defaultVideoBitrate
 	preset := defaultVideoPreset
 	format := defaultVideoFormat
@@ -164,7 +163,6 @@ func newvideostore(
 
 	vs.enc, err = newEncoder(
 		logger,
-		codec,
 		bitrate,
 		preset,
 		vs.framerate,
