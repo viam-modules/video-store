@@ -143,7 +143,12 @@ func (e *encoder) initialize(width, height int) (err error) {
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
 func (e *encoder) encode(frame image.Image) (encodeResult, error) {
-	var result encodeResult
+	result := encodeResult{
+		encodedData:      nil,
+		pts:              0,
+		dts:              0,
+		frameDimsChanged: false,
+	}
 	dy, dx := frame.Bounds().Dy(), frame.Bounds().Dx()
 	if e.codecCtx == nil || dy != int(e.codecCtx.height) || dx != int(e.codecCtx.width) {
 		e.logger.Infof("Initializing encoder with frame dimensions %dx%d", dx, dy)
