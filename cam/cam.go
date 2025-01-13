@@ -370,14 +370,14 @@ func (vs *videostore) processFrames(ctx context.Context) {
 			}
 			result, err := vs.enc.encode(*latestFrame)
 			if err != nil {
-				vs.logger.Error("failed to encode frame", err)
+				vs.logger.Debug("failed to encode frame", err)
 				continue
 			}
 			if result.frameDimsChanged {
 				vs.logger.Info("reinitializing segmenter due to encoder refresh")
 				err = vs.seg.initialize(vs.enc.codecCtx)
 				if err != nil {
-					vs.logger.Error("failed to reinitialize segmenter", err)
+					vs.logger.Debug("failed to reinitialize segmenter", err)
 					// Hack that flags the encoder to reinitialize if segmenter fails to
 					// ensure that encoder and segmenter inits are in sync.
 					vs.enc.codecCtx = nil
@@ -386,7 +386,7 @@ func (vs *videostore) processFrames(ctx context.Context) {
 			}
 			err = vs.seg.writeEncodedFrame(result.encodedData, result.pts, result.dts)
 			if err != nil {
-				vs.logger.Error("failed to segment frame", err)
+				vs.logger.Debug("failed to segment frame", err)
 				continue
 			}
 		}
