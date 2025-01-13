@@ -160,7 +160,7 @@ func newvideostore(
 	if newConf.Video.Format != "" {
 		format = newConf.Video.Format
 	}
-	if newConf.Framerate > 0 {
+	if newConf.Framerate != 0 {
 		vs.framerate = newConf.Framerate
 	}
 
