@@ -27,45 +27,87 @@ type encoder struct {
 	codecCtx   *C.AVCodecContext
 	srcFrame   *C.AVFrame
 	frameCount int64
+	framerate  int
+	width      int
+	height     int
+	bitrate    int
+	preset     string
+}
+
+type encodeResult struct {
+	encodedData      []byte
+	pts              int64
+	dts              int64
+	frameDimsChanged bool
 }
 
 func newEncoder(
 	logger logging.Logger,
-	videoCodec codecType,
 	bitrate int,
 	preset string,
-	width int,
-	height int,
 	framerate int,
 ) (*encoder, error) {
+	// Initialize without codec context and source frame. We will spin up
+	// the codec context and source frame when we get the first frame or when
+	// a resize is needed.
 	enc := &encoder{
 		logger:     logger,
+		codecCtx:   nil,
+		srcFrame:   nil,
+		bitrate:    bitrate,
+		framerate:  framerate,
+		width:      0,
+		height:     0,
 		frameCount: 0,
+		preset:     preset,
 	}
-	codecID := lookupCodecIDByType(videoCodec)
+
+	return enc, nil
+}
+
+func (e *encoder) initialize(width, height int) (err error) {
+	if e.codecCtx != nil {
+		C.avcodec_close(e.codecCtx)
+		C.avcodec_free_context(&e.codecCtx)
+		// We need to reset the frame count when reinitializing the encoder
+		// in order to ensure that keyframes intervals are generated correctly.
+		e.frameCount = 0
+	}
+	if e.srcFrame != nil {
+		C.av_frame_free(&e.srcFrame)
+	}
+	// Defer cleanup in case of error. This will prevent side effects from
+	// a partially initialized encoder.
+	defer func() {
+		if err != nil {
+			if e.codecCtx != nil {
+				C.avcodec_free_context(&e.codecCtx)
+			}
+			if e.srcFrame != nil {
+				C.av_frame_free(&e.srcFrame)
+			}
+		}
+	}()
+	codecID := lookupCodecIDByType(codecH264)
 	codec := C.avcodec_find_encoder(codecID)
 	if codec == nil {
-		return nil, errors.New("codec not found")
+		return errors.New("codec not found")
 	}
-
-	enc.codecCtx = C.avcodec_alloc_context3(codec)
-	if enc.codecCtx == nil {
-		return nil, errors.New("failed to allocate codec context")
+	e.codecCtx = C.avcodec_alloc_context3(codec)
+	if e.codecCtx == nil {
+		return errors.New("failed to allocate codec context")
 	}
-
-	enc.codecCtx.bit_rate = C.int64_t(bitrate)
-	enc.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV422P
-	enc.codecCtx.time_base = C.AVRational{num: 1, den: C.int(framerate)}
-	enc.codecCtx.width = C.int(width)
-	enc.codecCtx.height = C.int(height)
-
+	e.codecCtx.bit_rate = C.int64_t(e.bitrate)
+	e.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV422P
+	e.codecCtx.time_base = C.AVRational{num: 1, den: C.int(e.framerate)}
+	e.codecCtx.width = C.int(width)
+	e.codecCtx.height = C.int(height)
 	// TODO(seanp): Do we want b frames? This could make it more complicated to split clips.
-	enc.codecCtx.max_b_frames = 0
-	presetCStr := C.CString(preset)
+	e.codecCtx.max_b_frames = 0
+	presetCStr := C.CString(e.preset)
 	tuneCStr := C.CString("zerolatency")
 	defer C.free(unsafe.Pointer(presetCStr))
 	defer C.free(unsafe.Pointer(tuneCStr))
-
 	// The user can set the preset and tune for the encoder. This affects the
 	// encoding speed and quality. See https://trac.ffmpeg.org/wiki/Encode/H.264
 	// for more information.
@@ -73,29 +115,26 @@ func newEncoder(
 	defer C.av_dict_free(&opts)
 	ret := C.av_dict_set(&opts, C.CString("preset"), presetCStr, 0)
 	if ret < 0 {
-		return nil, fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
+		return fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
 	}
 	ret = C.av_dict_set(&opts, C.CString("tune"), tuneCStr, 0)
 	if ret < 0 {
-		return nil, fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
+		return fmt.Errorf("av_dict_set failed: %s", ffmpegError(ret))
 	}
-
-	ret = C.avcodec_open2(enc.codecCtx, codec, &opts)
+	ret = C.avcodec_open2(e.codecCtx, codec, &opts)
 	if ret < 0 {
-		return nil, fmt.Errorf("avcodec_open2: %s", ffmpegError(ret))
+		return fmt.Errorf("avcodec_open2: %s", ffmpegError(ret))
 	}
-
 	srcFrame := C.av_frame_alloc()
 	if srcFrame == nil {
-		C.avcodec_close(enc.codecCtx)
-		return nil, errors.New("could not allocate source frame")
+		C.avcodec_close(e.codecCtx)
+		return errors.New("could not allocate source frame")
 	}
-	srcFrame.width = enc.codecCtx.width
-	srcFrame.height = enc.codecCtx.height
-	srcFrame.format = C.int(enc.codecCtx.pix_fmt)
-	enc.srcFrame = srcFrame
-
-	return enc, nil
+	srcFrame.width = e.codecCtx.width
+	srcFrame.height = e.codecCtx.height
+	srcFrame.format = C.int(e.codecCtx.pix_fmt)
+	e.srcFrame = srcFrame
+	return nil
 }
 
 // encode encodes the given frame and returns the encoded data
@@ -103,15 +142,30 @@ func newEncoder(
 // PTS is calculated based on the frame count and source framerate.
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
-func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
+func (e *encoder) encode(frame image.Image) (encodeResult, error) {
+	result := encodeResult{
+		encodedData:      nil,
+		pts:              0,
+		dts:              0,
+		frameDimsChanged: false,
+	}
+	dy, dx := frame.Bounds().Dy(), frame.Bounds().Dx()
+	if e.codecCtx == nil || dy != int(e.codecCtx.height) || dx != int(e.codecCtx.width) {
+		e.logger.Infof("Initializing encoder with frame dimensions %dx%d", dx, dy)
+		err := e.initialize(dx, dy)
+		if err != nil {
+			return result, err
+		}
+		result.frameDimsChanged = true
+	}
 	yuv, err := imageToYUV422(frame)
 	if err != nil {
-		return nil, 0, 0, err
+		return result, err
 	}
 
-	ySize := frame.Bounds().Dx() * frame.Bounds().Dy()
-	uSize := (frame.Bounds().Dx() / subsampleFactor) * frame.Bounds().Dy()
-	vSize := (frame.Bounds().Dx() / subsampleFactor) * frame.Bounds().Dy()
+	ySize := dx * dy
+	uSize := (dx / subsampleFactor) * dy
+	vSize := (dx / subsampleFactor) * dy
 	yPlane := C.CBytes(yuv[:ySize])
 	uPlane := C.CBytes(yuv[ySize : ySize+uSize])
 	vPlane := C.CBytes(yuv[ySize+uSize : ySize+uSize+vSize])
@@ -121,9 +175,9 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 	e.srcFrame.data[0] = (*C.uint8_t)(yPlane)
 	e.srcFrame.data[1] = (*C.uint8_t)(uPlane)
 	e.srcFrame.data[2] = (*C.uint8_t)(vPlane)
-	e.srcFrame.linesize[0] = C.int(frame.Bounds().Dx())
-	e.srcFrame.linesize[1] = C.int(frame.Bounds().Dx() / subsampleFactor)
-	e.srcFrame.linesize[2] = C.int(frame.Bounds().Dx() / subsampleFactor)
+	e.srcFrame.linesize[0] = C.int(dx)
+	e.srcFrame.linesize[1] = C.int(dx / subsampleFactor)
+	e.srcFrame.linesize[2] = C.int(dx / subsampleFactor)
 
 	// Both PTS and DTS times are equal frameCount multiplied by the time_base.
 	// This assumes that the processFrame routine is running at the source framerate.
@@ -144,29 +198,29 @@ func (e *encoder) encode(frame image.Image) ([]byte, int64, int64, error) {
 
 	ret := C.avcodec_send_frame(e.codecCtx, e.srcFrame)
 	if ret < 0 {
-		return nil, 0, 0, fmt.Errorf("avcodec_send_frame: %s", ffmpegError(ret))
+		return result, fmt.Errorf("avcodec_send_frame: %s", ffmpegError(ret))
 	}
 	pkt := C.av_packet_alloc()
 	if pkt == nil {
-		return nil, 0, 0, errors.New("could not allocate packet")
+		return result, errors.New("could not allocate packet")
 	}
 	// Safe to free the packet since we copy later.
 	defer C.av_packet_free(&pkt)
 	ret = C.avcodec_receive_packet(e.codecCtx, pkt)
 	if ret < 0 {
-		return nil, 0, 0, fmt.Errorf("avcodec_receive_packet failed %s", ffmpegError(ret))
+		return result, fmt.Errorf("avcodec_receive_packet failed %s", ffmpegError(ret))
 	}
 
 	// Convert the encoded data to a Go byte slice. This is a necessary copy
 	// to prevent dangling pointer in C memory. By copying to a Go bytes we can
 	// allow the frame to be garbage collected automatically.
-	encodedData := C.GoBytes(unsafe.Pointer(pkt.data), pkt.size)
-	pts := int64(pkt.pts)
-	dts := int64(pkt.dts)
+	result.encodedData = C.GoBytes(unsafe.Pointer(pkt.data), pkt.size)
+	result.pts = int64(pkt.pts)
+	result.dts = int64(pkt.dts)
 	e.frameCount++
-	// return encoded data
 
-	return encodedData, pts, dts, nil
+	// return encoded data
+	return result, nil
 }
 
 func (e *encoder) close() {

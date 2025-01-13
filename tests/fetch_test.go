@@ -34,11 +34,7 @@ func TestFetchDoCommand(t *testing.T) {
 						"upload_path": "%s",
 						"storage_path": "%s"
 					},
-					"cam_props": {
-						"width": 1280,
-						"height": 720,
-						"framerate": 30
-					},
+					"framerate": 30,
 					"video": {
 						"codec": "h264",
 						"bitrate": 1000000,

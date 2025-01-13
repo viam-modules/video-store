@@ -55,6 +55,7 @@ type videostore struct {
 	cam         camera.Camera
 	latestFrame atomic.Pointer[image.Image]
 	workers     *utils.StoppableWorkers
+	framerate   int
 
 	enc  *encoder
 	seg  *segmenter
@@ -78,21 +79,13 @@ type video struct {
 	Format  string `json:"format,omitempty"`
 }
 
-type cameraProperties struct {
-	Width     int `json:"width"`
-	Height    int `json:"height"`
-	Framerate int `json:"framerate"`
-}
-
 // Config is the configuration for the video storage camera component.
 type Config struct {
-	Camera  string  `json:"camera"`
-	Sync    string  `json:"sync"`
-	Storage storage `json:"storage"`
-	Video   video   `json:"video,omitempty"`
-
-	// TODO(seanp): Remove once camera properties are returned from camera component.
-	Properties cameraProperties `json:"cam_props"`
+	Camera    string  `json:"camera"`
+	Sync      string  `json:"sync"`
+	Storage   storage `json:"storage"`
+	Video     video   `json:"video,omitempty"`
+	Framerate int     `json:"framerate,omitempty"`
 }
 
 // Validate validates the configuration for the video storage camera component.
@@ -109,6 +102,9 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Sync == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "sync")
 	}
+	if cfg.Framerate < 0 {
+		return nil, fmt.Errorf("invalid framerate %d, must be greater than 0", cfg.Framerate)
+	}
 
 	return []string{cfg.Camera}, nil
 }
@@ -123,7 +119,7 @@ func init() {
 }
 
 func newvideostore(
-	ctx context.Context,
+	_ context.Context,
 	deps resource.Dependencies,
 	conf resource.Config,
 	logger logging.Logger,
@@ -150,11 +146,11 @@ func newvideostore(
 	ffmppegLogLevel(logLevel)
 
 	// Create encoder to handle encoding of frames.
-	// TODO(seanp): Forcing h264 for now until h265 is supported.
-	codec := defaultVideoCodec
+	// TODO(seanp): Ignoring codec and using h264 for now until h265 is supported.
 	bitrate := defaultVideoBitrate
 	preset := defaultVideoPreset
 	format := defaultVideoFormat
+	vs.framerate = defaultFramerate
 	if newConf.Video.Bitrate != 0 {
 		bitrate = newConf.Video.Bitrate
 	}
@@ -164,39 +160,15 @@ func newvideostore(
 	if newConf.Video.Format != "" {
 		format = newConf.Video.Format
 	}
-
-	if newConf.Properties.Width == 0 && newConf.Properties.Height == 0 {
-		vs.logger.Info("received unspecified frame width and height, fetching frame to get dimensions")
-		for range make([]struct{}, numFetchFrameAttempts) {
-			frame, err := camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, vs.cam)
-			if err != nil {
-				vs.logger.Warn("failed to get and decode frame from camera, retrying. Error: ", err)
-				time.Sleep(retryInterval * time.Second)
-				continue
-			}
-			bounds := frame.Bounds()
-			newConf.Properties.Width = bounds.Dx()
-			newConf.Properties.Height = bounds.Dy()
-			vs.logger.Infof("received frame width and height: %d, %d", newConf.Properties.Width, newConf.Properties.Height)
-			break
-		}
-	}
-	if newConf.Properties.Width == 0 && newConf.Properties.Height == 0 {
-		return nil, fmt.Errorf("failed to get source camera width and height after %d attempts", numFetchFrameAttempts)
-	}
-
-	if newConf.Properties.Framerate == 0 {
-		newConf.Properties.Framerate = defaultFramerate
+	if newConf.Framerate != 0 {
+		vs.framerate = newConf.Framerate
 	}
 
 	vs.enc, err = newEncoder(
 		logger,
-		codec,
 		bitrate,
 		preset,
-		newConf.Properties.Width,
-		newConf.Properties.Height,
-		newConf.Properties.Framerate,
+		vs.framerate,
 	)
 	if err != nil {
 		return nil, err
@@ -240,7 +212,6 @@ func newvideostore(
 	vs.storagePath = storagePath
 	vs.seg, err = newSegmenter(
 		logger,
-		vs.enc,
 		sizeGB,
 		segmentSeconds,
 		storagePath,
@@ -359,7 +330,7 @@ func (vs *videostore) Properties(_ context.Context) (camera.Properties, error) {
 // fetchFrames reads frames from the camera at the framerate interval
 // and stores the decoded image in the latestFrame atomic pointer.
 func (vs *videostore) fetchFrames(ctx context.Context) {
-	frameInterval := time.Second / time.Duration(vs.conf.Properties.Framerate)
+	frameInterval := time.Second / time.Duration(vs.framerate)
 	ticker := time.NewTicker(frameInterval)
 	defer ticker.Stop()
 	for {
@@ -376,7 +347,7 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 			lazyImage, ok := frame.(*rimage.LazyEncodedImage)
 			if !ok {
 				vs.logger.Error("frame is not of type *rimage.LazyEncodedImage")
-				return
+				continue
 			}
 			decodedImage := lazyImage.DecodedImage()
 			vs.latestFrame.Store(&decodedImage)
@@ -387,7 +358,7 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 // processFrames grabs the latest frame, encodes, and writes to the segmenter
 // which chunks video stream into clip files inside the storage directory.
 func (vs *videostore) processFrames(ctx context.Context) {
-	frameInterval := time.Second / time.Duration(vs.conf.Properties.Framerate)
+	frameInterval := time.Second / time.Duration(vs.framerate)
 	ticker := time.NewTicker(frameInterval)
 	defer ticker.Stop()
 	for {
@@ -400,15 +371,26 @@ func (vs *videostore) processFrames(ctx context.Context) {
 				vs.logger.Debug("latest frame is not available yet")
 				continue
 			}
-			encoded, pts, dts, err := vs.enc.encode(*latestFrame)
+			result, err := vs.enc.encode(*latestFrame)
 			if err != nil {
-				vs.logger.Error("failed to encode frame", err)
-				return
+				vs.logger.Debug("failed to encode frame", err)
+				continue
 			}
-			err = vs.seg.writeEncodedFrame(encoded, pts, dts)
+			if result.frameDimsChanged {
+				vs.logger.Info("reinitializing segmenter due to encoder refresh")
+				err = vs.seg.initialize(vs.enc.codecCtx)
+				if err != nil {
+					vs.logger.Debug("failed to reinitialize segmenter", err)
+					// Hack that flags the encoder to reinitialize if segmenter fails to
+					// ensure that encoder and segmenter inits are in sync.
+					vs.enc.codecCtx = nil
+					continue
+				}
+			}
+			err = vs.seg.writeEncodedFrame(result.encodedData, result.pts, result.dts)
 			if err != nil {
-				vs.logger.Error("failed to segment frame", err)
-				return
+				vs.logger.Debug("failed to segment frame", err)
+				continue
 			}
 		}
 	}
