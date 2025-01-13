@@ -102,6 +102,9 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Sync == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "sync")
 	}
+	if cfg.Framerate < 0 {
+		return nil, fmt.Errorf("invalid framerate %d, must be greater than 0", cfg.Framerate)
+	}
 
 	return []string{cfg.Camera}, nil
 }
