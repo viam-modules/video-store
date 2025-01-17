@@ -131,7 +131,7 @@ func (mh *mimeHandler) decodeJPEG(frameBytes []byte) (*C.AVFrame, error) {
 	if mh.jpegCodecCtx == nil {
 		return nil, errors.New("JPEG decoder not initialized")
 	}
-	// Allocate the destination frame if not already allocated
+	// Allocate the destination frame if it does not already allocated
 	if mh.jpegDstFrame == nil {
 		mh.jpegDstFrame = C.av_frame_alloc()
 		if mh.jpegDstFrame == nil {
@@ -163,8 +163,6 @@ func (mh *mimeHandler) initJPEGDecoder() error {
 	if mh.jpegDstFrame != nil {
 		C.av_frame_free(&mh.jpegDstFrame)
 	}
-
-	// initialize codec context
 	codec := C.avcodec_find_decoder(C.AV_CODEC_ID_MJPEG)
 	if codec == nil {
 		return errors.New("failed to find JPEG codec")
@@ -194,6 +192,12 @@ func (mh *mimeHandler) close() {
 	}
 }
 
+// packYUYVHeader creates a header for YUYV data with the given width and height.
+// The header structure is as follows:
+// - "YUYV" (4 bytes): A fixed string indicating the format.
+// - Width (4 bytes): The width of the image, stored in big-endian format.
+// - Height (4 bytes): The height of the image, stored in big-endian format.
+// The rest of the payload is the actual YUYV data.
 func parseYUYVPacket(pkt []byte) (int, int, []byte, error) {
 	if len(pkt) < yuyvHeaderSize {
 		return 0, 0, nil, errors.New("packet too small, need at least 12 bytes")
@@ -203,7 +207,6 @@ func parseYUYVPacket(pkt []byte) (int, int, []byte, error) {
 	}
 	width := int(binary.BigEndian.Uint32(pkt[4:8]))
 	height := int(binary.BigEndian.Uint32(pkt[8:12]))
-	// The rest is the actual YUYV payload
 	yuyvData := pkt[12:]
 
 	return width, height, yuyvData, nil
