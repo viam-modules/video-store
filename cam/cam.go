@@ -58,9 +58,7 @@ type videostore struct {
 	logger logging.Logger
 
 	cam camera.Camera
-	// latestFrame atomic.Pointer[image.Image]
-	// latestFrame atomic.Pointer[[]byte]
-	// latestframe as avframe
+
 	latestFrame atomic.Pointer[C.AVFrame]
 
 	workers *utils.StoppableWorkers
@@ -370,9 +368,6 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 			var frame *C.AVFrame
 			switch metadata.MimeType {
 			case mimeTypeYUYV, mimeTypeYUYV + "+" + rutils.MimeTypeSuffixLazy:
-				// We need to extract width and height somehow,
-				// either threw custom header or adding to metadata response.
-				// For now, we will assume width and height are known.
 				vs.logger.Info("converting yuyv422 to yuv420p")
 				// frame, err = vs.mh.yuyvToYUV420p(bytes, 352, 240) //nolint
 				frame, err = vs.mh.yuyvToYUV420p(bytes)

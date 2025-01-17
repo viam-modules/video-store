@@ -96,7 +96,6 @@ func (e *encoder) initialize(width, height int) (err error) {
 		return errors.New("failed to allocate codec context")
 	}
 	e.codecCtx.bit_rate = C.int64_t(e.bitrate)
-	// e.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV422P
 	e.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV420P
 	e.codecCtx.time_base = C.AVRational{num: 1, den: C.int(e.framerate)}
 	e.codecCtx.width = C.int(width)
@@ -141,7 +140,6 @@ func (e *encoder) initialize(width, height int) (err error) {
 // PTS is calculated based on the frame count and source framerate.
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
-// func (e *encoder) encode(frame image.Image) (encodeResult, error) {
 func (e *encoder) encode(frame *C.AVFrame) (encodeResult, error) {
 	result := encodeResult{
 		encodedData:      nil,

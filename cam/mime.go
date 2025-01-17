@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	yuyvHeaderSize = 12
+	yuyvHeaderSize  = 12
+	yuyvMagicString = "YUYV"
 )
 
 type mimeHandler struct {
@@ -37,7 +38,7 @@ func newMimeHandler(logger logging.Logger) *mimeHandler {
 }
 
 func (mh *mimeHandler) yuyvToYUV420p(bytes []byte) (*C.AVFrame, error) {
-	// scrape width and height from the header
+	// Scrape width and height from the custom header.
 	width, height, frameBytes, err := parseYUYVPacket(bytes)
 	if err != nil {
 		return nil, err
@@ -47,14 +48,10 @@ func (mh *mimeHandler) yuyvToYUV420p(bytes []byte) (*C.AVFrame, error) {
 			return nil, err
 		}
 	}
-	// Fill src frame with YUYV data bytes.
-	// We use C.CBytes to allocate memory in C heap and defer free it.
 	yuyvBytes := C.CBytes(frameBytes)
 	defer C.free(yuyvBytes)
 	mh.yuyvSrcFrame.data[0] = (*C.uint8_t)(yuyvBytes)
 	mh.yuyvSrcFrame.linesize[0] = C.int(width * subsampleFactor)
-
-	// Convert YUYV to YUV420p.
 	ret := C.sws_scale(
 		mh.yuyvSwCtx,
 		&mh.yuyvSrcFrame.data[0],
@@ -126,7 +123,6 @@ func (mh *mimeHandler) decodeJPEG(frameBytes []byte) (*C.AVFrame, error) {
 		data: (*C.uint8_t)(dataPtr),
 		size: C.int(len(frameBytes)),
 	}
-	// defer free the pkt data
 	if mh.jpegCodecCtx == nil {
 		if err := mh.initJPEGDecoder(); err != nil {
 			return nil, err
@@ -199,20 +195,15 @@ func (mh *mimeHandler) close() {
 }
 
 func parseYUYVPacket(pkt []byte) (int, int, []byte, error) {
-	// We need at least 12 bytes
 	if len(pkt) < yuyvHeaderSize {
 		return 0, 0, nil, errors.New("packet too small, need at least 12 bytes")
 	}
-
-	// Check the magic: pkt[0..4] should be "YUYV"
-	if string(pkt[0:4]) != "YUYV" {
-		return 0, 0, nil, errors.New("missing 'YUYV' magic")
+	if string(pkt[0:4]) != yuyvMagicString {
+		return 0, 0, nil, errors.New("missing 'YUYV' magic bytes")
 	}
-
 	width := int(binary.BigEndian.Uint32(pkt[4:8]))
 	height := int(binary.BigEndian.Uint32(pkt[8:12]))
-
-	// The rest is YUYV payload
+	// The rest is the actual YUYV payload
 	yuyvData := pkt[12:]
 
 	return width, height, yuyvData, nil
