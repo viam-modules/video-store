@@ -374,7 +374,8 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 				// either threw custom header or adding to metadata response.
 				// For now, we will assume width and height are known.
 				vs.logger.Info("converting yuyv422 to yuv420p")
-				frame, err = vs.mh.yuyvToYUV420p(bytes, 352, 240) //nolint
+				// frame, err = vs.mh.yuyvToYUV420p(bytes, 352, 240) //nolint
+				frame, err = vs.mh.yuyvToYUV420p(bytes)
 				if err != nil {
 					vs.logger.Error("failed to convert yuyv422 to yuv420p", err)
 					continue

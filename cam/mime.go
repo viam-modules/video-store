@@ -11,9 +11,14 @@ package videostore
 import "C"
 
 import (
+	"encoding/binary"
 	"errors"
 
 	"go.viam.com/rdk/logging"
+)
+
+const (
+	yuyvHeaderSize = 12
 )
 
 type mimeHandler struct {
@@ -31,13 +36,17 @@ func newMimeHandler(logger logging.Logger) *mimeHandler {
 	}
 }
 
-func (mh *mimeHandler) yuyvToYUV420p(frameBytes []byte, width, height int) (*C.AVFrame, error) {
+func (mh *mimeHandler) yuyvToYUV420p(bytes []byte) (*C.AVFrame, error) {
+	// scrape width and height from the header
+	width, height, frameBytes, err := parseYUYVPacket(bytes)
+	if err != nil {
+		return nil, err
+	}
 	if mh.yuyvSwCtx == nil || width != int(mh.yuyvDstFrame.width) || height != int(mh.yuyvDstFrame.height) {
 		if err := mh.initYUYVCtx(width, height); err != nil {
 			return nil, err
 		}
 	}
-
 	// Fill src frame with YUYV data bytes.
 	// We use C.CBytes to allocate memory in C heap and defer free it.
 	yuyvBytes := C.CBytes(frameBytes)
@@ -177,21 +186,6 @@ func (mh *mimeHandler) initJPEGDecoder() error {
 	return nil
 }
 
-/*
-	// initialize the destination frame
-	mh.jpegDstFrame = C.av_frame_alloc()
-	if mh.jpegDstFrame == nil {
-		return errors.New("failed to allocate JPEG destination frame")
-	}
-	mh.jpegDstFrame.width = C.int(width)
-	mh.jpegDstFrame.height = C.int(height)
-	mh.jpegDstFrame.format = C.AV_PIX_FMT_YUV420P
-	ret = C.av_frame_get_buffer(mh.jpegDstFrame, 32)
-	if ret < 0 {
-		return errors.New("failed to allocate buffer for JPEG destination frame")
-	}
-*/
-
 func (mh *mimeHandler) close() {
 	if mh.yuyvSwCtx != nil {
 		C.sws_freeContext(mh.yuyvSwCtx)
@@ -202,4 +196,24 @@ func (mh *mimeHandler) close() {
 	if mh.yuyvSrcFrame != nil {
 		C.av_frame_free(&mh.yuyvSrcFrame)
 	}
+}
+
+func parseYUYVPacket(pkt []byte) (int, int, []byte, error) {
+	// We need at least 12 bytes
+	if len(pkt) < yuyvHeaderSize {
+		return 0, 0, nil, errors.New("packet too small, need at least 12 bytes")
+	}
+
+	// Check the magic: pkt[0..4] should be "YUYV"
+	if string(pkt[0:4]) != "YUYV" {
+		return 0, 0, nil, errors.New("missing 'YUYV' magic")
+	}
+
+	width := int(binary.BigEndian.Uint32(pkt[4:8]))
+	height := int(binary.BigEndian.Uint32(pkt[8:12]))
+
+	// The rest is YUYV payload
+	yuyvData := pkt[12:]
+
+	return width, height, yuyvData, nil
 }
