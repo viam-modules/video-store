@@ -39,7 +39,8 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-protocol=file \
                --enable-protocol=concat \
                --enable-protocol=crypto \
-               --enable-bsf=h264_mp4toannexb
+               --enable-bsf=h264_mp4toannexb \
+               --enable-decoder=mjpeg
 
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lswscale -lz
 ifeq ($(SOURCE_OS),linux)

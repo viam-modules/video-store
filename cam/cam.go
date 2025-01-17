@@ -63,8 +63,7 @@ type videostore struct {
 	// latestframe as avframe
 	latestFrame atomic.Pointer[C.AVFrame]
 
-	workers   *utils.StoppableWorkers
-	framerate int
+	workers *utils.StoppableWorkers
 
 	enc  *encoder
 	mh   *mimeHandler
@@ -73,6 +72,8 @@ type videostore struct {
 
 	storagePath string
 	uploadPath  string
+	framerate   int
+	yuyv        bool
 }
 
 type storage struct {
@@ -96,6 +97,7 @@ type Config struct {
 	Storage   storage `json:"storage"`
 	Video     video   `json:"video,omitempty"`
 	Framerate int     `json:"framerate,omitempty"`
+	YUYV      bool    `json:"yuyv,omitempty"`
 }
 
 // Validate validates the configuration for the video storage camera component.
@@ -172,6 +174,9 @@ func newvideostore(
 	}
 	if newConf.Framerate != 0 {
 		vs.framerate = newConf.Framerate
+	}
+	if newConf.YUYV {
+		vs.yuyv = newConf.YUYV
 	}
 
 	vs.enc, err = newEncoder(
@@ -350,7 +355,13 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			bytes, metadata, err := vs.cam.Image(ctx, "image/yuyv422", nil)
+			var mimeTypeReq string
+			if vs.yuyv {
+				mimeTypeReq = mimeTypeYUYV
+			} else {
+				mimeTypeReq = rutils.MimeTypeJPEG
+			}
+			bytes, metadata, err := vs.cam.Image(ctx, mimeTypeReq, nil)
 			if err != nil {
 				vs.logger.Warn("failed to get frame from camera", err)
 				time.Sleep(retryInterval * time.Second)
@@ -359,19 +370,22 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 			var frame *C.AVFrame
 			switch metadata.MimeType {
 			case mimeTypeYUYV, mimeTypeYUYV + "+" + rutils.MimeTypeSuffixLazy:
-				vs.logger.Info("converting yuyv422 to yuv420p")
 				// We need to extract width and height somehow,
 				// either threw custom header or adding to metadata response.
 				// For now, we will assume width and height are known.
+				vs.logger.Info("converting yuyv422 to yuv420p")
 				frame, err = vs.mh.yuyvToYUV420p(bytes, 352, 240) //nolint
 				if err != nil {
 					vs.logger.Error("failed to convert yuyv422 to yuv420p", err)
 					continue
 				}
 			case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
-				// TODO(seanp): Use rimage to decode image bytes and fill AVFrame.
-				// Or, use FFmpeg mjpeg decoder to fill AVFrame.
 				vs.logger.Info("converting jpeg to yuv420p")
+				frame, err = vs.mh.decodeJPEG(bytes)
+				if err != nil {
+					vs.logger.Error("failed to decode jpeg", err)
+					continue
+				}
 			default:
 				vs.logger.Warn("unsupported image format", metadata.MimeType)
 				continue
