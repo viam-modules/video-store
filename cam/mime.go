@@ -69,7 +69,7 @@ func (mh *mimeHandler) yuyvToYUV420p(bytes []byte) (*C.AVFrame, error) {
 }
 
 func (mh *mimeHandler) initYUYVCtx(width, height int) error {
-	mh.logger.Infof("Initializing YUYV sws context with width %d and height %d", width, height)
+	mh.logger.Infof("initializing YUYV sws context with width %d and height %d", width, height)
 	if mh.yuyvSwCtx != nil {
 		C.sws_freeContext(mh.yuyvSwCtx)
 	}
@@ -156,7 +156,7 @@ func (mh *mimeHandler) decodeJPEG(frameBytes []byte) (*C.AVFrame, error) {
 }
 
 func (mh *mimeHandler) initJPEGDecoder() error {
-	mh.logger.Infof("Initializing JPEG decoder")
+	mh.logger.Infof("initializing JPEG decoder")
 	if mh.jpegCodecCtx != nil {
 		C.avcodec_free_context(&mh.jpegCodecCtx)
 	}
