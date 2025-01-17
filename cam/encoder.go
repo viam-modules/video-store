@@ -11,8 +11,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"image"
-	"reflect"
 	"unsafe"
 
 	"go.viam.com/rdk/logging"
@@ -98,7 +96,8 @@ func (e *encoder) initialize(width, height int) (err error) {
 		return errors.New("failed to allocate codec context")
 	}
 	e.codecCtx.bit_rate = C.int64_t(e.bitrate)
-	e.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV422P
+	// e.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV422P
+	e.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV420P
 	e.codecCtx.time_base = C.AVRational{num: 1, den: C.int(e.framerate)}
 	e.codecCtx.width = C.int(width)
 	e.codecCtx.height = C.int(height)
@@ -142,61 +141,41 @@ func (e *encoder) initialize(width, height int) (err error) {
 // PTS is calculated based on the frame count and source framerate.
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
-func (e *encoder) encode(frame image.Image) (encodeResult, error) {
+// func (e *encoder) encode(frame image.Image) (encodeResult, error) {
+func (e *encoder) encode(frame *C.AVFrame) (encodeResult, error) {
 	result := encodeResult{
 		encodedData:      nil,
 		pts:              0,
 		dts:              0,
 		frameDimsChanged: false,
 	}
-	dy, dx := frame.Bounds().Dy(), frame.Bounds().Dx()
-	if e.codecCtx == nil || dy != int(e.codecCtx.height) || dx != int(e.codecCtx.width) {
-		e.logger.Infof("Initializing encoder with frame dimensions %dx%d", dx, dy)
-		err := e.initialize(dx, dy)
+	if e.codecCtx == nil || frame.height != e.codecCtx.height || frame.width != e.codecCtx.width {
+		e.logger.Infof("Initializing encoder with frame dimensions %dx%d", frame.width, frame.height)
+		err := e.initialize(int(frame.width), int(frame.height))
 		if err != nil {
 			return result, err
 		}
 		result.frameDimsChanged = true
 	}
-	yuv, err := imageToYUV422(frame)
-	if err != nil {
-		return result, err
-	}
-
-	ySize := dx * dy
-	uSize := (dx / subsampleFactor) * dy
-	vSize := (dx / subsampleFactor) * dy
-	yPlane := C.CBytes(yuv[:ySize])
-	uPlane := C.CBytes(yuv[ySize : ySize+uSize])
-	vPlane := C.CBytes(yuv[ySize+uSize : ySize+uSize+vSize])
-	defer C.free(yPlane)
-	defer C.free(uPlane)
-	defer C.free(vPlane)
-	e.srcFrame.data[0] = (*C.uint8_t)(yPlane)
-	e.srcFrame.data[1] = (*C.uint8_t)(uPlane)
-	e.srcFrame.data[2] = (*C.uint8_t)(vPlane)
-	e.srcFrame.linesize[0] = C.int(dx)
-	e.srcFrame.linesize[1] = C.int(dx / subsampleFactor)
-	e.srcFrame.linesize[2] = C.int(dx / subsampleFactor)
 
 	// Both PTS and DTS times are equal frameCount multiplied by the time_base.
 	// This assumes that the processFrame routine is running at the source framerate.
 	// TODO(seanp): What happens to playback if frame is dropped?
-	e.srcFrame.pts = C.int64_t(e.frameCount)
-	e.srcFrame.pkt_dts = e.srcFrame.pts
+	frame.pts = C.int64_t(e.frameCount)
+	frame.pkt_dts = frame.pts
 
 	// Manually force keyframes every second, removing the need to rely on
 	// gop_size or other encoder settings. This is necessary for the segmenter
 	// to split the video files at keyframe boundaries.
 	if e.frameCount%int64(e.codecCtx.time_base.den) == 0 {
-		e.srcFrame.key_frame = 1
-		e.srcFrame.pict_type = C.AV_PICTURE_TYPE_I
+		frame.key_frame = 1
+		frame.pict_type = C.AV_PICTURE_TYPE_I
 	} else {
-		e.srcFrame.key_frame = 0
-		e.srcFrame.pict_type = C.AV_PICTURE_TYPE_NONE
+		frame.key_frame = 0
+		frame.pict_type = C.AV_PICTURE_TYPE_NONE
 	}
 
-	ret := C.avcodec_send_frame(e.codecCtx, e.srcFrame)
+	ret := C.avcodec_send_frame(e.codecCtx, frame)
 	if ret < 0 {
 		return result, fmt.Errorf("avcodec_send_frame: %s", ffmpegError(ret))
 	}
@@ -227,43 +206,4 @@ func (e *encoder) close() {
 	C.avcodec_close(e.codecCtx)
 	C.av_frame_free(&e.srcFrame)
 	C.avcodec_free_context(&e.codecCtx)
-}
-
-// imageToYUV422 extracts unpadded YUV422 bytes from image.Image.
-// This uses a row-wise copy of the Y, U, and V planes.
-func imageToYUV422(img image.Image) ([]byte, error) {
-	ycbcrImg, ok := img.(*image.YCbCr)
-	if !ok {
-		return nil, fmt.Errorf("expected type *image.YCbCr, got %s", reflect.TypeOf(img))
-	}
-
-	rect := ycbcrImg.Rect
-	width := rect.Dx()
-	height := rect.Dy()
-
-	// Ensure width is even for YUV422 format
-	if width%2 != 0 {
-		return nil, fmt.Errorf("image width must be even for YUV422 format, got width=%d", width)
-	}
-
-	ySize := width * height
-	halfWidth := width / subsampleFactor
-	uSize := halfWidth * height
-	vSize := uSize
-
-	rawYUV := make([]byte, ySize+uSize+vSize)
-
-	for y := range height {
-		ySrcStart := ycbcrImg.YOffset(rect.Min.X, rect.Min.Y+y)
-		cSrcStart := ycbcrImg.COffset(rect.Min.X, rect.Min.Y+y)
-		yDstStart := y * width
-		uDstStart := y * halfWidth
-		vDstStart := y * halfWidth
-
-		copy(rawYUV[yDstStart:yDstStart+width], ycbcrImg.Y[ySrcStart:ySrcStart+width])
-		copy(rawYUV[ySize+uDstStart:ySize+uDstStart+halfWidth], ycbcrImg.Cb[cSrcStart:cSrcStart+halfWidth])
-		copy(rawYUV[ySize+uSize+vDstStart:ySize+uSize+vDstStart+halfWidth], ycbcrImg.Cr[cSrcStart:cSrcStart+halfWidth])
-	}
-
-	return rawYUV, nil
 }

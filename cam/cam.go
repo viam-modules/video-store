@@ -1,12 +1,16 @@
 // Package videostore contains the implementation of the video storage camera component.
 package videostore
 
+/*
+#include <libavutil/frame.h>
+*/
+import "C"
+
 import (
 	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"image"
 	"path/filepath"
 	"sync/atomic"
 	"time"
@@ -16,7 +20,6 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
-	"go.viam.com/rdk/rimage"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
@@ -43,6 +46,8 @@ const (
 	asyncTimeout          = 60               // seconds
 	numFetchFrameAttempts = 3                // iterations
 	tempPath              = "/tmp"
+
+	mimeTypeYUYV = "image/yuyv422"
 )
 
 type videostore struct {
@@ -52,12 +57,17 @@ type videostore struct {
 	conf   *Config
 	logger logging.Logger
 
-	cam         camera.Camera
-	latestFrame atomic.Pointer[image.Image]
-	workers     *utils.StoppableWorkers
-	framerate   int
+	cam camera.Camera
+	// latestFrame atomic.Pointer[image.Image]
+	// latestFrame atomic.Pointer[[]byte]
+	// latestframe as avframe
+	latestFrame atomic.Pointer[C.AVFrame]
+
+	workers   *utils.StoppableWorkers
+	framerate int
 
 	enc  *encoder
+	mh   *mimeHandler
 	seg  *segmenter
 	conc *concater
 
@@ -173,6 +183,8 @@ func newvideostore(
 	if err != nil {
 		return nil, err
 	}
+
+	vs.mh = newMimeHandler(logger)
 
 	// Create segmenter to handle segmentation of video stream into clips.
 	sizeGB := newConf.Storage.SizeGB
@@ -338,19 +350,33 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			frame, err := camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, vs.cam)
+			bytes, metadata, err := vs.cam.Image(ctx, "image/yuyv422", nil)
 			if err != nil {
 				vs.logger.Warn("failed to get frame from camera", err)
 				time.Sleep(retryInterval * time.Second)
 				continue
 			}
-			lazyImage, ok := frame.(*rimage.LazyEncodedImage)
-			if !ok {
-				vs.logger.Error("frame is not of type *rimage.LazyEncodedImage")
+			var frame *C.AVFrame
+			switch metadata.MimeType {
+			case mimeTypeYUYV, mimeTypeYUYV + "+" + rutils.MimeTypeSuffixLazy:
+				vs.logger.Info("converting yuyv422 to yuv420p")
+				// We need to extract width and height somehow,
+				// either threw custom header or adding to metadata response.
+				// For now, we will assume width and height are known.
+				frame, err = vs.mh.yuyvToYUV420p(bytes, 352, 240) //nolint
+				if err != nil {
+					vs.logger.Error("failed to convert yuyv422 to yuv420p", err)
+					continue
+				}
+			case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
+				// TODO(seanp): Use rimage to decode image bytes and fill AVFrame.
+				// Or, use FFmpeg mjpeg decoder to fill AVFrame.
+				vs.logger.Info("converting jpeg to yuv420p")
+			default:
+				vs.logger.Warn("unsupported image format", metadata.MimeType)
 				continue
 			}
-			decodedImage := lazyImage.DecodedImage()
-			vs.latestFrame.Store(&decodedImage)
+			vs.latestFrame.Store(frame)
 		}
 	}
 }
@@ -371,7 +397,7 @@ func (vs *videostore) processFrames(ctx context.Context) {
 				vs.logger.Debug("latest frame is not available yet")
 				continue
 			}
-			result, err := vs.enc.encode(*latestFrame)
+			result, err := vs.enc.encode(latestFrame)
 			if err != nil {
 				vs.logger.Debug("failed to encode frame", err)
 				continue
@@ -445,6 +471,7 @@ func (vs *videostore) Close(_ context.Context) error {
 	vs.workers.Stop()
 	vs.enc.close()
 	vs.seg.close()
+	vs.mh.close()
 	return nil
 }
 
