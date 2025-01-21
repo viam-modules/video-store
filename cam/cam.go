@@ -57,11 +57,9 @@ type videostore struct {
 	conf   *Config
 	logger logging.Logger
 
-	cam camera.Camera
-
+	cam         camera.Camera
 	latestFrame atomic.Pointer[C.AVFrame]
-
-	workers *utils.StoppableWorkers
+	workers     *utils.StoppableWorkers
 
 	enc  *encoder
 	mh   *mimeHandler
