@@ -115,7 +115,7 @@ ifeq ($(shell which artifact > /dev/null 2>&1; echo $$?), 1)
 endif
 	artifact pull
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
-	go test -v ./tests/
+	go test -v ./tests/... ./cam/...
 	rm bin/video-store
 
 module: $(BIN_OUTPUT_PATH)/video-store
