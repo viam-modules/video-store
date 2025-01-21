@@ -79,7 +79,6 @@ func (mh *mimeHandler) initYUYVCtx(width, height int) error {
 	if mh.yuyvSrcFrame != nil {
 		C.av_frame_free(&mh.yuyvSrcFrame)
 	}
-
 	mh.yuyvSwCtx = C.sws_getContext(C.int(width), C.int(height), C.AV_PIX_FMT_YUYV422,
 		C.int(width), C.int(height), C.AV_PIX_FMT_YUV420P,
 		C.SWS_FAST_BILINEAR, nil, nil, nil)
@@ -94,7 +93,6 @@ func (mh *mimeHandler) initYUYVCtx(width, height int) error {
 	mh.yuyvSrcFrame.width = C.int(width)
 	mh.yuyvSrcFrame.height = C.int(height)
 	mh.yuyvSrcFrame.format = C.AV_PIX_FMT_YUYV422
-	// allocate buffer for YUYV data
 	ret := C.av_frame_get_buffer(mh.yuyvSrcFrame, 32)
 	if ret < 0 {
 		return errors.New("failed to allocate buffer for YUYV source frame")

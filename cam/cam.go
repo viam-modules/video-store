@@ -368,15 +368,12 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 			var frame *C.AVFrame
 			switch metadata.MimeType {
 			case mimeTypeYUYV, mimeTypeYUYV + "+" + rutils.MimeTypeSuffixLazy:
-				vs.logger.Info("converting yuyv422 to yuv420p")
-				// frame, err = vs.mh.yuyvToYUV420p(bytes, 352, 240) //nolint
 				frame, err = vs.mh.yuyvToYUV420p(bytes)
 				if err != nil {
 					vs.logger.Error("failed to convert yuyv422 to yuv420p", err)
 					continue
 				}
 			case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
-				vs.logger.Info("converting jpeg to yuv420p")
 				frame, err = vs.mh.decodeJPEG(bytes)
 				if err != nil {
 					vs.logger.Error("failed to decode jpeg", err)
