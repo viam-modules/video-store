@@ -13,13 +13,15 @@ import "C"
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 
 	"go.viam.com/rdk/logging"
 )
 
 const (
-	yuyvHeaderSize  = 12
-	yuyvMagicString = "YUYV"
+	yuyvHeaderSize    = 12
+	yuyvMagicString   = "YUYV"
+	yuyvBytesPerPixel = 2
 )
 
 type mimeHandler struct {
@@ -206,6 +208,10 @@ func parseYUYVPacket(pkt []byte) (int, int, []byte, error) {
 	width := int(binary.BigEndian.Uint32(pkt[4:8]))
 	height := int(binary.BigEndian.Uint32(pkt[8:12]))
 	yuyvData := pkt[12:]
+	expectedLength := width * height * yuyvBytesPerPixel
+	if len(yuyvData) != expectedLength {
+		return 0, 0, nil, fmt.Errorf("unexpected YUYV data length, expected %d, got %d", expectedLength, len(yuyvData))
+	}
 
 	return width, height, yuyvData, nil
 }
