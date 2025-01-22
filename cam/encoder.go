@@ -96,6 +96,8 @@ func (e *encoder) initialize(width, height int) (err error) {
 		return errors.New("failed to allocate codec context")
 	}
 	e.codecCtx.bit_rate = C.int64_t(e.bitrate)
+	// We are choosing YUV20p here as the input to the encoder
+	// so that the same format can be used between JPEG decodes and YUYV conversions.
 	e.codecCtx.pix_fmt = C.AV_PIX_FMT_YUV420P
 	e.codecCtx.time_base = C.AVRational{num: 1, den: C.int(e.framerate)}
 	e.codecCtx.width = C.int(width)
