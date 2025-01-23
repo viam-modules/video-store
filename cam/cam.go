@@ -144,9 +144,13 @@ func newvideostore(
 	}
 
 	// Source camera that provides the frames to be processed.
+	// If camera is not available, the component will start
+	// without processing frames.
+	cameraAvailable := true
 	vs.cam, err = camera.FromDependencies(deps, newConf.Camera)
 	if err != nil {
-		return nil, err
+		vs.logger.Error("failed to get camera from dependencies", err)
+		cameraAvailable = false
 	}
 
 	// TODO(seanp): make this configurable
@@ -251,7 +255,9 @@ func newvideostore(
 	}
 
 	// Start workers to process frames and clean up storage.
-	vs.workers = utils.NewBackgroundStoppableWorkers(vs.fetchFrames, vs.processFrames, vs.deleter)
+	if cameraAvailable {
+		vs.workers = utils.NewBackgroundStoppableWorkers(vs.fetchFrames, vs.processFrames, vs.deleter)
+	}
 
 	return vs, nil
 }
