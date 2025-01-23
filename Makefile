@@ -39,9 +39,10 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-protocol=file \
                --enable-protocol=concat \
                --enable-protocol=crypto \
-               --enable-bsf=h264_mp4toannexb
+               --enable-bsf=h264_mp4toannexb \
+               --enable-decoder=mjpeg
 
-CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lz
+CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lswscale -lz
 ifeq ($(SOURCE_OS),linux)
 	CGO_LDFLAGS += -l:libx264.a
 endif
@@ -114,7 +115,7 @@ ifeq ($(shell which artifact > /dev/null 2>&1; echo $$?), 1)
 endif
 	artifact pull
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
-	go test -v ./tests/
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go test -v ./tests/ ./cam/
 	rm bin/video-store
 
 module: $(BIN_OUTPUT_PATH)/video-store
