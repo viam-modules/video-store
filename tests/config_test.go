@@ -438,7 +438,7 @@ func TestModuleConfiguration(t *testing.T) {
 							"storage_path": "/tmp"
 						},
 						"video": {
-							"preset": "ultrafast",
+							"preset": "ultrafast"
 						}
 					},
 					"depends_on": [
