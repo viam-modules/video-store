@@ -476,7 +476,9 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 
 // Close closes the video storage camera component.
 func (vs *videostore) Close(_ context.Context) error {
-	vs.workers.Stop()
+	if vs.workers != nil {
+		vs.workers.Stop()
+	}
 	vs.enc.close()
 	vs.seg.close()
 	vs.mh.close()
