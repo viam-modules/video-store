@@ -430,16 +430,16 @@ func TestModuleConfiguration(t *testing.T) {
 	})
 
 	// no camera specified
-	t.Run("Fails Configuration No Camera", func(t *testing.T) {
+	// we want this to succeed to accept do-command requests
+	t.Run("Succeeds Configuration No Camera", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config2)
 		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
 		cam, err := camera.FromRobot(r, videoStoreComponentName)
-		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, cam, test.ShouldBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "camera")
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, cam, test.ShouldNotBeNil)
 	})
 
 	// no storage specified
