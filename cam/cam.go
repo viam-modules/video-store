@@ -110,7 +110,11 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Framerate < 0 {
 		return nil, fmt.Errorf("invalid framerate %d, must be greater than 0", cfg.Framerate)
 	}
-
+	// This allows for an implicit camera dependency so we do not need to explicitly
+	// add the camera dependency in the config.
+	if cfg.Camera != "" {
+		return []string{cfg.Camera}, nil
+	}
 	return []string{}, nil
 }
 
@@ -146,7 +150,7 @@ func newvideostore(
 	cameraAvailable := true
 	vs.cam, err = camera.FromDependencies(deps, newConf.Camera)
 	if err != nil {
-		vs.logger.Error("failed to get camera from dependencies", err)
+		vs.logger.Error("failed to get camera from dependencies, video-store will not be storing video", err)
 		cameraAvailable = false
 	}
 
