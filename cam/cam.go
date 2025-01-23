@@ -180,18 +180,6 @@ func newvideostore(
 		vs.yuyv = newConf.YUYV
 	}
 
-	vs.enc, err = newEncoder(
-		logger,
-		bitrate,
-		preset,
-		vs.framerate,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	vs.mh = newMimeHandler(logger)
-
 	// Create segmenter to handle segmentation of video stream into clips.
 	sizeGB := newConf.Storage.SizeGB
 	segmentSeconds := defaultSegmentSeconds
@@ -227,18 +215,6 @@ func newvideostore(
 		return nil, fmt.Errorf("sync service %s not found", newConf.Sync)
 	}
 
-	vs.storagePath = storagePath
-	vs.seg, err = newSegmenter(
-		logger,
-		sizeGB,
-		segmentSeconds,
-		storagePath,
-		format,
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	// Create concater to handle concatenation of video clips when requested.
 	vs.uploadPath = uploadPath
 	err = createDir(vs.uploadPath)
@@ -247,7 +223,7 @@ func newvideostore(
 	}
 	vs.conc, err = newConcater(
 		logger,
-		vs.storagePath,
+		storagePath,
 		vs.uploadPath,
 		segmentSeconds,
 	)
@@ -255,8 +231,30 @@ func newvideostore(
 		return nil, err
 	}
 
-	// Start workers to process frames and clean up storage.
+	// Only initialize mime handler, encoder, segmenter, and frame processing routines
+	// if the source camera is available.
 	if cameraAvailable {
+		vs.mh = newMimeHandler(logger)
+		vs.enc, err = newEncoder(
+			logger,
+			bitrate,
+			preset,
+			vs.framerate,
+		)
+		if err != nil {
+			return nil, err
+		}
+		vs.seg, err = newSegmenter(
+			logger,
+			sizeGB,
+			segmentSeconds,
+			storagePath,
+			format,
+		)
+		if err != nil {
+			return nil, err
+		}
+		// Start workers to process frames and clean up storage.
 		vs.workers = utils.NewBackgroundStoppableWorkers(vs.fetchFrames, vs.processFrames, vs.deleter)
 	}
 
@@ -483,9 +481,15 @@ func (vs *videostore) Close(_ context.Context) error {
 	if vs.workers != nil {
 		vs.workers.Stop()
 	}
-	vs.enc.close()
-	vs.seg.close()
-	vs.mh.close()
+	if vs.enc != nil {
+		vs.enc.close()
+	}
+	if vs.seg != nil {
+		vs.seg.close()
+	}
+	if vs.mh != nil {
+		vs.mh.close()
+	}
 	return nil
 }
 
