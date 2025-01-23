@@ -88,7 +88,7 @@ type video struct {
 
 // Config is the configuration for the video storage camera component.
 type Config struct {
-	Camera    string  `json:"camera"`
+	Camera    string  `json:"camera,omitempty"`
 	Sync      string  `json:"sync"`
 	Storage   storage `json:"storage"`
 	Video     video   `json:"video,omitempty"`
@@ -98,9 +98,6 @@ type Config struct {
 
 // Validate validates the configuration for the video storage camera component.
 func (cfg *Config) Validate(path string) ([]string, error) {
-	if cfg.Camera == "" {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
-	}
 	if cfg.Storage == (storage{}) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "storage")
 	}
@@ -114,7 +111,7 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 		return nil, fmt.Errorf("invalid framerate %d, must be greater than 0", cfg.Framerate)
 	}
 
-	return []string{cfg.Camera}, nil
+	return []string{}, nil
 }
 
 func init() {
