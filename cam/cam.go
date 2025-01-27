@@ -88,7 +88,7 @@ type video struct {
 
 // Config is the configuration for the video storage camera component.
 type Config struct {
-	Camera    string  `json:"camera"`
+	Camera    string  `json:"camera,omitempty"`
 	Sync      string  `json:"sync"`
 	Storage   storage `json:"storage"`
 	Video     video   `json:"video,omitempty"`
@@ -98,9 +98,6 @@ type Config struct {
 
 // Validate validates the configuration for the video storage camera component.
 func (cfg *Config) Validate(path string) ([]string, error) {
-	if cfg.Camera == "" {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
-	}
 	if cfg.Storage == (storage{}) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "storage")
 	}
@@ -113,8 +110,12 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Framerate < 0 {
 		return nil, fmt.Errorf("invalid framerate %d, must be greater than 0", cfg.Framerate)
 	}
-
-	return []string{cfg.Camera}, nil
+	// This allows for an implicit camera dependency so we do not need to explicitly
+	// add the camera dependency in the config.
+	if cfg.Camera != "" {
+		return []string{cfg.Camera}, nil
+	}
+	return []string{}, nil
 }
 
 func init() {
@@ -144,9 +145,13 @@ func newvideostore(
 	}
 
 	// Source camera that provides the frames to be processed.
+	// If camera is not available, the component will start
+	// without processing frames.
+	cameraAvailable := true
 	vs.cam, err = camera.FromDependencies(deps, newConf.Camera)
 	if err != nil {
-		return nil, err
+		vs.logger.Error("failed to get camera from dependencies, video-store will not be storing video", err)
+		cameraAvailable = false
 	}
 
 	// TODO(seanp): make this configurable
@@ -174,18 +179,6 @@ func newvideostore(
 	if newConf.YUYV {
 		vs.yuyv = newConf.YUYV
 	}
-
-	vs.enc, err = newEncoder(
-		logger,
-		bitrate,
-		preset,
-		vs.framerate,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	vs.mh = newMimeHandler(logger)
 
 	// Create segmenter to handle segmentation of video stream into clips.
 	sizeGB := newConf.Storage.SizeGB
@@ -222,18 +215,6 @@ func newvideostore(
 		return nil, fmt.Errorf("sync service %s not found", newConf.Sync)
 	}
 
-	vs.storagePath = storagePath
-	vs.seg, err = newSegmenter(
-		logger,
-		sizeGB,
-		segmentSeconds,
-		storagePath,
-		format,
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	// Create concater to handle concatenation of video clips when requested.
 	vs.uploadPath = uploadPath
 	err = createDir(vs.uploadPath)
@@ -242,7 +223,7 @@ func newvideostore(
 	}
 	vs.conc, err = newConcater(
 		logger,
-		vs.storagePath,
+		storagePath,
 		vs.uploadPath,
 		segmentSeconds,
 	)
@@ -250,8 +231,32 @@ func newvideostore(
 		return nil, err
 	}
 
-	// Start workers to process frames and clean up storage.
-	vs.workers = utils.NewBackgroundStoppableWorkers(vs.fetchFrames, vs.processFrames, vs.deleter)
+	// Only initialize mime handler, encoder, segmenter, and frame processing routines
+	// if the source camera is available.
+	if cameraAvailable {
+		vs.mh = newMimeHandler(logger)
+		vs.enc, err = newEncoder(
+			logger,
+			bitrate,
+			preset,
+			vs.framerate,
+		)
+		if err != nil {
+			return nil, err
+		}
+		vs.seg, err = newSegmenter(
+			logger,
+			sizeGB,
+			segmentSeconds,
+			storagePath,
+			format,
+		)
+		if err != nil {
+			return nil, err
+		}
+		// Start workers to process frames and clean up storage.
+		vs.workers = utils.NewBackgroundStoppableWorkers(vs.fetchFrames, vs.processFrames, vs.deleter)
+	}
 
 	return vs, nil
 }
@@ -473,10 +478,18 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 
 // Close closes the video storage camera component.
 func (vs *videostore) Close(_ context.Context) error {
-	vs.workers.Stop()
-	vs.enc.close()
-	vs.seg.close()
-	vs.mh.close()
+	if vs.workers != nil {
+		vs.workers.Stop()
+	}
+	if vs.enc != nil {
+		vs.enc.close()
+	}
+	if vs.seg != nil {
+		vs.seg.close()
+	}
+	if vs.mh != nil {
+		vs.mh.close()
+	}
 	return nil
 }
 
