@@ -562,20 +562,6 @@ func TestModuleConfiguration(t *testing.T) {
 				"attributes": {}
 			}
 		],
-		"services": [
-			{
-				"name": "data_manager-1",
-				"namespace": "rdk",
-				"type": "data_manager",
-				"attributes": {
-					"additional_sync_paths": [],
-					"capture_disabled": true,
-					"sync_interval_mins": 0.1,
-					"capture_dir": "",
-					"tags": []
-				}
-			}
-		],
 		"modules": [
 			{
 				"type": "local",
