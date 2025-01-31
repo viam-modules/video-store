@@ -477,6 +477,115 @@ func TestModuleConfiguration(t *testing.T) {
 			]
 		}`, fullModuleBinPath)
 
+	// Implicit sync dependency
+	config8 := fmt.Sprintf(`
+	{
+		"components": [
+			{
+				"name": "video-store-1",
+				"namespace": "rdk",
+				"type": "camera",
+				"model": "viam:video:storage",
+				"attributes": {
+					"camera": "fake-cam-1",
+					"sync": "data_manager-1",
+					"storage": {
+						"size_gb": 10,
+						"segment_seconds": 30,
+						"upload_path": "/tmp",
+						"storage_path": "/tmp"
+					},
+					"video": {
+						"preset": "ultrafast"
+					}
+				}
+			},
+			{
+				"name": "fake-cam-1",
+				"namespace": "rdk",
+				"type": "camera",
+				"model": "fake",
+				"attributes": {}
+			}
+		],
+		"services": [
+			{
+				"name": "data_manager-1",
+				"namespace": "rdk",
+				"type": "data_manager",
+				"attributes": {
+					"additional_sync_paths": [],
+					"capture_disabled": true,
+					"sync_interval_mins": 0.1,
+					"capture_dir": "",
+					"tags": []
+				}
+			}
+		],
+		"modules": [
+			{
+				"type": "local",
+				"name": "video-storage",
+				"executable_path": "%s",
+				"log_level": "debug"
+			}
+		]
+	}`, fullModuleBinPath)
+
+	// No sync dependency
+	config9 := fmt.Sprintf(`
+	{
+		"components": [
+			{
+				"name": "video-store-1",
+				"namespace": "rdk",
+				"type": "camera",
+				"model": "viam:video:storage",
+				"attributes": {
+					"camera": "fake-cam-1",
+					"storage": {
+						"size_gb": 10,
+						"segment_seconds": 30,
+						"upload_path": "/tmp",
+						"storage_path": "/tmp"
+					},
+					"video": {
+						"preset": "ultrafast"
+					}
+				}
+			},
+			{
+				"name": "fake-cam-1",
+				"namespace": "rdk",
+				"type": "camera",
+				"model": "fake",
+				"attributes": {}
+			}
+		],
+		"services": [
+			{
+				"name": "data_manager-1",
+				"namespace": "rdk",
+				"type": "data_manager",
+				"attributes": {
+					"additional_sync_paths": [],
+					"capture_disabled": true,
+					"sync_interval_mins": 0.1,
+					"capture_dir": "",
+					"tags": []
+				}
+			}
+		],
+		"modules": [
+			{
+				"type": "local",
+				"name": "video-storage",
+				"executable_path": "%s",
+				"log_level": "debug"
+			}
+		]
+	}`, fullModuleBinPath)
+
 	t.Run("Valid Configuration Successful", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
@@ -551,6 +660,26 @@ func TestModuleConfiguration(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config7)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		_, err = camera.FromRobot(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
+	})
+
+	t.Run("Implicit Sync Dependency Succeeds", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config8)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		_, err = camera.FromRobot(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
+	})
+
+	t.Run("No Sync Dependency Succeeds", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config9)
 		test.That(t, err, test.ShouldBeNil)
 		defer r.Close(timeoutCtx)
 		_, err = camera.FromRobot(r, videoStoreComponentName)
