@@ -630,7 +630,7 @@ func TestModuleConfiguration(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 	})
 
-	t.Run("Fails Configuration No DataManager", func(t *testing.T) {
+	t.Run("Specified Sync Without DataManager Service Fails", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config6)
