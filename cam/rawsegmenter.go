@@ -12,7 +12,6 @@ package videostore
 import "C"
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"unsafe"
@@ -63,18 +62,17 @@ func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 	rs.outCtx = fmtCtx
 
 	rs.logger.Info("setting up stream")
-	// Create new stream for the output context
+	// Create new stream for the output context.
 	stream := C.avformat_new_stream(fmtCtx, nil)
 	if stream == nil {
 		return errors.New("failed to allocate stream")
 	}
 	stream.id = C.int(fmtCtx.nb_streams) - 1
+	// gortsplib gives PTS in milliseconds, so we need to set the time base to 1/1000.
 	stream.time_base.num = 1
 	stream.time_base.den = 1000
 
-	rs.logger.Info("setting up codec ctx")
-	// Set the codec parameters for the output stream
-	// TODO(seanp): What should the time base be?
+	// Set the codec parameters for the output stream.
 	codec := C.avcodec_find_encoder(codecID)
 	if codec == nil {
 		return errors.New("failed to find codec")
@@ -84,15 +82,16 @@ func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 	if codecCtx == nil {
 		return errors.New("failed to allocate codec context")
 	}
+	// TODO(seanp); Size and pixel format is hardcoded for now. Need to make this dynamic.
+	// Maybe we can get this from ONVIF or the RTSP stream SDP.
 	codecCtx.width = 704
 	codecCtx.height = 480
 	codecCtx.pix_fmt = C.AV_PIX_FMT_YUV420P
 	codecCtx.time_base.num = 1
-	// codecCtx.time_base.den = 90000
 	codecCtx.time_base.den = 1000
-	// codecCtx.pix_fmt = C.AV_PIX_FMT_YUV420P
 
-	// Set up the extradata for the codec context
+	// Set up the extradata for the codec context. This allows the muxer to know how to
+	// decode the stream without having to read the SPS/PPS from the stream.
 	extradata, err := buildAVCCExtradata(sps, pps)
 	if err != nil {
 		rs.logger.Error("failed to build extradata: ", err)
@@ -107,15 +106,15 @@ func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 	C.memcpy(unsafe.Pointer(codecCtx.extradata), unsafe.Pointer(&extradata[0]), C.size_t(extradataSize))
 	codecCtx.extradata_size = C.int(extradataSize)
 
-	rs.logger.Info("copying codec parameters")
-	// Copy the codec parameters from the input stream to the output stream
+	// Copy the codec parameters from the input stream to the output stream. Thi is equivalent
+	// to -c:v copy in ffmpeg cli. This is needed to make sure we do not re-encode the stream.
 	if ret := C.avcodec_parameters_from_context(stream.codecpar, codecCtx); ret < 0 {
 		return fmt.Errorf("failed to copy codec parameters: %s", ffmpegError(ret))
 	}
 
 	rs.logger.Info("setting up segmenting parameters")
-	// Set up segmenting parameters
-	// segmentLengthCStr := C.CString(strconv.Itoa(10))
+	// Set up segmenting parameters.
+	// TODO(seanp): Make these configurable.
 	segmentLengthCStr := C.CString("10")
 	segmentFormatCStr := C.CString("mp4")
 	resetTimestampsCStr := C.CString("1")
@@ -206,17 +205,13 @@ func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 // }
 
 func (rs *RawSegmenter) WritePacket(payload []byte, pts int64) error {
-	rs.logger.Infof("creating av packet: %d, pts: %d", len(payload), pts)
-	// Turn the gortsplib packet into a AVPacket
+	// Stuff the bytes payload and timestamps into an AV Packet.
 	avpkt := C.av_packet_alloc()
 	if avpkt == nil {
 		return errors.New("failed to allocate AVPacket")
 	}
 	defer C.av_packet_free(&avpkt)
-
-	// Set the packet data and size
-	// avpkt.data = (*C.uint8_t)(unsafe.Pointer(&payload[0]))
-	// avpkt.size = C.int(len(payload))
+	// TODO(seanp): should i use (*C.uint8_t)(unsafe.Pointer(&payload[0])) or C.CBytes(payload) instead?
 	avpkt.data = (*C.uint8_t)(C.av_malloc(C.size_t(len(payload))))
 	if avpkt.data == nil {
 		C.av_packet_free(&avpkt)
@@ -231,14 +226,10 @@ func (rs *RawSegmenter) WritePacket(payload []byte, pts int64) error {
 	if avpkt.data == nil {
 		return errors.New("nil packet data")
 	}
-	// rs.logger.Info("setting pts: ", pkt.Timestamp)
-	// convertedTimestamp := pkt.Timestamp / 1500
-	// avpkt.pts = C.int64_t(convertedTimestamp)
-	// avpkt.dts = C.int64_t(convertedTimestamp)
 	avpkt.pts = C.int64_t(pts)
 	avpkt.dts = C.int64_t(pts)
 
-	// Write the packet to the output file
+	// Write the packet to the output file.
 	ret := C.av_interleaved_write_frame(rs.outCtx, avpkt)
 	if ret < 0 {
 		return fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
@@ -246,12 +237,33 @@ func (rs *RawSegmenter) WritePacket(payload []byte, pts int64) error {
 	return nil
 }
 
+/*
+	aligned(8) class AVCDecoderConfigurationRecord {
+		   unsigned int(8) configurationVersion = 1;
+		   unsigned int(8) AVCProfileIndication;
+		   unsigned int(8) profile_compatibility;
+		   unsigned int(8) AVCLevelIndication;
+		   bit(6) reserved = ‘111111’b;
+		   unsigned int(2) lengthSizeMinusOne;
+		   bit(3) reserved = ‘111’b;
+		   unsigned int(5) numOfSequenceParameterSets;
+		   for (i=0; i< numOfSequenceParameterSets;  i++) {
+		      unsigned int(16) sequenceParameterSetLength ;
+		  bit(8*sequenceParameterSetLength) sequenceParameterSetNALUnit;
+		 }
+		   unsigned int(8) numOfPictureParameterSets;
+		   for (i=0; i< numOfPictureParameterSets;  i++) {
+		  unsigned int(16) pictureParameterSetLength;
+		  bit(8*pictureParameterSetLength) pictureParameterSetNALUnit;
+		 }
+		}
+*/
+// buildAVCCExtradata builds the AVCDecoderConfigurationRecord extradata from the SPS and PPS data.
+// The SPS and PPS data are expected to be packed into the format listed above.
 func buildAVCCExtradata(sps, pps []byte) ([]byte, error) {
 	if len(sps) < 4 || len(pps) < 1 {
 		return nil, fmt.Errorf("invalid SPS/PPS data")
 	}
-	fmt.Println("length of sps: ", len(sps))
-	fmt.Println("length of pps: ", len(pps))
 	extradata := []byte{}
 	// configurationVersion
 	extradata = append(extradata, 1)
@@ -274,8 +286,7 @@ func buildAVCCExtradata(sps, pps []byte) ([]byte, error) {
 	// PPS data
 	extradata = append(extradata, pps...)
 
-	// fmpt println hex dump here
-	hexdump := hex.Dump(extradata)
-	fmt.Println("extradata: \n", hexdump)
+	// hexdump := hex.Dump(extradata)
+	// fmt.Println("extradata: \n", hexdump)
 	return extradata, nil
 }
