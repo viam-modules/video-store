@@ -5,12 +5,7 @@ TARGET_ARCH ?= $(SOURCE_ARCH)
 normalize_arch = $(if $(filter aarch64,$(1)),arm64,$(if $(filter x86_64,$(1)),amd64,$(1)))
 SOURCE_ARCH := $(call normalize_arch,$(SOURCE_ARCH))
 TARGET_ARCH := $(call normalize_arch,$(TARGET_ARCH))
-PPROF_ENABLED ?= false
 BUILD_TAGS ?=
-
-ifeq ($(PPROF_ENABLED),true)
-    BUILD_TAGS := $(BUILD_TAGS) pprof
-endif
 
 BIN_OUTPUT_PATH = bin/$(TARGET_OS)-$(TARGET_ARCH)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
@@ -55,16 +50,18 @@ GOFLAGS := -buildvcs=false
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 export PATH := $(PATH):$(shell go env GOPATH)/bin
 
-.PHONY: lint tool-install test clean module build build-pprof
+.PHONY: lint tool-install test clean module build 
 
-build: $(BIN_OUTPUT_PATH)/video-store
+build: $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
 
-build-pprof:
-	$(MAKE) build PPROF_ENABLED=true
-
-$(BIN_OUTPUT_PATH)/video-store: *.go cam/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
+$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
 	go mod tidy
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store main.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
+	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
+
+$(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
+	go mod tidy
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/concat cmd/concat/cmd.go
 	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
 
 $(FFMPEG_VERSION_PLATFORM):
@@ -115,7 +112,7 @@ ifeq ($(shell which artifact > /dev/null 2>&1; echo $$?), 1)
 endif
 	artifact pull
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go test -v ./tests/ ./cam/
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go test -v ./...
 	rm bin/video-store
 
 module: $(BIN_OUTPUT_PATH)/video-store
@@ -124,7 +121,11 @@ module: $(BIN_OUTPUT_PATH)/video-store
 	rm bin/video-store
 
 clean:
-	rm -rf $(BIN_OUTPUT_PATH)
+	rm -rf bin
 	rm -f $(BUILD_TAG_FILE)
+
+clean-ffmpeg: 
 	rm -rf FFmpeg
+
+clean-all: clean clean-ffmpeg
 	git clean -fxd
