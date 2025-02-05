@@ -19,6 +19,14 @@ import (
 	"time"
 )
 
+// SetLibAVLogLevel sets the libav log level.
+// this is global for the entire OS process.
+// valid inputs are "info", "warn", "error", "debug"
+// https://www.ffmpeg.org/doxygen/2.5/group__lavu__log__constants.html
+func SetLibAVLogLevel(level string) {
+	ffmppegLogLevel(lookupLogID(level))
+}
+
 type codecType int
 
 const (
@@ -97,7 +105,7 @@ func lookupLogID(level string) C.int {
 	switch level {
 	case "error":
 		return C.AV_LOG_ERROR
-	case "warning":
+	case "warn":
 		return C.AV_LOG_WARNING
 	case "info":
 		return C.AV_LOG_INFO
@@ -106,15 +114,6 @@ func lookupLogID(level string) C.int {
 	default:
 		return C.AV_LOG_INFO
 	}
-}
-
-// getHomeDir returns the home directory of the user.
-func getHomeDir() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return home
 }
 
 // createDir creates a directory at the provided path if it does not exist.
@@ -202,12 +201,12 @@ func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	datePart := parts[0]
 	timePart := strings.TrimSuffix(parts[1], filepath.Ext(parts[1]))
 	dateTimeStr := datePart + "_" + timePart
-	return parseDateTimeString(dateTimeStr)
+	return ParseDateTimeString(dateTimeStr)
 }
 
-// parseDateTimeString parses a date and time string in the format "2006-01-02_15-04-05".
+// ParseDateTimeString parses a date and time string in the format "2006-01-02_15-04-05".
 // Returns a time.Time object and an error if the string is not in the correct format.
-func parseDateTimeString(datetime string) (time.Time, error) {
+func ParseDateTimeString(datetime string) (time.Time, error) {
 	dateTime, err := time.Parse("2006-01-02_15-04-05", datetime)
 	if err != nil {
 		return time.Time{}, err
@@ -259,6 +258,17 @@ func matchStorageToRange(files []string, start, end time.Time, duration time.Dur
 	return matchedFiles
 }
 
+// generateOutputFilename generates the output filename for the video file.
+func generateOutputFilePath(camName, fromStr, metadata, path string) string {
+	var outputFilename string
+	if metadata == "" {
+		outputFilename = fmt.Sprintf("%s_%s.%s", camName, fromStr, defaultVideoFormat)
+	} else {
+		outputFilename = fmt.Sprintf("%s_%s_%s.%s", camName, fromStr, metadata, defaultVideoFormat)
+	}
+	return filepath.Join(path, outputFilename)
+}
+
 // validateTimeRange validates the start and end time range against storage files.
 // Extracts the start timestamp of the oldest file and the start of the most recent file.
 // Since the most recent segment file is still being written to by the segmenter
@@ -279,71 +289,4 @@ func validateTimeRange(files []string, start, end time.Time) error {
 		return errors.New("time range is outside of storage range")
 	}
 	return nil
-}
-
-// validateSaveCommand validates the save command params and checks for valid time format.
-func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, string, bool, error) {
-	fromStr, ok := command["from"].(string)
-	if !ok {
-		return time.Time{}, time.Time{}, "", false, errors.New("from timestamp not found")
-	}
-	from, err := parseDateTimeString(fromStr)
-	if err != nil {
-		return time.Time{}, time.Time{}, "", false, err
-	}
-	toStr, ok := command["to"].(string)
-	if !ok {
-		return time.Time{}, time.Time{}, "", false, errors.New("to timestamp not found")
-	}
-	to, err := parseDateTimeString(toStr)
-	if err != nil {
-		return time.Time{}, time.Time{}, "", false, err
-	}
-	if from.After(to) {
-		return time.Time{}, time.Time{}, "", false, errors.New("from timestamp is after to timestamp")
-	}
-	metadata, ok := command["metadata"].(string)
-	if !ok {
-		metadata = ""
-	}
-	async, ok := command["async"].(bool)
-	if !ok {
-		async = false
-	}
-	return from, to, metadata, async, nil
-}
-
-// validateFetchCommand validates the fetch command params and checks for valid time format.
-func validateFetchCommand(command map[string]interface{}) (time.Time, time.Time, error) {
-	fromStr, ok := command["from"].(string)
-	if !ok {
-		return time.Time{}, time.Time{}, errors.New("from timestamp not found")
-	}
-	from, err := parseDateTimeString(fromStr)
-	if err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-	toStr, ok := command["to"].(string)
-	if !ok {
-		return time.Time{}, time.Time{}, errors.New("to timestamp not found")
-	}
-	to, err := parseDateTimeString(toStr)
-	if err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-	if from.After(to) {
-		return time.Time{}, time.Time{}, errors.New("from timestamp is after to timestamp")
-	}
-	return from, to, nil
-}
-
-// generateOutputFilename generates the output filename for the video file.
-func generateOutputFilePath(camName, fromStr, metadata, path string) string {
-	var outputFilename string
-	if metadata == "" {
-		outputFilename = fmt.Sprintf("%s_%s.%s", camName, fromStr, defaultVideoFormat)
-	} else {
-		outputFilename = fmt.Sprintf("%s_%s_%s.%s", camName, fromStr, metadata, defaultVideoFormat)
-	}
-	return filepath.Join(path, outputFilename)
 }

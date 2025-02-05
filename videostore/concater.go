@@ -51,7 +51,7 @@ func newConcater(
 
 // concat takes in from and to timestamps and concates the video files between them.
 // returns the path to the concated video file.
-func (c *concater) concat(from, to time.Time, path string) error {
+func (c *concater) Concat(from, to time.Time, path string) error {
 	// Find the storage files that match the concat query.
 	storageFiles, err := getSortedFiles(c.storagePath)
 	if err != nil {
