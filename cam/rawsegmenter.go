@@ -189,6 +189,16 @@ func (rs *RawSegmenter) WritePacket(payload []byte, pts int64, isIDR bool) error
 	return nil
 }
 
+// Close closes the segmenter and writes the trailer to prevent corruption
+// when exiting early in the middle of a segment.
+func (rs *RawSegmenter) Close() {
+	ret := C.av_write_trailer(rs.outCtx)
+	if ret < 0 {
+		rs.logger.Errorf("failed to write trailer", "error", ffmpegError(ret))
+	}
+	C.avformat_free_context(rs.outCtx)
+}
+
 /*
 	aligned(8) class AVCDecoderConfigurationRecord {
 		   unsigned int(8) configurationVersion = 1;
