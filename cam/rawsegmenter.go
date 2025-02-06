@@ -1,7 +1,6 @@
 package videostore
 
 /*
-#cgo pkg-config: libavutil libavcodec libavformat libswscale
 #include <libavfilter/avfilter.h>
 #include <libavutil/avutil.h>
 #include <libavformat/avformat.h>
@@ -37,14 +36,11 @@ func NewRawSegmenter(
 	if err != nil {
 		return nil, err
 	}
-	s.logger.Info("created segmenter")
 
 	return s, nil
 }
 
 func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
-	fmt.Println("Init segmenter")
-	rs.logger.Info("setting up output ctx")
 	// Allocate output context for segmenter. The "segment" format is a special format
 	// that allows for segmenting output files. The output pattern is a strftime pattern
 	// that specifies the output file name. The pattern is set to the current time.
@@ -52,8 +48,6 @@ func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 	defer C.free(unsafe.Pointer(outputPatternCStr))
 	formatName := C.CString("segment")
 	defer C.free(unsafe.Pointer(formatName))
-	// log the output pattern
-	fmt.Println("outputPatternCStr: ", C.GoString(outputPatternCStr))
 	var fmtCtx *C.AVFormatContext
 	ret := C.avformat_alloc_output_context2(&fmtCtx, nil, formatName, outputPatternCStr)
 	if ret < 0 {
@@ -61,7 +55,6 @@ func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 	}
 	rs.outCtx = fmtCtx
 
-	rs.logger.Info("setting up stream")
 	// Create new stream for the output context.
 	stream := C.avformat_new_stream(fmtCtx, nil)
 	if stream == nil {
@@ -92,7 +85,7 @@ func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 
 	// Set up the extradata for the codec context. This allows the muxer to know how to
 	// decode the stream without having to read the SPS/PPS from the stream.
-	extradata, err := buildAVCCExtradata(sps, pps)
+	extradata, err := buildAVCExtradata(sps, pps)
 	if err != nil {
 		rs.logger.Error("failed to build extradata: ", err)
 		return err
@@ -112,19 +105,16 @@ func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 		return fmt.Errorf("failed to copy codec parameters: %s", ffmpegError(ret))
 	}
 
-	rs.logger.Info("setting up segmenting parameters")
 	// Set up segmenting parameters.
 	// TODO(seanp): Make these configurable.
 	segmentLengthCStr := C.CString("10")
 	segmentFormatCStr := C.CString("mp4")
 	resetTimestampsCStr := C.CString("1")
-	breakNonKeyFramesCStr := C.CString("1")
 	strftimeCStr := C.CString("1")
 	defer func() {
 		C.free(unsafe.Pointer(segmentLengthCStr))
 		C.free(unsafe.Pointer(segmentFormatCStr))
 		C.free(unsafe.Pointer(resetTimestampsCStr))
-		C.free(unsafe.Pointer(breakNonKeyFramesCStr))
 		C.free(unsafe.Pointer(strftimeCStr))
 	}()
 
@@ -144,67 +134,25 @@ func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 	if ret < 0 {
 		return fmt.Errorf("failed to set reset_timestamps: %s", ffmpegError(ret))
 	}
-	// TODO(seanp): Allowing this could cause flakey playback. Remove if not needed.
-	// Or, fix by adding keyframe forces on the encoder side
-	ret = C.av_dict_set(&opts, C.CString("break_non_keyframes"), breakNonKeyFramesCStr, 0)
-	if ret < 0 {
-		return fmt.Errorf("failed to set break_non_keyframes: %s", ffmpegError(ret))
-	}
 	ret = C.av_dict_set(&opts, C.CString("strftime"), strftimeCStr, 0)
 	if ret < 0 {
 		return fmt.Errorf("failed to set strftime: %s", ffmpegError(ret))
 	}
 
-	rs.logger.Info("writing header")
 	// Open the output file for writing
 	ret = C.avformat_write_header(fmtCtx, &opts)
 	if ret < 0 {
 		return fmt.Errorf("failed to write header: %s", ffmpegError(ret))
 	}
 
-	// need to reset stream time base to 1/1000
+	// Need to reset stream time base to 1/1000
 	stream.time_base.num = 1
 	stream.time_base.den = 1000
 
 	return nil
 }
 
-// func (rs *RawSegmenter) WritePacket(pkt *rtp.Packet, pts int64) error {
-// 	rs.logger.Info("creating av packet")
-// 	// Turn the gortsplib packet into a AVPacket
-// 	avpkt := C.av_packet_alloc()
-// 	if avpkt == nil {
-// 		return errors.New("failed to allocate AVPacket")
-// 	}
-// 	defer C.av_packet_free(&avpkt)
-
-// 	// Set the packet data and size
-// 	avpkt.data = (*C.uint8_t)(unsafe.Pointer(&pkt.Payload[0]))
-// 	avpkt.size = C.int(len(pkt.Payload))
-// 	if avpkt.size == 0 {
-// 		return errors.New("empty packet")
-// 	}
-// 	if avpkt.data == nil {
-// 		return errors.New("nil packet data")
-// 	}
-// 	// rs.logger.Info("setting pts: ", pkt.Timestamp)
-// 	// convertedTimestamp := pkt.Timestamp / 1500
-// 	// avpkt.pts = C.int64_t(convertedTimestamp)
-// 	// avpkt.dts = C.int64_t(convertedTimestamp)
-// 	avpkt.pts = C.int64_t(pts)
-// 	avpkt.dts = C.int64_t(pts)
-
-// 	rs.logger.Info("writing packet: ", len(pkt.Payload), pkt.Timestamp, pts)
-// 	// Write the packet to the output file
-// 	ret := C.av_interleaved_write_frame(rs.outCtx, avpkt)
-// 	if ret < 0 {
-// 		return fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
-// 	}
-// 	rs.logger.Info("wrote packet")
-// 	return nil
-// }
-
-func (rs *RawSegmenter) WritePacket(payload []byte, pts int64) error {
+func (rs *RawSegmenter) WritePacket(payload []byte, pts int64, isIDR bool) error {
 	// Stuff the bytes payload and timestamps into an AV Packet.
 	avpkt := C.av_packet_alloc()
 	if avpkt == nil {
@@ -228,7 +176,11 @@ func (rs *RawSegmenter) WritePacket(payload []byte, pts int64) error {
 	}
 	avpkt.pts = C.int64_t(pts)
 	avpkt.dts = C.int64_t(pts)
-
+	// Set the keyframe flag if this is an IDR frame. This is needed to make sure the
+	// muxer knows it is a keyframe and is safe to start a new segment.
+	if isIDR {
+		avpkt.flags |= C.AV_PKT_FLAG_KEY
+	}
 	// Write the packet to the output file.
 	ret := C.av_interleaved_write_frame(rs.outCtx, avpkt)
 	if ret < 0 {
@@ -258,9 +210,9 @@ func (rs *RawSegmenter) WritePacket(payload []byte, pts int64) error {
 		 }
 		}
 */
-// buildAVCCExtradata builds the AVCDecoderConfigurationRecord extradata from the SPS and PPS data.
+// buildAVCExtradata builds the AVCDecoderConfigurationRecord extradata from the SPS and PPS data.
 // The SPS and PPS data are expected to be packed into the format listed above.
-func buildAVCCExtradata(sps, pps []byte) ([]byte, error) {
+func buildAVCExtradata(sps, pps []byte) ([]byte, error) {
 	if len(sps) < 4 || len(pps) < 1 {
 		return nil, fmt.Errorf("invalid SPS/PPS data")
 	}
