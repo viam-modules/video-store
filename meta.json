@@ -6,7 +6,9 @@
   "models": [
       {
           "api": "rdk:component:camera",
-          "model": "viam:video:storage"
+          "model": "viam:video:storage",
+          "markdown_link" : "README.md#configure-your-video-store-component",
+          "short_description" : "A driver for storing video from a camera"
       }
   ],
   "build": {
