@@ -2,6 +2,9 @@
 
 The `video-store` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and saves the output as video files on disk. You can then upload video slices to the cloud using the [save](#save) command, or request the video bytes directly using the [fetch](#fetch) command.
 
+Navigate to the [**CONFIGURE** tab](https://docs.viam.com/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in [the Viam app](https://app.viam.com/).
+[Add camera / video-store to your machine](https://docs.viam.com/configure/#components).
+
 ## Requirements
 
 ### Configure a Data Manager Service
@@ -31,9 +34,6 @@ Navigate to the [**CONFIGURE** tab](https://docs.viam.com/configure/) of your [m
 ```
 
 ## Configure your `video-store` component
-
-Navigate to the [**CONFIGURE** tab](https://docs.viam.com/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in [the Viam app](https://app.viam.com/).
-[Add camera / video-store to your machine](https://docs.viam.com/configure/#components).
 
 On the new component panel, copy and paste the following attribute template into your camera’s attributes field:
 
