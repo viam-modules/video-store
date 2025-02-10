@@ -57,7 +57,7 @@ Additionally, make sure to add your configured data manager service to the `depe
 | Attribute       | Sub-Attribute     | Type    | Inclusion | Description                                                                                       |
 |-----------------|-------------------|---------|-----------|---------------------------------------------------------------------------------------------------|
 | `camera`        |                   | string  | optional  | Name of the source camera to read images from. If not provided, video-store will not save video.  |
-| `sync`          |                   | string  | required  | Name of the dependency datamanager service.                                                       |
+| `sync`          |                   | string  | optional  | Name of the dependency datamanager service.                                                       |
 | `storage`       |                   | object  | required  |                                                                                                   |
 |                 | `segment_seconds` | integer | optional  | Length in seconds of the individual segment video files.                                          |
 |                 | `size_gb`         | integer | required  | Total amount of allocated storage in gigabytes.                                                   |

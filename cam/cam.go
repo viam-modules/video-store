@@ -20,6 +20,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/rdk/services/datamanager"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
@@ -104,18 +105,17 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Storage.SizeGB == 0 {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "size_gb")
 	}
-	if cfg.Sync == "" {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "sync")
-	}
 	if cfg.Framerate < 0 {
 		return nil, fmt.Errorf("invalid framerate %d, must be greater than 0", cfg.Framerate)
 	}
-	// This allows for an implicit camera dependency so we do not need to explicitly
-	// add the camera dependency in the config.
-	if cfg.Camera != "" {
-		return []string{cfg.Camera}, nil
+	dependencies := []string{}
+	if cfg.Sync != "" {
+		dependencies = append(dependencies, cfg.Sync)
 	}
-	return []string{}, nil
+	if cfg.Camera != "" {
+		dependencies = append(dependencies, cfg.Camera)
+	}
+	return dependencies, nil
 }
 
 func init() {
@@ -150,7 +150,7 @@ func newvideostore(
 	cameraAvailable := true
 	vs.cam, err = camera.FromDependencies(deps, newConf.Camera)
 	if err != nil {
-		vs.logger.Error("failed to get camera from dependencies, video-store will not be storing video", err)
+		vs.logger.Errorf("failed to get camera from dependencies, video-store will not be storing video: %v", err)
 		cameraAvailable = false
 	}
 
@@ -197,22 +197,9 @@ func newvideostore(
 
 	// Check for data_manager service dependency.
 	// TODO(seanp): Check custom_sync_paths if not using default upload_path in config.
-	syncFound := false
-	for key, dep := range deps {
-		if key.Name == newConf.Sync {
-			if dep.Name().API.Type.String() != "rdk:service" {
-				return nil, fmt.Errorf("sync service %s is not a service", newConf.Sync)
-			}
-			if dep.Name().API.SubtypeName != "data_manager" {
-				return nil, fmt.Errorf("sync service %s is not a data_manager service", newConf.Sync)
-			}
-			logger.Debugf("found sync service: %s", key.Name)
-			syncFound = true
-			break
-		}
-	}
-	if !syncFound {
-		return nil, fmt.Errorf("sync service %s not found", newConf.Sync)
+	_, err = datamanager.FromDependencies(deps, newConf.Sync)
+	if err != nil {
+		vs.logger.Errorf("failed to get sync service from dependencies, video-store will not upload saved clips to the cloud: %v", err)
 	}
 
 	// Create concater to handle concatenation of video clips when requested.
