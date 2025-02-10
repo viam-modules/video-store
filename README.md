@@ -35,8 +35,11 @@ Navigate to the [**CONFIGURE** tab](https://docs.viam.com/configure/) of your [m
 
 ## Configure your `video-store` component
 
-On the new component panel, copy and paste the following attribute template into your camera’s attributes field:
+Video store requires a [Data Manager](https://docs.viam.com/data-ai/capture-data/capture-sync/#configure-the-data-management-service-for-your-machine) to be configured on you machine before it can be used.
+Use the "depends_on" dropdown to add a dependency on the datamanger configured on your machine. 
 
+
+Copy and paste the following attributes into your JSON configuration:
 ```json
 {
   "camera": "<source-camera-name>",
@@ -48,9 +51,9 @@ On the new component panel, copy and paste the following attribute template into
 }
 ```
 
-Additionally, make sure to add your configured data manager service to the `depends_on` array of your `video-store` component.
 
-> For more information, see [Configure a Machine](https://docs.viam.com/manage/configuration/).
+
+Additionally, make sure to add your configured data manager service to the `depends_on` array of your `video-store` component.
 
 ### Attributes
 
