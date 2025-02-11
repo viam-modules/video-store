@@ -4,7 +4,7 @@ package main
 import (
 	"context"
 
-	videostore "github.com/viam-modules/video-store"
+	cam "github.com/viam-modules/video-store/model/camera"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
@@ -20,7 +20,7 @@ func mainWithArgs(ctx context.Context, _ []string, _ logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	err = module.AddModelFromRegistry(ctx, camera.API, videostore.Model)
+	err = module.AddModelFromRegistry(ctx, camera.API, cam.Model)
 	if err != nil {
 		return err
 	}

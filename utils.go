@@ -109,12 +109,12 @@ func lookupLogID(level string) C.int {
 }
 
 // getHomeDir returns the home directory of the user.
-func getHomeDir() string {
+func getHomeDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ""
+		return "", err
 	}
-	return home
+	return home, nil
 }
 
 // createDir creates a directory at the provided path if it does not exist.
@@ -281,26 +281,22 @@ func validateTimeRange(files []string, start, end time.Time) error {
 	return nil
 }
 
-// validateSaveCommand validates the save command params and checks for valid time format.
-func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, string, bool, error) {
+func toSaveCommand(command map[string]interface{}) (*SaveRequest, error) {
 	fromStr, ok := command["from"].(string)
 	if !ok {
-		return time.Time{}, time.Time{}, "", false, errors.New("from timestamp not found")
+		return nil, errors.New("from timestamp not found")
 	}
 	from, err := parseDateTimeString(fromStr)
 	if err != nil {
-		return time.Time{}, time.Time{}, "", false, err
+		return nil, err
 	}
 	toStr, ok := command["to"].(string)
 	if !ok {
-		return time.Time{}, time.Time{}, "", false, errors.New("to timestamp not found")
+		return nil, errors.New("to timestamp not found")
 	}
 	to, err := parseDateTimeString(toStr)
 	if err != nil {
-		return time.Time{}, time.Time{}, "", false, err
-	}
-	if from.After(to) {
-		return time.Time{}, time.Time{}, "", false, errors.New("from timestamp is after to timestamp")
+		return nil, err
 	}
 	metadata, ok := command["metadata"].(string)
 	if !ok {
@@ -310,31 +306,32 @@ func validateSaveCommand(command map[string]interface{}) (time.Time, time.Time, 
 	if !ok {
 		async = false
 	}
-	return from, to, metadata, async, nil
+	return &SaveRequest{
+		From:     from,
+		To:       to,
+		Metadata: metadata,
+		Async:    async,
+	}, nil
 }
 
-// validateFetchCommand validates the fetch command params and checks for valid time format.
-func validateFetchCommand(command map[string]interface{}) (time.Time, time.Time, error) {
+func toFetchCommand(command map[string]interface{}) (*FetchRequest, error) {
 	fromStr, ok := command["from"].(string)
 	if !ok {
-		return time.Time{}, time.Time{}, errors.New("from timestamp not found")
+		return nil, errors.New("from timestamp not found")
 	}
 	from, err := parseDateTimeString(fromStr)
 	if err != nil {
-		return time.Time{}, time.Time{}, err
+		return nil, err
 	}
 	toStr, ok := command["to"].(string)
 	if !ok {
-		return time.Time{}, time.Time{}, errors.New("to timestamp not found")
+		return nil, errors.New("to timestamp not found")
 	}
 	to, err := parseDateTimeString(toStr)
 	if err != nil {
-		return time.Time{}, time.Time{}, err
+		return nil, err
 	}
-	if from.After(to) {
-		return time.Time{}, time.Time{}, errors.New("from timestamp is after to timestamp")
-	}
-	return from, to, nil
+	return &FetchRequest{From: from, To: to}, nil
 }
 
 // generateOutputFilename generates the output filename for the video file.
