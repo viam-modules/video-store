@@ -80,15 +80,15 @@ type videostore struct {
 	concater    *concater
 }
 
-type FrameVideoStoreStorageConfig struct {
+type StorageConfig struct {
 	SegmentSeconds int
 	SizeGB         int
 	UploadPath     string
 	StoragePath    string
 }
 
-func (c FrameVideoStoreStorageConfig) Validate() error {
-	var zero FrameVideoStoreStorageConfig
+func (c StorageConfig) Validate() error {
+	var zero StorageConfig
 	if c == zero {
 		return errors.New("video config can't be empty")
 	}
@@ -110,13 +110,13 @@ func (c FrameVideoStoreStorageConfig) Validate() error {
 	return nil
 }
 
-type FrameVideoStoreVideoConfig struct {
+type EncoderConfig struct {
 	Bitrate int
 	Preset  string
 }
 
-func (c FrameVideoStoreVideoConfig) Validate() error {
-	var zero FrameVideoStoreVideoConfig
+func (c EncoderConfig) Validate() error {
+	var zero EncoderConfig
 	if c == zero {
 		return errors.New("video config can't be empty")
 	}
@@ -133,15 +133,15 @@ func (c FrameVideoStoreVideoConfig) Validate() error {
 
 // Config is the configuration for the video storage camera component.
 type Config struct {
-	Camera    string                       `json:"camera,omitempty"`
-	Sync      string                       `json:"sync"`
-	Storage   FrameVideoStoreStorageConfig `json:"storage"`
-	Video     FrameVideoStoreVideoConfig   `json:"video,omitempty"`
-	Framerate int                          `json:"framerate,omitempty"`
-	YUYV      bool                         `json:"yuyv,omitempty"`
+	Camera    string        `json:"camera,omitempty"`
+	Sync      string        `json:"sync"`
+	Storage   StorageConfig `json:"storage"`
+	Video     EncoderConfig `json:"video,omitempty"`
+	Framerate int           `json:"framerate,omitempty"`
+	YUYV      bool          `json:"yuyv,omitempty"`
 }
 
-func applyVideoDefaults(c FrameVideoStoreVideoConfig) FrameVideoStoreVideoConfig {
+func applyVideoEncoderDefaults(c EncoderConfig) EncoderConfig {
 	if c.Bitrate == 0 {
 		c.Bitrate = defaultVideoBitrate
 	}
@@ -151,8 +151,8 @@ func applyVideoDefaults(c FrameVideoStoreVideoConfig) FrameVideoStoreVideoConfig
 	return c
 }
 
-func applyStorageDefaults(c FrameVideoStoreStorageConfig, name string) (FrameVideoStoreStorageConfig, error) {
-	var zero FrameVideoStoreStorageConfig
+func applyStorageDefaults(c StorageConfig, name string) (StorageConfig, error) {
+	var zero StorageConfig
 	if c.SegmentSeconds == 0 {
 		c.SegmentSeconds = defaultSegmentSeconds
 	}
@@ -190,11 +190,13 @@ func ToFrameVideoStoreVideoConfig(
 	}
 
 	fvsc := FrameVideoStoreConfig{
-		Video:     applyVideoDefaults(config.Video),
-		Storage:   storage,
-		Camera:    camera,
-		Framerate: framerate,
-		YUYV:      config.YUYV,
+		Encoder: applyVideoEncoderDefaults(config.Video),
+		Storage: storage,
+		Camera:  camera,
+		FramePoller: FramePollerConfig{
+			Framerate: framerate,
+			YUYV:      config.YUYV,
+		},
 	}
 
 	if err := fvsc.Validate(); err != nil {
@@ -206,7 +208,7 @@ func ToFrameVideoStoreVideoConfig(
 
 // Validate validates the configuration for the video storage camera component.
 func (cfg *Config) Validate(path string) ([]string, error) {
-	if cfg.Storage == (FrameVideoStoreStorageConfig{}) {
+	if cfg.Storage == (StorageConfig{}) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "storage")
 	}
 	if cfg.Storage.SizeGB == 0 {
@@ -232,16 +234,20 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	return []string{}, nil
 }
 
-type FrameVideoStoreConfig struct {
-	Camera    camera.Camera
-	Storage   FrameVideoStoreStorageConfig
-	Video     FrameVideoStoreVideoConfig
+type FramePollerConfig struct {
 	Framerate int
 	YUYV      bool
 }
 
+type FrameVideoStoreConfig struct {
+	Camera      camera.Camera
+	Storage     StorageConfig
+	Encoder     EncoderConfig
+	FramePoller FramePollerConfig
+}
+
 func (c *FrameVideoStoreConfig) Validate() error {
-	if err := c.Video.Validate(); err != nil {
+	if err := c.Encoder.Validate(); err != nil {
 		return err
 	}
 
@@ -249,7 +255,7 @@ func (c *FrameVideoStoreConfig) Validate() error {
 		return err
 	}
 
-	if c.Framerate <= 0 {
+	if c.FramePoller.Framerate <= 0 {
 		return errors.New("framerate can't be less than or equal to 0")
 	}
 	return nil
@@ -332,9 +338,9 @@ func NewFrameVideoStore(_ context.Context, config FrameVideoStoreConfig, logger 
 		vs.mimeHandler = newMimeHandler(logger)
 		vs.encoder, err = newEncoder(
 			logger,
-			vs.config.Video.Bitrate,
-			vs.config.Video.Preset,
-			vs.config.Framerate,
+			vs.config.Encoder.Bitrate,
+			vs.config.Encoder.Preset,
+			vs.config.FramePoller.Framerate,
 		)
 		if err != nil {
 			return nil, err
@@ -458,7 +464,7 @@ func (vs *videostore) DoCommand(ctx context.Context, command map[string]interfac
 // fetchFrames reads frames from the camera at the framerate interval
 // and stores the decoded image in the latestFrame atomic pointer.
 func (vs *videostore) fetchFrames(ctx context.Context) {
-	frameInterval := time.Second / time.Duration(vs.config.Framerate)
+	frameInterval := time.Second / time.Duration(vs.config.FramePoller.Framerate)
 	ticker := time.NewTicker(frameInterval)
 	defer ticker.Stop()
 	for {
@@ -467,7 +473,7 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 			return
 		case <-ticker.C:
 			var mimeTypeReq string
-			if vs.config.YUYV {
+			if vs.config.FramePoller.YUYV {
 				mimeTypeReq = mimeTypeYUYV
 			} else {
 				mimeTypeReq = rutils.MimeTypeJPEG
@@ -504,7 +510,7 @@ func (vs *videostore) fetchFrames(ctx context.Context) {
 // processFrames grabs the latest frame, encodes, and writes to the segmenter
 // which chunks video stream into clip files inside the storage directory.
 func (vs *videostore) processFrames(ctx context.Context) {
-	frameInterval := time.Second / time.Duration(vs.config.Framerate)
+	frameInterval := time.Second / time.Duration(vs.config.FramePoller.Framerate)
 	ticker := time.NewTicker(frameInterval)
 	defer ticker.Stop()
 	for {
