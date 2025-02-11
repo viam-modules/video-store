@@ -5,12 +5,7 @@ TARGET_ARCH ?= $(SOURCE_ARCH)
 normalize_arch = $(if $(filter aarch64,$(1)),arm64,$(if $(filter x86_64,$(1)),amd64,$(1)))
 SOURCE_ARCH := $(call normalize_arch,$(SOURCE_ARCH))
 TARGET_ARCH := $(call normalize_arch,$(TARGET_ARCH))
-PPROF_ENABLED ?= false
 BUILD_TAGS ?=
-
-ifeq ($(PPROF_ENABLED),true)
-    BUILD_TAGS := $(BUILD_TAGS) pprof
-endif
 
 BIN_OUTPUT_PATH = bin/$(TARGET_OS)-$(TARGET_ARCH)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
@@ -59,10 +54,10 @@ export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 build: $(BIN_OUTPUT_PATH)/video-store
 
-build-pprof:
-	$(MAKE) build PPROF_ENABLED=true
+build-pprof: BUILD_TAGS:=$(strip $(BUILD_TAGS) pprof)
+build-pprof: build
 
-$(BIN_OUTPUT_PATH)/video-store: *.go cam/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
+$(BIN_OUTPUT_PATH)/video-store: cam/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
 	go mod tidy
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
 	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
