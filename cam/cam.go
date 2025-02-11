@@ -2,6 +2,7 @@
 package videostore
 
 /*
+#cgo pkg-config: libavcodec libavutil libswscale
 #include <libavutil/frame.h>
 */
 import "C"
