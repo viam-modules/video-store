@@ -4,7 +4,7 @@ package main
 import (
 	"context"
 
-	videostore "github.com/viam-modules/video-store/cam"
+	videostore "github.com/viam-modules/video-store"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
