@@ -85,7 +85,7 @@ func applyStorageDefaults(c storage, name string) (videostore.StorageConfig, err
 		}
 		c.UploadPath = filepath.Join(home, defaultUploadPath, name)
 	}
-	if c.StoragePath != "" {
+	if c.StoragePath == "" {
 		home, err := getHomeDir()
 		if err != nil {
 			return zero, err

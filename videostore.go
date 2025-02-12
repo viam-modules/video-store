@@ -64,10 +64,9 @@ type videostore struct {
 	latestFrame atomic.Pointer[C.AVFrame]
 	workers     *utils.StoppableWorkers
 
-	encoder     *encoder
-	mimeHandler *mimeHandler
-	segmenter   *segmenter
-	concater    *concater
+	// encoder   *encoder
+	segmenter *segmenter
+	concater  *concater
 }
 
 // VideoStore stores video and provides APIs to request the stored video
@@ -146,8 +145,7 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 	// if the source camera is available.
 	cameraAvailable := config.FramePoller.Camera != nil
 	if cameraAvailable {
-		vs.mimeHandler = newMimeHandler(logger)
-		vs.encoder, err = newEncoder(
+		encoder, err := newEncoder(
 			logger,
 			vs.config.Encoder.Bitrate,
 			vs.config.Encoder.Preset,
@@ -169,7 +167,7 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 		// Start workers to process frames and clean up storage.
 		vs.workers = utils.NewBackgroundStoppableWorkers(
 			func(ctx context.Context) { vs.fetchFrames(ctx, config.FramePoller.Camera) },
-			vs.processFrames,
+			func(ctx context.Context) { vs.processFrames(ctx, encoder) },
 			vs.deleter)
 	}
 
@@ -233,6 +231,8 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 // fetchFrames reads frames from the camera at the framerate interval
 // and stores the decoded image in the latestFrame atomic pointer.
 func (vs *videostore) fetchFrames(ctx context.Context, cam camera.Camera) {
+	mimeHandler := newMimeHandler(vs.logger)
+	defer mimeHandler.close()
 	frameInterval := time.Second / time.Duration(vs.config.FramePoller.Framerate)
 	ticker := time.NewTicker(frameInterval)
 	defer ticker.Stop()
@@ -254,15 +254,17 @@ func (vs *videostore) fetchFrames(ctx context.Context, cam camera.Camera) {
 				continue
 			}
 			var frame *C.AVFrame
-			switch metadata.MimeType {
-			case mimeTypeYUYV, mimeTypeYUYV + "+" + rutils.MimeTypeSuffixLazy:
-				frame, err = vs.mimeHandler.yuyvToYUV420p(bytes)
+
+			mimetype, _ := rutils.CheckLazyMIMEType(metadata.MimeType)
+			switch mimetype {
+			case mimeTypeYUYV:
+				frame, err = mimeHandler.yuyvToYUV420p(bytes)
 				if err != nil {
 					vs.logger.Error("failed to convert yuyv422 to yuv420p", err)
 					continue
 				}
 			case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
-				frame, err = vs.mimeHandler.decodeJPEG(bytes)
+				frame, err = mimeHandler.decodeJPEG(bytes)
 				if err != nil {
 					vs.logger.Error("failed to decode jpeg", err)
 					continue
@@ -278,7 +280,8 @@ func (vs *videostore) fetchFrames(ctx context.Context, cam camera.Camera) {
 
 // processFrames grabs the latest frame, encodes, and writes to the segmenter
 // which chunks video stream into clip files inside the storage directory.
-func (vs *videostore) processFrames(ctx context.Context) {
+func (vs *videostore) processFrames(ctx context.Context, encoder *encoder) {
+	defer encoder.close()
 	frameInterval := time.Second / time.Duration(vs.config.FramePoller.Framerate)
 	ticker := time.NewTicker(frameInterval)
 	defer ticker.Stop()
@@ -292,19 +295,19 @@ func (vs *videostore) processFrames(ctx context.Context) {
 				vs.logger.Debug("latest frame is not available yet")
 				continue
 			}
-			result, err := vs.encoder.encode(latestFrame)
+			result, err := encoder.encode(latestFrame)
 			if err != nil {
 				vs.logger.Debug("failed to encode frame", err)
 				continue
 			}
 			if result.frameDimsChanged {
 				vs.logger.Info("reinitializing segmenter due to encoder refresh")
-				err = vs.segmenter.initialize(vs.encoder.codecCtx)
+				err = vs.segmenter.initialize(encoder.codecCtx)
 				if err != nil {
 					vs.logger.Debug("failed to reinitialize segmenter", err)
 					// Hack that flags the encoder to reinitialize if segmenter fails to
 					// ensure that encoder and segmenter inits are in sync.
-					vs.encoder.codecCtx = nil
+					encoder.codecCtx = nil
 					continue
 				}
 			}
@@ -366,14 +369,8 @@ func (vs *videostore) Close(_ context.Context) error {
 	if vs.workers != nil {
 		vs.workers.Stop()
 	}
-	if vs.encoder != nil {
-		vs.encoder.close()
-	}
 	if vs.segmenter != nil {
 		vs.segmenter.close()
-	}
-	if vs.mimeHandler != nil {
-		vs.mimeHandler.close()
 	}
 	return nil
 }

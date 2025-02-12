@@ -198,11 +198,14 @@ func (s *segmenter) cleanupStorage() error {
 		if currStorageSize < s.maxStorageSize {
 			break
 		}
+		s.logger.Debugf("deleting file: %s", file)
 		err := os.Remove(file)
 		if err != nil {
 			return err
 		}
 		s.logger.Debugf("deleted file: %s", file)
+		// NOTE: This is going to be super slow
+		// we should speed this up
 		currStorageSize, err = getDirectorySize(s.storagePath)
 		if err != nil {
 			return err
