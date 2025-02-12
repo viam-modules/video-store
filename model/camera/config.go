@@ -48,7 +48,7 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 		return nil, fmt.Errorf("invalid framerate %d, must be greater than 0", cfg.Framerate)
 	}
 
-	_, err := toFrameVideoStoreVideoConfig(cfg, "", nil)
+	_, err := toFrameVideoStoreVideoConfig(cfg, "someprefix", nil)
 	if err != nil {
 		return nil, err
 	}
