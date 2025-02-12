@@ -18,17 +18,17 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-type RawSegmenter struct {
+type rawSegmenter struct {
 	logger      logging.Logger
 	storagePath string
 	outCtx      *C.AVFormatContext
 }
 
-func NewRawSegmenter(
+func newRawSegmenter(
 	logger logging.Logger,
 	storagePath string,
-) (*RawSegmenter, error) {
-	s := &RawSegmenter{
+) (*rawSegmenter, error) {
+	s := &rawSegmenter{
 		logger:      logger,
 		storagePath: storagePath,
 	}
@@ -40,7 +40,7 @@ func NewRawSegmenter(
 	return s, nil
 }
 
-func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
+func (rs *rawSegmenter) init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 	// Allocate output context for segmenter. The "segment" format is a special format
 	// that allows for segmenting output files. The output pattern is a strftime pattern
 	// that specifies the output file name. The pattern is set to the current time.
@@ -152,7 +152,7 @@ func (rs *RawSegmenter) Init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 	return nil
 }
 
-func (rs *RawSegmenter) WritePacket(payload []byte, pts int64, isIDR bool) error {
+func (rs *rawSegmenter) writePacket(payload []byte, pts int64, isIDR bool) error {
 	// Stuff the bytes payload and timestamps into an AV Packet.
 	avpkt := C.av_packet_alloc()
 	if avpkt == nil {
@@ -189,9 +189,9 @@ func (rs *RawSegmenter) WritePacket(payload []byte, pts int64, isIDR bool) error
 	return nil
 }
 
-// Close closes the segmenter and writes the trailer to prevent corruption
+// close closes the segmenter and writes the trailer to prevent corruption
 // when exiting early in the middle of a segment.
-func (rs *RawSegmenter) Close() {
+func (rs *rawSegmenter) close() {
 	ret := C.av_write_trailer(rs.outCtx)
 	if ret < 0 {
 		rs.logger.Errorf("failed to write trailer", "error", ffmpegError(ret))
@@ -224,7 +224,7 @@ func (rs *RawSegmenter) Close() {
 // The SPS and PPS data are expected to be packed into the format listed above.
 func buildAVCExtradata(sps, pps []byte) ([]byte, error) {
 	if len(sps) < 4 || len(pps) < 1 {
-		return nil, fmt.Errorf("invalid SPS/PPS data")
+		return nil, errors.New("invalid SPS/PPS data")
 	}
 	extradata := []byte{}
 	// configurationVersion
@@ -232,11 +232,14 @@ func buildAVCExtradata(sps, pps []byte) ([]byte, error) {
 	// AVCProfileIndication, profile_compatibility, AVCLevelIndication (from SPS)
 	extradata = append(extradata, sps[1], sps[2], sps[3])
 	// 6 bits reserved (111111) + 2 bits lengthSizeMinusOne (3 for 4 bytes)
+	//nolint:mnd
 	extradata = append(extradata, 0xFF)
 	// 3 bits reserved (111) + 5 bits numOfSequenceParameterSets (usually 1)
+	//nolint:mnd
 	extradata = append(extradata, 0xE1)
 	// SPS length (2 bytes big-endian)
 	spsLen := uint16(len(sps))
+	//nolint:mnd
 	extradata = append(extradata, byte(spsLen>>8), byte(spsLen&0xff))
 	// SPS data
 	extradata = append(extradata, sps...)
@@ -244,6 +247,7 @@ func buildAVCExtradata(sps, pps []byte) ([]byte, error) {
 	extradata = append(extradata, 1)
 	// PPS length (2 bytes big-endian)
 	ppsLen := uint16(len(pps))
+	//nolint:mnd
 	extradata = append(extradata, byte(ppsLen>>8), byte(ppsLen&0xff))
 	// PPS data
 	extradata = append(extradata, pps...)

@@ -46,19 +46,19 @@ const (
 )
 
 var presets = map[string]struct{}{
-	"ultrafast": struct{}{},
-	"superfast": struct{}{},
-	"veryfast":  struct{}{},
-	"faster":    struct{}{},
-	"fast":      struct{}{},
-	"medium":    struct{}{},
-	"slow":      struct{}{},
-	"slower":    struct{}{},
-	"veryslow":  struct{}{},
+	"ultrafast": {},
+	"superfast": {},
+	"veryfast":  {},
+	"faster":    {},
+	"fast":      {},
+	"medium":    {},
+	"slow":      {},
+	"slower":    {},
+	"veryslow":  {},
 }
 
 type videostore struct {
-	config FrameVideoStoreConfig
+	config Config
 	logger logging.Logger
 
 	latestFrame atomic.Pointer[C.AVFrame]
@@ -70,12 +70,14 @@ type videostore struct {
 	concater    *concater
 }
 
+// VideoStore stores video and provides APIs to request the stored video
 type VideoStore interface {
-	Fetch(context.Context, *FetchRequest) (*FetchResponse, error)
-	Save(context.Context, *SaveRequest) (*SaveResponse, error)
-	Close(context.Context) error
+	Fetch(ctx context.Context, r *FetchRequest) (*FetchResponse, error)
+	Save(ctx context.Context, r *SaveRequest) (*SaveResponse, error)
+	Close(ctx context.Context) error
 }
 
+// SaveRequest is the request to the Save method
 type SaveRequest struct {
 	From     time.Time
 	To       time.Time
@@ -83,10 +85,12 @@ type SaveRequest struct {
 	Async    bool
 }
 
+// SaveResponse is the response to the Save method
 type SaveResponse struct {
 	Filename string
 }
 
+// Validate returns an error if the SaveRequest is invalid
 func (r *SaveRequest) Validate() error {
 	if r.From.After(r.To) {
 		return errors.New("'from' timestamp is after 'to' timestamp")
@@ -94,15 +98,18 @@ func (r *SaveRequest) Validate() error {
 	return nil
 }
 
+// FetchRequest is the request to the Fetch method
 type FetchRequest struct {
 	From time.Time
 	To   time.Time
 }
 
+// FetchResponse is the resonse to the Fetch method
 type FetchResponse struct {
 	Video []byte
 }
 
+// Validate returns an error if the FetchRequest is invalid
 func (r *FetchRequest) Validate() error {
 	if r.From.After(r.To) {
 		return errors.New("'from' timestamp is after 'to' timestamp")
@@ -110,7 +117,8 @@ func (r *FetchRequest) Validate() error {
 	return nil
 }
 
-func NewFrameVideoStore(_ context.Context, config FrameVideoStoreConfig, logger logging.Logger) (VideoStore, error) {
+// NewFramePollingVideoStore returns a VideoStore that stores video it encoded from polling frames from a camera.Camera
+func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.Logger) (VideoStore, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -136,7 +144,7 @@ func NewFrameVideoStore(_ context.Context, config FrameVideoStoreConfig, logger 
 
 	// Only initialize mime handler, encoder, segmenter, and frame processing routines
 	// if the source camera is available.
-	cameraAvailable := config.Camera != nil
+	cameraAvailable := config.FramePoller.Camera != nil
 	if cameraAvailable {
 		vs.mimeHandler = newMimeHandler(logger)
 		vs.encoder, err = newEncoder(
@@ -159,19 +167,26 @@ func NewFrameVideoStore(_ context.Context, config FrameVideoStoreConfig, logger 
 			return nil, err
 		}
 		// Start workers to process frames and clean up storage.
-		vs.workers = utils.NewBackgroundStoppableWorkers(func(ctx context.Context) { vs.fetchFrames(ctx, config.Camera) }, vs.processFrames, vs.deleter)
+		vs.workers = utils.NewBackgroundStoppableWorkers(
+			func(ctx context.Context) { vs.fetchFrames(ctx, config.FramePoller.Camera) },
+			vs.processFrames,
+			vs.deleter)
 	}
 
 	return vs, nil
 }
 
-func (vs *videostore) Fetch(ctx context.Context, r *FetchRequest) (*FetchResponse, error) {
+func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse, error) {
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
 	vs.logger.Debug("fetch command received")
 
-	fetchFilePath := generateOutputFilePath(vs.config.Storage.OutputFileNamePrefix, formatDateTimeToString(r.From), "", tempPath)
+	fetchFilePath := generateOutputFilePath(
+		vs.config.Storage.OutputFileNamePrefix,
+		formatDateTimeToString(r.From),
+		"",
+		tempPath)
 
 	if err := vs.concater.concat(r.From, r.To, fetchFilePath); err != nil {
 		vs.logger.Error("failed to concat files ", err)
@@ -191,9 +206,14 @@ func (vs *videostore) Fetch(ctx context.Context, r *FetchRequest) (*FetchRespons
 	return &FetchResponse{Video: videoBytes}, nil
 }
 
-func (vs *videostore) Save(ctx context.Context, r *SaveRequest) (*SaveResponse, error) {
+func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, error) {
 	vs.logger.Debug("save command received")
-	uploadFilePath := generateOutputFilePath(vs.config.Storage.OutputFileNamePrefix, formatDateTimeToString(r.From), r.Metadata, vs.config.Storage.UploadPath)
+	uploadFilePath := generateOutputFilePath(
+		vs.config.Storage.OutputFileNamePrefix,
+		formatDateTimeToString(r.From),
+		r.Metadata,
+		vs.config.Storage.UploadPath,
+	)
 	uploadFileName := filepath.Base(uploadFilePath)
 	if r.Async {
 		vs.logger.Debug("running save command asynchronously")

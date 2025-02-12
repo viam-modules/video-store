@@ -6,7 +6,6 @@ import (
 
 	videostore "github.com/viam-modules/video-store"
 	"go.viam.com/rdk/components/camera"
-	"go.viam.com/rdk/resource"
 	"go.viam.com/utils"
 )
 
@@ -106,8 +105,8 @@ func toFrameVideoStoreVideoConfig(
 	config *Config,
 	name string,
 	camera camera.Camera,
-) (videostore.FrameVideoStoreConfig, error) {
-	var zero videostore.FrameVideoStoreConfig
+) (videostore.Config, error) {
+	var zero videostore.Config
 	framerate := config.Framerate
 	if config.Framerate == 0 {
 		framerate = defaultFramerate
@@ -118,13 +117,13 @@ func toFrameVideoStoreVideoConfig(
 		return zero, err
 	}
 
-	fvsc := videostore.FrameVideoStoreConfig{
+	fvsc := videostore.Config{
 		Encoder: applyVideoEncoderDefaults(config.Video),
 		Storage: storage,
-		Camera:  camera,
 		FramePoller: videostore.FramePollerConfig{
 			Framerate: framerate,
 			YUYV:      config.YUYV,
+			Camera:    camera,
 		},
 	}
 
@@ -133,12 +132,4 @@ func toFrameVideoStoreVideoConfig(
 	}
 
 	return fvsc, nil
-}
-func init() {
-	resource.RegisterComponent(
-		camera.API,
-		Model,
-		resource.Registration[camera.Camera, *Config]{
-			Constructor: newvideostore,
-		})
 }

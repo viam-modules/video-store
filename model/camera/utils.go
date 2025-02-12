@@ -94,5 +94,4 @@ func checkDeps(deps resource.Dependencies, config *Config, logger logging.Logger
 	}
 
 	return nil
-
 }

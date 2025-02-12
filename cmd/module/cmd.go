@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 
+	videostore "github.com/viam-modules/video-store"
 	cam "github.com/viam-modules/video-store/model/camera"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
@@ -12,10 +13,15 @@ import (
 )
 
 func main() {
-	utils.ContextualMain(mainWithArgs, logging.NewLogger("video-store-module"))
+	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("[video-store-module]"))
 }
 
-func mainWithArgs(ctx context.Context, _ []string, _ logging.Logger) error {
+func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
+	if logger.GetLevel() == logging.DEBUG {
+		videostore.SetLibAVLogLevel("info")
+	} else {
+		videostore.SetLibAVLogLevel("error")
+	}
 	module, err := module.NewModuleFromArgs(ctx)
 	if err != nil {
 		return err

@@ -1,4 +1,4 @@
-// Package videostore contains the implementation of the video storage camera component.
+// Package camera contains the implementation of the video storage camera component.
 package camera
 
 /*
@@ -20,6 +20,13 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
+func init() {
+	resource.RegisterComponent(
+		camera.API,
+		Model,
+		resource.Registration[camera.Camera, *Config]{Constructor: newComponent})
+}
+
 // Model is the model for the video storage camera component.
 var Model = resource.ModelNamespace("viam").WithFamily("video").WithModel("storage")
 
@@ -33,7 +40,6 @@ const (
 	defaultVideoFormat    = "mp4"
 	defaultUploadPath     = ".viam/capture/video-upload"
 	defaultStoragePath    = ".viam/video-storage"
-	defaultLogLevel       = "error"
 
 	maxGRPCSize           = 1024 * 1024 * 32 // bytes
 	deleterInterval       = 10               // minutes
@@ -70,23 +76,21 @@ func newComponent(
 	// Source camera that provides the frames to be processed.
 	// If camera is not available, the component will start
 	// without processing frames.
-	cam, err := camera.FromDependencies(deps, config.Camera)
+	c, err := camera.FromDependencies(deps, config.Camera)
 	if err != nil {
 		logger.Error("failed to get camera from dependencies, video-store will not be storing video", err)
-		cam = nil
+		c = nil
 	}
 
-	vsConfig, err := toFrameVideoStoreVideoConfig(config, conf.ResourceName().Name, cam)
+	vsConfig, err := toFrameVideoStoreVideoConfig(config, conf.ResourceName().Name, c)
 	if err != nil {
 		return nil, err
 	}
 
-	vs, err := videostore.NewFrameVideoStore(ctx, vsConfig, logger)
+	vs, err := videostore.NewFramePollingVideoStore(ctx, vsConfig, logger)
 	if err != nil {
 		return nil, err
 	}
-
-	videostore.SetLibAVLogLevel(defaultLogLevel)
 
 	return &component{
 		name:       conf.ResourceName(),

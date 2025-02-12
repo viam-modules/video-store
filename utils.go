@@ -19,8 +19,10 @@ import (
 	"time"
 )
 
-// TODO(seanp): make this configurable
-// TODO: move to C api
+// SetLibAVLogLevel sets the libav log level.
+// this is global for the entire OS process.
+// valid inputs are "info", "warn", "error", "debug"
+// https://www.ffmpeg.org/doxygen/2.5/group__lavu__log__constants.html
 func SetLibAVLogLevel(level string) {
 	ffmppegLogLevel(lookupLogID(level))
 }
@@ -103,7 +105,7 @@ func lookupLogID(level string) C.int {
 	switch level {
 	case "error":
 		return C.AV_LOG_ERROR
-	case "warning":
+	case "warn":
 		return C.AV_LOG_WARNING
 	case "info":
 		return C.AV_LOG_INFO

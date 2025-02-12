@@ -10,14 +10,15 @@ import (
 	"go.viam.com/rdk/components/camera"
 )
 
-type FrameVideoStoreConfig struct {
-	Camera      camera.Camera
+// Config configures a videostore.
+type Config struct {
 	Storage     StorageConfig
 	Encoder     EncoderConfig
 	FramePoller FramePollerConfig
 }
 
-func (c *FrameVideoStoreConfig) Validate() error {
+// Validate returns an error if the Config is invalid.
+func (c *Config) Validate() error {
 	if err := c.Encoder.Validate(); err != nil {
 		return err
 	}
@@ -32,6 +33,7 @@ func (c *FrameVideoStoreConfig) Validate() error {
 	return nil
 }
 
+// StorageConfig is the config for storage.
 type StorageConfig struct {
 	SegmentSeconds       int
 	SizeGB               int
@@ -40,6 +42,7 @@ type StorageConfig struct {
 	StoragePath          string
 }
 
+// Validate returns an error if the StorageConfig is invalid.
 func (c StorageConfig) Validate() error {
 	var zero StorageConfig
 	if c == zero {
@@ -67,11 +70,13 @@ func (c StorageConfig) Validate() error {
 	return nil
 }
 
+// EncoderConfig is the config for the video encoder.
 type EncoderConfig struct {
 	Bitrate int
 	Preset  string
 }
 
+// Validate returns an error if the EncoderConfig is invalid.
 func (c EncoderConfig) Validate() error {
 	var zero EncoderConfig
 	if c == zero {
@@ -88,11 +93,14 @@ func (c EncoderConfig) Validate() error {
 	return nil
 }
 
+// FramePollerConfig is the config for the frame poller.
 type FramePollerConfig struct {
+	Camera    camera.Camera
 	Framerate int
 	YUYV      bool
 }
 
+// Validate returns an error if the	FramePollerConfig is invalid.
 func (c FramePollerConfig) Validate() error {
 	var zero FramePollerConfig
 	if c == zero {
