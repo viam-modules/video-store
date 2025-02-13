@@ -13,6 +13,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"unsafe"
 
 	"go.viam.com/rdk/logging"
@@ -21,6 +22,7 @@ import (
 type rawSegmenter struct {
 	logger      logging.Logger
 	storagePath string
+	outCtxMu    sync.Mutex
 	outCtx      *C.AVFormatContext
 }
 
@@ -41,6 +43,11 @@ func newRawSegmenter(
 }
 
 func (rs *rawSegmenter) init(codecID C.enum_AVCodecID, sps, pps []byte) error {
+	rs.outCtxMu.Lock()
+	defer rs.outCtxMu.Unlock()
+	if rs.outCtx != nil {
+		return errors.New("*rawSegmenter init called more than once")
+	}
 	// Allocate output context for segmenter. The "segment" format is a special format
 	// that allows for segmenting output files. The output pattern is a strftime pattern
 	// that specifies the output file name. The pattern is set to the current time.
@@ -153,6 +160,8 @@ func (rs *rawSegmenter) init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 }
 
 func (rs *rawSegmenter) writePacket(payload []byte, pts int64, isIDR bool) error {
+	rs.outCtxMu.Lock()
+	defer rs.outCtxMu.Unlock()
 	// Stuff the bytes payload and timestamps into an AV Packet.
 	avpkt := C.av_packet_alloc()
 	if avpkt == nil {
@@ -192,6 +201,11 @@ func (rs *rawSegmenter) writePacket(payload []byte, pts int64, isIDR bool) error
 // close closes the segmenter and writes the trailer to prevent corruption
 // when exiting early in the middle of a segment.
 func (rs *rawSegmenter) close() {
+	rs.outCtxMu.Lock()
+	defer rs.outCtxMu.Unlock()
+	if rs.outCtx == nil {
+		return
+	}
 	ret := C.av_write_trailer(rs.outCtx)
 	if ret < 0 {
 		rs.logger.Errorf("failed to write trailer", "error", ffmpegError(ret))

@@ -57,16 +57,25 @@ var presets = map[string]struct{}{
 	"veryslow":  {},
 }
 
+type videoStoreType int
+
+const (
+	videoStoreTypeUnknown videoStoreType = iota
+	videoStoreTypeFrame
+	videoStoreTypeRTPPacket
+)
+
 type videostore struct {
+	typ    videoStoreType
 	config Config
 	logger logging.Logger
 
 	latestFrame atomic.Pointer[C.AVFrame]
 	workers     *utils.StoppableWorkers
 
-	// encoder   *encoder
-	segmenter *segmenter
-	concater  *concater
+	rawSegmenter *rawSegmenter
+	segmenter    *segmenter
+	concater     *concater
 }
 
 // VideoStore stores video and provides APIs to request the stored video
@@ -74,6 +83,12 @@ type VideoStore interface {
 	Fetch(ctx context.Context, r *FetchRequest) (*FetchResponse, error)
 	Save(ctx context.Context, r *SaveRequest) (*SaveResponse, error)
 	Close(ctx context.Context) error
+}
+
+// RTPVideoStore stores video derived from RTP packets and provides APIs to request the stored video
+type RTPVideoStore interface {
+	VideoStore
+	WritePacket(payload []byte, pts int64, isIDR bool) error
 }
 
 // SaveRequest is the request to the Save method
@@ -116,8 +131,8 @@ func (r *FetchRequest) Validate() error {
 	return nil
 }
 
-// NewFramePollingVideoStore returns a VideoStore that stores video it encoded from polling frames from a camera.Camera
-func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.Logger) (VideoStore, error) {
+// NewH264RTPVideoStore returns a VideoStore that stores video it receives from the caller
+func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logger) (RTPVideoStore, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -172,6 +187,46 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 	}
 
 	return vs, nil
+}
+
+// NewFramePollingVideoStore returns a VideoStore that stores video it encoded from polling frames from a camera.Camera
+func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.Logger) (VideoStore, error) {
+	if err := config.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := createDir(config.Storage.UploadPath); err != nil {
+		return nil, err
+	}
+
+	concater, err := newConcater(
+		logger,
+		config.Storage.StoragePath,
+		config.Storage.UploadPath,
+		config.Storage.SegmentSeconds,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rawSegmenter, err := newRawSegmenter(logger, config.Storage.StoragePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return &videostore{
+		concater:     concater,
+		rawSegmenter: rawSegmenter,
+		logger:       logger,
+		config:       config,
+	}, nil
+}
+
+func (vs *videostore) WritePacket(payload []byte, pts int64, isIDR bool) error {
+	if vs.typ != videoStoreTypeRTPPacket {
+		return errors.New("WritePacket unimplmeented")
+	}
+	return vs.rawSegmenter.writePacket(payload, pts, isIDR)
 }
 
 func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse, error) {

@@ -227,7 +227,6 @@ func (s *segmenter) cleanupStorage() error {
 func (s *segmenter) close() {
 	s.outCtxMu.Lock()
 	defer s.outCtxMu.Unlock()
-	s.logger.Infof("outCtx: %p", s.outCtx)
 	if s.outCtx == nil {
 		return
 	}
