@@ -499,15 +499,13 @@ func (vs *videostore) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gos
 }
 
 func (vs *videostore) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
-	// Return a single empty byte to satisfy the Image method
-	// avoiding errors from the RenderFrame GRPC call.
-	return []byte{0}, camera.ImageMetadata{}, nil
+	return nil, camera.ImageMetadata{}, errors.New("camera.Image not implemented")
 }
 
 func (vs *videostore) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
-	return nil, resource.ResponseMetadata{}, errors.New("not implemented")
+	return nil, resource.ResponseMetadata{}, errors.New("camera.Images not implemented")
 }
 
 func (vs *videostore) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
-	return nil, errors.New("not implemented")
+	return nil, errors.New("camera.NextPointCloud not implemented")
 }
