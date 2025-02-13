@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"unsafe"
 
 	"go.viam.com/rdk/logging"
@@ -27,6 +28,7 @@ const (
 
 type segmenter struct {
 	logger         logging.Logger
+	outCtxMu       sync.Mutex
 	outCtx         *C.AVFormatContext
 	stream         *C.AVStream
 	frameCount     int64
@@ -65,6 +67,8 @@ func newSegmenter(
 
 // initialize takes in a codec ctx and initializes the segmenter with the codec parameters.
 func (s *segmenter) initialize(codecCtx *C.AVCodecContext) error {
+	s.outCtxMu.Lock()
+	defer s.outCtxMu.Unlock()
 	if s.outCtx != nil {
 		ret := C.av_write_trailer(s.outCtx)
 		if ret < 0 {
@@ -161,6 +165,8 @@ func (s *segmenter) initialize(codecCtx *C.AVCodecContext) error {
 
 // writeEncodedFrame writes an encoded frame to the output segment file.
 func (s *segmenter) writeEncodedFrame(encodedData []byte, pts, dts int64) error {
+	s.outCtxMu.Lock()
+	defer s.outCtxMu.Unlock()
 	if s.outCtx == nil {
 		return errors.New("segmenter not initialized")
 	}
@@ -217,6 +223,12 @@ func (s *segmenter) cleanupStorage() error {
 // Close closes the segmenter and writes the trailer to prevent corruption
 // when exiting early in the middle of a segment.
 func (s *segmenter) close() {
+	s.outCtxMu.Lock()
+	defer s.outCtxMu.Unlock()
+	s.logger.Infof("outCtx: %p", s.outCtx)
+	if s.outCtx == nil {
+		return
+	}
 	ret := C.av_write_trailer(s.outCtx)
 	if ret < 0 {
 		s.logger.Errorf("failed to write trailer", "error", ffmpegError(ret))
