@@ -41,7 +41,6 @@ type Config struct {
 	Storage     StorageConfig
 	Encoder     EncoderConfig
 	FramePoller FramePollerConfig
-	RTPConfig   RTPConfig
 }
 
 // Validate returns an error if the Config is invalid.
@@ -60,12 +59,6 @@ func (c *Config) Validate() error {
 		}
 
 		if err := c.FramePoller.Validate(); err != nil {
-			return err
-		}
-	}
-
-	if c.Type == SourceTypeH264RTPPacket {
-		if err := c.RTPConfig.Validate(); err != nil {
 			return err
 		}
 	}
