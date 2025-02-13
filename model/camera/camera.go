@@ -172,9 +172,7 @@ func (c *component) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostr
 }
 
 func (c *component) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
-	// Return a single empty byte to satisfy the Image method
-	// avoiding errors from the RenderFrame GRPC call.
-	return []byte{0}, camera.ImageMetadata{}, nil
+	return nil, camera.ImageMetadata{}, errors.New("not implemented")
 }
 
 func (c *component) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {

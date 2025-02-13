@@ -189,6 +189,8 @@ func (s *segmenter) writeEncodedFrame(encodedData []byte, pts, dts int64) error 
 // cleanupStorage cleans up the storage directory by deleting the oldest files
 // until the storage size is below the max.
 func (s *segmenter) cleanupStorage() error {
+	s.logger.Info("cleanupStorage start")
+	defer s.logger.Info("cleanupStorage stop")
 	currStorageSize, err := getDirectorySize(s.storagePath)
 	if err != nil {
 		return err

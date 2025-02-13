@@ -36,7 +36,7 @@ const (
 	defaultLogLevel       = "error"
 
 	maxGRPCSize           = 1024 * 1024 * 32 // bytes
-	deleterInterval       = 10               // minutes
+	deleterInterval       = 1                // minutes
 	retryInterval         = 1                // seconds
 	asyncTimeout          = 60               // seconds
 	numFetchFrameAttempts = 3                // iterations
@@ -331,8 +331,7 @@ func (vs *videostore) deleter(ctx context.Context) {
 			return
 		case <-ticker.C:
 			// Perform the deletion of the oldest clip
-			err := vs.segmenter.cleanupStorage()
-			if err != nil {
+			if err := vs.segmenter.cleanupStorage(); err != nil {
 				vs.logger.Error("failed to clean up storage", err)
 				continue
 			}
