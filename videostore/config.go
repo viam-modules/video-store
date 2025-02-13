@@ -10,8 +10,30 @@ import (
 	"go.viam.com/rdk/components/camera"
 )
 
+type VideoStoreType int
+
+const (
+	VideoStoreTypeUnknown VideoStoreType = iota
+	VideoStoreTypeFrame
+	VideoStoreTypeRTPPacket
+)
+
+func (t VideoStoreType) String() string {
+	switch t {
+	case VideoStoreTypeUnknown:
+		return "VideoStoreTypeUnknown"
+	case VideoStoreTypeFrame:
+		return "VideoStoreTypeFrame"
+	case VideoStoreTypeRTPPacket:
+		return "VideoStoreTypeRTPPacket"
+	default:
+		return "VideoStoreTypeUnknown"
+	}
+}
+
 // Config configures a videostore.
 type Config struct {
+	Type        VideoStoreType
 	Storage     StorageConfig
 	Encoder     EncoderConfig
 	FramePoller FramePollerConfig
@@ -19,16 +41,23 @@ type Config struct {
 
 // Validate returns an error if the Config is invalid.
 func (c *Config) Validate() error {
-	if err := c.Encoder.Validate(); err != nil {
-		return err
+	if c.Type == VideoStoreTypeUnknown {
+		return fmt.Errorf("video store type can't be %s", c.Type)
 	}
 
 	if err := c.Storage.Validate(); err != nil {
 		return err
 	}
 
-	if err := c.FramePoller.Validate(); err != nil {
-		return err
+	if c.Type == VideoStoreTypeFrame {
+
+		if err := c.Encoder.Validate(); err != nil {
+			return err
+		}
+
+		if err := c.FramePoller.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
