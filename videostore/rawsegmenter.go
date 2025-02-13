@@ -43,6 +43,7 @@ func newRawSegmenter(
 }
 
 func (rs *rawSegmenter) initH264(sps, pps []byte) error {
+	rs.logger.Info("initH264 called")
 	rs.outCtxMu.Lock()
 	defer rs.outCtxMu.Unlock()
 	if rs.outCtx != nil {
