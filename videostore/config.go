@@ -18,8 +18,8 @@ const (
 	SourceTypeUnknown SourceType = iota
 	// SourceTypeFrame is a video store that creates a video from frames.
 	SourceTypeFrame
-	// SourceTypeRTPPacket is a video store that creates a video from rtp packets.
-	SourceTypeRTPPacket
+	// SourceTypeH264RTPPacket is a video store that creates a video from rtp packets.
+	SourceTypeH264RTPPacket
 )
 
 func (t SourceType) String() string {
@@ -28,8 +28,8 @@ func (t SourceType) String() string {
 		return "VideoStoreTypeUnknown"
 	case SourceTypeFrame:
 		return "VideoStoreTypeFrame"
-	case SourceTypeRTPPacket:
-		return "VideoStoreTypeRTPPacket"
+	case SourceTypeH264RTPPacket:
+		return "SourceTypeH264RTPPacket"
 	default:
 		return "VideoStoreTypeUnknown"
 	}
@@ -41,6 +41,7 @@ type Config struct {
 	Storage     StorageConfig
 	Encoder     EncoderConfig
 	FramePoller FramePollerConfig
+	RTPConfig   RTPConfig
 }
 
 // Validate returns an error if the Config is invalid.
@@ -62,6 +63,13 @@ func (c *Config) Validate() error {
 			return err
 		}
 	}
+
+	if c.Type == SourceTypeH264RTPPacket {
+		if err := c.RTPConfig.Validate(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -141,6 +149,20 @@ func (c FramePollerConfig) Validate() error {
 
 	if c.Framerate <= 0 {
 		return errors.New("framerate can't be less than or equal to 0")
+	}
+
+	return nil
+}
+
+// RTPConfig is the config for the rtp packet video source.
+type RTPConfig struct {
+	sps, pps []byte
+}
+
+// Validate returns an error if the	RTPConfig is invalid.
+func (c RTPConfig) Validate() error {
+	if len(c.sps) == 0 || len(c.pps) == 0 {
+		return errors.New("rtp config must have both sps & pps")
 	}
 
 	return nil

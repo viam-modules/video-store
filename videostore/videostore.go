@@ -188,7 +188,7 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 
 // NewH264RTPVideoStore returns a VideoStore that stores video it receives from the caller
 func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logger) (RTPVideoStore, error) {
-	if config.Type != SourceTypeRTPPacket {
+	if config.Type != SourceTypeH264RTPPacket {
 		return nil, fmt.Errorf("config type must be %s", SourceTypeFrame)
 	}
 	if err := config.Validate(); err != nil {
@@ -214,6 +214,10 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 		return nil, err
 	}
 
+	if err := rawSegmenter.initH264(config.RTPConfig.sps, config.RTPConfig.pps); err != nil {
+		return nil, err
+	}
+
 	return &videostore{
 		typ:          config.Type,
 		concater:     concater,
@@ -225,7 +229,7 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 }
 
 func (vs *videostore) WritePacket(payload []byte, pts int64, isIDR bool) error {
-	if vs.typ != SourceTypeRTPPacket {
+	if vs.typ != SourceTypeH264RTPPacket {
 		return errors.New("WritePacket unimplmeented")
 	}
 	return vs.rawSegmenter.writePacket(payload, pts, isIDR)
@@ -429,6 +433,9 @@ func (vs *videostore) Close(_ context.Context) error {
 	}
 	if vs.segmenter != nil {
 		vs.segmenter.close()
+	}
+	if vs.rawSegmenter != nil {
+		vs.rawSegmenter.close()
 	}
 	return nil
 }

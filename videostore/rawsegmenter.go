@@ -42,7 +42,7 @@ func newRawSegmenter(
 	return s, nil
 }
 
-func (rs *rawSegmenter) init(codecID C.enum_AVCodecID, sps, pps []byte) error {
+func (rs *rawSegmenter) initH264(sps, pps []byte) error {
 	rs.outCtxMu.Lock()
 	defer rs.outCtxMu.Unlock()
 	if rs.outCtx != nil {
@@ -73,7 +73,7 @@ func (rs *rawSegmenter) init(codecID C.enum_AVCodecID, sps, pps []byte) error {
 	stream.time_base.den = 1000
 
 	// Set the codec parameters for the output stream.
-	codec := C.avcodec_find_encoder(codecID)
+	codec := C.avcodec_find_encoder(C.AV_CODEC_ID_H264)
 	if codec == nil {
 		return errors.New("failed to find codec")
 	}
