@@ -16,6 +16,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"go.viam.com/rdk/logging"
 )
 
@@ -48,6 +49,11 @@ func newRawSegmenter(
 func (rs *rawSegmenter) initH264(sps, pps []byte) error {
 	if len(sps) == 0 || len(pps) == 0 {
 		return errors.New("both sps & pps must not be empty")
+	}
+
+	var hsps h264.SPS
+	if err := hsps.Unmarshal(sps); err != nil {
+		return err
 	}
 	rs.outCtxMu.Lock()
 	defer rs.outCtxMu.Unlock()
@@ -88,10 +94,11 @@ func (rs *rawSegmenter) initH264(sps, pps []byte) error {
 	if codecCtx == nil {
 		return errors.New("failed to allocate codec context")
 	}
+
 	// TODO(seanp); Size and pixel format is hardcoded for now. Need to make this dynamic.
 	// Maybe we can get this from ONVIF or the RTSP stream SDP.
-	codecCtx.width = 704
-	codecCtx.height = 480
+	codecCtx.width = C.int(hsps.Width())
+	codecCtx.height = C.int(hsps.Height())
 	codecCtx.pix_fmt = C.AV_PIX_FMT_YUV420P
 	codecCtx.time_base.num = 1
 	codecCtx.time_base.den = 1000
