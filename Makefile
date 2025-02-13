@@ -54,7 +54,7 @@ export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 build: $(BIN_OUTPUT_PATH)/video-store
 
-$(BIN_OUTPUT_PATH)/video-store: *.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
+$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
 	go mod tidy
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
 	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
@@ -107,7 +107,7 @@ ifeq ($(shell which artifact > /dev/null 2>&1; echo $$?), 1)
 endif
 	artifact pull
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go test -v ./tests/ .
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go test -v ./...
 	rm bin/video-store
 
 module: $(BIN_OUTPUT_PATH)/video-store
@@ -116,7 +116,7 @@ module: $(BIN_OUTPUT_PATH)/video-store
 	rm bin/video-store
 
 clean:
-	rm -rf $(BIN_OUTPUT_PATH)
+	rm -rf bin
 	rm -f $(BUILD_TAG_FILE)
 
 clean-ffmpeg: 

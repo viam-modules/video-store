@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	videostore "github.com/viam-modules/video-store"
+	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/utils"
 )

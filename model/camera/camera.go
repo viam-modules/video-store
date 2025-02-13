@@ -12,7 +12,7 @@ import (
 	"encoding/base64"
 	"errors"
 
-	videostore "github.com/viam-modules/video-store"
+	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/gostream"
 	"go.viam.com/rdk/logging"

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	videostore "github.com/viam-modules/video-store"
+	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 )
