@@ -20,19 +20,22 @@ import (
 )
 
 type rawSegmenter struct {
-	logger      logging.Logger
-	storagePath string
-	outCtxMu    sync.Mutex
-	outCtx      *C.AVFormatContext
+	logger         logging.Logger
+	storagePath    string
+	segmentSeconds int
+	outCtxMu       sync.Mutex
+	outCtx         *C.AVFormatContext
 }
 
 func newRawSegmenter(
 	logger logging.Logger,
 	storagePath string,
+	segmentSeconds int,
 ) (*rawSegmenter, error) {
 	s := &rawSegmenter{
-		logger:      logger,
-		storagePath: storagePath,
+		logger:         logger,
+		storagePath:    storagePath,
+		segmentSeconds: segmentSeconds,
 	}
 	err := createDir(s.storagePath)
 	if err != nil {
@@ -43,7 +46,9 @@ func newRawSegmenter(
 }
 
 func (rs *rawSegmenter) initH264(sps, pps []byte) error {
-	rs.logger.Info("initH264 called")
+	if len(sps) == 0 || len(pps) == 0 {
+		return errors.New("both sps & pps must not be empty")
+	}
 	rs.outCtxMu.Lock()
 	defer rs.outCtxMu.Unlock()
 	if rs.outCtx != nil {
@@ -163,6 +168,9 @@ func (rs *rawSegmenter) initH264(sps, pps []byte) error {
 func (rs *rawSegmenter) writePacket(payload []byte, pts int64, isIDR bool) error {
 	rs.outCtxMu.Lock()
 	defer rs.outCtxMu.Unlock()
+	if rs.outCtx == nil {
+		return errors.New("writePacket called before initH264")
+	}
 	// Stuff the bytes payload and timestamps into an AV Packet.
 	avpkt := C.av_packet_alloc()
 	if avpkt == nil {

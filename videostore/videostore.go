@@ -78,9 +78,10 @@ type VideoStore interface {
 	Close(ctx context.Context) error
 }
 
-// RTPVideoStore stores video derived from RTP packets and provides APIs to request the stored video
-type RTPVideoStore interface {
+// H264RTPVideoStore stores h264 video derived from RTP packets and provides APIs to request the stored video
+type H264RTPVideoStore interface {
 	VideoStore
+	InitH264(sps, pps []byte) error
 	WritePacket(payload []byte, pts int64, isIDR bool) error
 }
 
@@ -187,7 +188,7 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 }
 
 // NewH264RTPVideoStore returns a VideoStore that stores video it receives from the caller
-func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logger) (RTPVideoStore, error) {
+func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logger) (H264RTPVideoStore, error) {
 	if config.Type != SourceTypeH264RTPPacket {
 		return nil, fmt.Errorf("config type must be %s", SourceTypeFrame)
 	}
@@ -209,12 +210,8 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 		return nil, err
 	}
 
-	rawSegmenter, err := newRawSegmenter(logger, config.Storage.StoragePath)
+	rawSegmenter, err := newRawSegmenter(logger, config.Storage.StoragePath, config.Storage.SegmentSeconds)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := rawSegmenter.initH264(config.RTPConfig.sps, config.RTPConfig.pps); err != nil {
 		return nil, err
 	}
 
@@ -226,6 +223,13 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 		config:       config,
 		workers:      utils.NewBackgroundStoppableWorkers(),
 	}, nil
+}
+
+func (vs *videostore) InitH264(sps, pps []byte) error {
+	if vs.typ != SourceTypeH264RTPPacket {
+		return errors.New("InitH264 unimplmeented")
+	}
+	return vs.rawSegmenter.initH264(sps, pps)
 }
 
 func (vs *videostore) WritePacket(payload []byte, pts int64, isIDR bool) error {

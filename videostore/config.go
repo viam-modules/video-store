@@ -153,17 +153,3 @@ func (c FramePollerConfig) Validate() error {
 
 	return nil
 }
-
-// RTPConfig is the config for the rtp packet video source.
-type RTPConfig struct {
-	sps, pps []byte
-}
-
-// Validate returns an error if the	RTPConfig is invalid.
-func (c RTPConfig) Validate() error {
-	if len(c.sps) == 0 || len(c.pps) == 0 {
-		return errors.New("rtp config must have both sps & pps")
-	}
-
-	return nil
-}
