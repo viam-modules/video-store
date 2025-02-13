@@ -10,21 +10,25 @@ import (
 	"go.viam.com/rdk/components/camera"
 )
 
-type VideoStoreType int
+// SourceType describes the type of video source.
+type SourceType int
 
 const (
-	VideoStoreTypeUnknown VideoStoreType = iota
-	VideoStoreTypeFrame
-	VideoStoreTypeRTPPacket
+	// SourceTypeUnknown is an invalid type.
+	SourceTypeUnknown SourceType = iota
+	// SourceTypeFrame is a video store that creates a video from frames.
+	SourceTypeFrame
+	// SourceTypeRTPPacket is a video store that creates a video from rtp packets.
+	SourceTypeRTPPacket
 )
 
-func (t VideoStoreType) String() string {
+func (t SourceType) String() string {
 	switch t {
-	case VideoStoreTypeUnknown:
+	case SourceTypeUnknown:
 		return "VideoStoreTypeUnknown"
-	case VideoStoreTypeFrame:
+	case SourceTypeFrame:
 		return "VideoStoreTypeFrame"
-	case VideoStoreTypeRTPPacket:
+	case SourceTypeRTPPacket:
 		return "VideoStoreTypeRTPPacket"
 	default:
 		return "VideoStoreTypeUnknown"
@@ -33,7 +37,7 @@ func (t VideoStoreType) String() string {
 
 // Config configures a videostore.
 type Config struct {
-	Type        VideoStoreType
+	Type        SourceType
 	Storage     StorageConfig
 	Encoder     EncoderConfig
 	FramePoller FramePollerConfig
@@ -41,7 +45,7 @@ type Config struct {
 
 // Validate returns an error if the Config is invalid.
 func (c *Config) Validate() error {
-	if c.Type == VideoStoreTypeUnknown {
+	if c.Type == SourceTypeUnknown {
 		return fmt.Errorf("video store type can't be %s", c.Type)
 	}
 
@@ -49,8 +53,7 @@ func (c *Config) Validate() error {
 		return err
 	}
 
-	if c.Type == VideoStoreTypeFrame {
-
+	if c.Type == SourceTypeFrame {
 		if err := c.Encoder.Validate(); err != nil {
 			return err
 		}
