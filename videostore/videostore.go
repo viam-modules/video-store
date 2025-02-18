@@ -406,7 +406,8 @@ func (vs *videostore) deleter(ctx context.Context) {
 // is written to storage before concatenation.
 // TODO: (seanp) Optimize this to immediately run as soon as the current segment is completed.
 func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path string) {
-	segmentDur := time.Duration(vs.rawSegmenter.segmentSeconds) * time.Second
+	// TODO: change this to be hard coded
+	segmentDur := time.Duration(vs.config.Storage.SegmentSeconds) * time.Second
 	totalTimeout := time.Duration(asyncTimeout)*time.Second + segmentDur
 	ctx, cancel := context.WithTimeout(ctx, totalTimeout)
 	defer cancel()
