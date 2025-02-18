@@ -1,3 +1,4 @@
+// package main concatinates video files in a storage directory
 package main
 
 import (
@@ -55,7 +56,8 @@ func main() {
 		logger.Fatal(err.Error())
 	}
 
-	if err := os.WriteFile(fmt.Sprintf("%s_%s.mp4", os.Args[2], os.Args[3]), res.Video, 0o660); err != nil {
+	//nolint:mnd
+	if err := os.WriteFile(fmt.Sprintf("%s_%s.mp4", os.Args[2], os.Args[3]), res.Video, 0o600); err != nil {
 		logger.Fatal(err.Error())
 	}
 }

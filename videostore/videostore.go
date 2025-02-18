@@ -77,6 +77,7 @@ type VideoStore interface {
 	Close(ctx context.Context) error
 }
 
+// Concater concatinates video files within the time range
 type Concater interface {
 	Concat(from, to time.Time, path string) error
 }
@@ -203,7 +204,7 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 		return nil, err
 	}
 
-	concater, err := newRtpConcater(
+	concater, err := newRTPConcater(
 		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
