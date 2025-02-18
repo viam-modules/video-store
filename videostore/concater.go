@@ -59,7 +59,9 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 		return err
 	}
 	if len(storageFiles) == 0 {
-		return errors.New("no video data in storage")
+		err := errors.New("no video data in storage")
+		c.logger.Errorf("%s, path: %s", err.Error(), path)
+		return err
 	}
 	err = validateTimeRange(storageFiles, from, to)
 	if err != nil {
@@ -178,6 +180,10 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 		// Any error other than EOF is a problem.
 		if ret < 0 {
 			return fmt.Errorf("failed to read frame: %s", ffmpegError(ret))
+		}
+		if int(packet.flags)&(C.AV_PKT_FLAG_DISCARD) == (C.AV_PKT_FLAG_DISCARD) {
+			c.logger.Info("packet is to be discarded")
+			continue
 		}
 		// Can have multiple streams, so need to adjust each packet based on the
 		// stream it belongs to.
