@@ -9,6 +9,7 @@ import (
 	"go.viam.com/utils"
 )
 
+// Storage is the config for storge.
 type Storage struct {
 	SegmentSeconds int    `json:"segment_seconds,omitempty"`
 	SizeGB         int    `json:"size_gb"`
@@ -16,6 +17,7 @@ type Storage struct {
 	StoragePath    string `json:"storage_path,omitempty"`
 }
 
+// Video is the config for storge.
 type Video struct {
 	Codec   string `json:"codec,omitempty"`
 	Bitrate int    `json:"bitrate,omitempty"`
@@ -101,6 +103,7 @@ func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, err
 	}, nil
 }
 
+// ToFrameVideoStoreVideoConfig converts a Config into a videostore.Config.
 func ToFrameVideoStoreVideoConfig(
 	config *Config,
 	name string,

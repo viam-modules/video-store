@@ -19,6 +19,7 @@ func getHomeDir() (string, error) {
 	return home, nil
 }
 
+// ToSaveCommand converts a do command to a *videostore.SaveRequest.
 func ToSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, error) {
 	fromStr, ok := command["from"].(string)
 	if !ok {
@@ -52,6 +53,7 @@ func ToSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, err
 	}, nil
 }
 
+// ToFetchCommand converts a do command to a *videostore.FetchRequest.
 func ToFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, error) {
 	fromStr, ok := command["from"].(string)
 	if !ok {

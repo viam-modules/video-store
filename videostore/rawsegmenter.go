@@ -13,6 +13,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"unsafe"
 
@@ -126,7 +127,7 @@ func (rs *rawSegmenter) initH264(sps, pps []byte) error {
 
 	// Set up segmenting parameters.
 	// TODO(seanp): Make these configurable.
-	segmentLengthCStr := C.CString(fmt.Sprint(rs.segmentSeconds))
+	segmentLengthCStr := C.CString(strconv.Itoa(rs.segmentSeconds))
 	segmentFormatCStr := C.CString("mp4")
 	resetTimestampsCStr := C.CString("1")
 	strftimeCStr := C.CString("1")
