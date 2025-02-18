@@ -45,7 +45,6 @@ Copy and paste the following attributes into your JSON configuration:
   "camera": "<source-camera-name>",
   "sync": "<data-manager-service-name>",
   "storage": {
-    "segment_seconds": <int>,
     "size_gb": <int>,
   }
 }
@@ -57,22 +56,21 @@ Additionally, make sure to add your configured data manager service to the `depe
 
 ### Attributes
 
-| Attribute       | Sub-Attribute     | Type    | Inclusion | Description                                                                                       |
+| Attribute       | Sub-Attribute     | Type    | Required | Description                                                                                       |
 |-----------------|-------------------|---------|-----------|---------------------------------------------------------------------------------------------------|
-| `camera`        |                   | string  | optional  | Name of the source camera to read images from. If not provided, video-store will not save video.  |
-| `sync`          |                   | string  | required  | Name of the dependency datamanager service.                                                       |
-| `storage`       |                   | object  | required  |                                                                                                   |
-|                 | `segment_seconds` | integer | optional  | Length in seconds of the individual segment video files.                                          |
-|                 | `size_gb`         | integer | required  | Total amount of allocated storage in gigabytes.                                                   |
-|                 | `storage_path`    | string  | optional  | Custom path to use for video storage.                                                             |
-|                 | `upload_path`     | string  | optional  | Custom path to use for uploading files. If not under `~/.viam/capture`, you will need to add to `additional_sync_paths` in datamanager service configuration. |
-| `video`         |                   | object  | optional  |                                                                                                   |
-|                 | `format`          | string  | optional  | Name of video format to use (e.g., mp4).                                                          |
-|                 | `codec`           | string  | optional  | Name of video codec to use (e.g., h264).                                                          |
-|                 | `bitrate`         | integer | optional  | Throughput of encoder in bits per second. Higher for better quality video, and lower for better storage efficiency. |
-|                 | `preset`          | string  | optional  | Name of codec video preset to use. See [here](https://trac.ffmpeg.org/wiki/Encode/H.264#a2.Chooseapresetandtune) for preset options.                                                                |
-| `framerate`     |                   | integer | optional  | Frame rate of the video in frames per second. Default value is 20 if not set.                      |
-| `yuyv`          |                   | bool    | optional  | Flag to request an "image/yuyv422" MIME type.                                                     |
+| `camera`        |                   | string  | no  | Name of the source camera to read images from. If not provided, video-store will not save video.  |
+| `sync`          |                   | string  | yes  | Name of the dependency datamanager service.                                                       |
+| `storage`       |                   | object  | yes  |                                                                                                   |
+|                 | `size_gb`         | integer | yes  | Total amount of allocated storage in gigabytes.                                                   |
+|                 | `storage_path`    | string  | no  | Custom path to use for video storage.                                                             |
+|                 | `upload_path`     | string  | no  | Custom path to use for uploading files. If not under `~/.viam/capture`, you will need to add to `additional_sync_paths` in datamanager service configuration. |
+| `video`         |                   | object  | no  |                                                                                                   |
+|                 | `format`          | string  | no  | Name of video format to use (e.g., mp4).                                                          |
+|                 | `codec`           | string  | no  | Name of video codec to use (e.g., h264).                                                          |
+|                 | `bitrate`         | integer | no  | Throughput of encoder in bits per second. Higher for better quality video, and lower for better storage efficiency. |
+|                 | `preset`          | string  | no  | Name of codec video preset to use. See [here](https://trac.ffmpeg.org/wiki/Encode/H.264#a2.Chooseapresetandtune) for preset options.                                                                |
+| `framerate`     |                   | integer | no  | Frame rate of the video in frames per second. Default value is 20 if not set.                      |
+| `yuyv`          |                   | bool    | no  | Flag to request an "image/yuyv422" MIME type.                                                     |
 
 ### Example Configuration
 
@@ -86,7 +84,6 @@ Additionally, make sure to add your configured data manager service to the `depe
     "camera": "wc-cam"
     "sync": "data-manager",
     "storage": {
-      "segment_seconds": 10,
       "size_gb": 50,
     }
   },
