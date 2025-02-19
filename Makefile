@@ -42,14 +42,6 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-bsf=h264_mp4toannexb \
                --enable-decoder=mjpeg
 
-# CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lswscale -lz
-# ifeq ($(SOURCE_OS),linux)
-# 	CGO_LDFLAGS += -l:libx264.a
-# endif
-# ifeq ($(SOURCE_OS),darwin)
-# 	CGO_LDFLAGS += $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a -liconv
-# endif
-
 GOFLAGS := -buildvcs=false
 SRC_DIR := src
 BUILD_DIR := build/$(TARGET_OS)-$(TARGET_ARCH)
@@ -89,7 +81,8 @@ $(BUILD_DIR)/libviamav.a:
 $(BIN_OUTPUT_PATH)/concat-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
 	rm -f $(BIN_OUTPUT_PATH)/concat-c
-	$(CC) $(OBJS) $(LDFLAGS) $(CFLAGS) -o $(BIN_OUTPUT_PATH)/concat-c
+	mkdir -p $(BUILD_DIR)
+	$(CC) $(OBJS) $(LDFLAGS) -ldl $(CFLAGS) -o $(BIN_OUTPUT_PATH)/concat-c
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo "-------- Make $(@) --------"
@@ -163,9 +156,9 @@ module: $(BIN_OUTPUT_PATH)/video-store
 clean:
 	rm -rf bin
 	rm -f $(BUILD_TAG_FILE)
-	rm -rf $(BUILD_DIR)
+	rm -rf build
 
-clean-ffmpeg: 
+clean-ffmpeg: clean
 	rm -rf FFmpeg
 
 clean-all: clean clean-ffmpeg
