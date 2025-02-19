@@ -15,6 +15,11 @@ FFMPEG_TAG ?= n6.1
 FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
 FFMPEG_VERSION_PLATFORM ?= $(FFMPEG_VERSION)/$(TARGET_OS)-$(TARGET_ARCH)
 FFMPEG_BUILD ?= $(FFMPEG_VERSION_PLATFORM)/build
+FFMPEG_LIBS=    libavformat                        \
+                libavcodec                         \
+                libavutil                          \
+                libswscale                          \
+
 FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --disable-shared \
                --disable-programs \
@@ -37,32 +42,67 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-bsf=h264_mp4toannexb \
                --enable-decoder=mjpeg
 
-CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lswscale -lz
+# CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lswscale -lz
+# ifeq ($(SOURCE_OS),linux)
+# 	CGO_LDFLAGS += -l:libx264.a
+# endif
+# ifeq ($(SOURCE_OS),darwin)
+# 	CGO_LDFLAGS += $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a -liconv
+# endif
+
+GOFLAGS := -buildvcs=false
+SRC_DIR := src
+BUILD_DIR := build/$(TARGET_OS)-$(TARGET_ARCH)
+SRCS := $(shell find $(SRC_DIR) -name '*.c')
+OBJS := $(subst $(SRC_DIR), $(BUILD_DIR), $(SRCS:.c=.o))
+PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
+CFLAGS ?= $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS))
 ifeq ($(SOURCE_OS),linux)
-	CGO_LDFLAGS += -l:libx264.a
+	LDFLAGS ?= $(subst -lx264, -l:libx264.a,$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS)))
+	# LDFLAGS ?= $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))
 endif
 ifeq ($(SOURCE_OS),darwin)
-	CGO_LDFLAGS += $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a -liconv
+	LDFLAGS = $(subst -lx264,,$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a -liconv
 endif
-
-CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
-GOFLAGS := -buildvcs=false
-export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
+CGO_CFLAGS = "-I$(FFMPEG_BUILD)/include -I$(BUILD_DIR)"
+CGO_LDFLAGS = $(LDFLAGS) -L$(BUILD_DIR) -lviamav
 export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 .PHONY: lint tool-install test clean module build 
 
-build: $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
+all: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a $(BIN_OUTPUT_PATH)/concat-c $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
 
-$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
+$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_DIR)/libviamav.a $(BUILD_TAG_FILE)
 	go mod tidy
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
 	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
 
-$(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
+$(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD) $(BUILD_DIR)/libviamav.a $(BUILD_TAG_FILE)
 	go mod tidy
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/concat cmd/concat/cmd.go
 	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
+
+AR = ar
+$(BUILD_DIR)/libviamav.a:
+	$(AR) crs $@ $(BUILD_DIR)/concat.o
+
+$(BIN_OUTPUT_PATH)/concat-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
+	rm -f $(BIN_OUTPUT_PATH)/concat-c
+	$(CC) $(OBJS) $(LDFLAGS) $(CFLAGS) -o $(BIN_OUTPUT_PATH)/concat-c
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
+	@echo "-------- Make $(@) --------"
+	rm -f $@
+	$(CC) $(LDFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR):
+	@echo "-------- mkdir $(@) --------"
+	mkdir -p $(BUILD_DIR)
+
+$(BIN_OUTPUT_PATH):
+	@echo "-------- mkdir $(@) --------"
+	mkdir -p $(BIN_OUTPUT_PATH)
 
 $(FFMPEG_VERSION_PLATFORM):
 	git clone https://github.com/FFmpeg/FFmpeg.git --depth 1 --branch $(FFMPEG_TAG) $(FFMPEG_VERSION_PLATFORM)
@@ -113,7 +153,7 @@ endif
 	artifact pull
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go test -v ./...
-	rm bin/video-store
+	#rm bin/video-store
 
 module: $(BIN_OUTPUT_PATH)/video-store
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
@@ -123,6 +163,7 @@ module: $(BIN_OUTPUT_PATH)/video-store
 clean:
 	rm -rf bin
 	rm -f $(BUILD_TAG_FILE)
+	rm -rf $(BUILD_DIR)
 
 clean-ffmpeg: 
 	rm -rf FFmpeg

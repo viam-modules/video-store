@@ -3,7 +3,6 @@ package videostore
 /*
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
 */
 import "C"
 
@@ -181,8 +180,12 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 		if ret < 0 {
 			return fmt.Errorf("failed to read frame: %s", ffmpegError(ret))
 		}
+
+		// c.logger.Infof("av_read_frame ret: %d", int(ret))
+		// c.logger.Infof("pts: %d, dts: %d, pos: %d, duration: %d, stream_index: %d, time_base: %d, packet.flags: %d",
+		// packet.pts, packet.dts, packet.pos, packet.duration, packet.stream_index, packet.time_base, packet.flags)
 		if int(packet.flags)&(C.AV_PKT_FLAG_DISCARD) == (C.AV_PKT_FLAG_DISCARD) {
-			c.logger.Info("packet is to be discarded")
+			// c.logger.Info("packet is to be discarded")
 			continue
 		}
 		// Can have multiple streams, so need to adjust each packet based on the
@@ -194,10 +197,13 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 		outputStreamOffset := uintptr(packet.stream_index) * unsafe.Sizeof(outputCtx.streams)
 		outStream := *(**C.AVStream)(unsafe.Pointer(uintptr(outputStreamsBase) + outputStreamOffset))
 
+		// This code is only needed as the pts and dts of mp4 files encoded by video store may have a didfferent time base
+		// than the default
 		packet.pts = C.av_rescale_q_rnd(packet.pts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
 		packet.dts = C.av_rescale_q_rnd(packet.dts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
 		packet.duration = C.av_rescale_q(packet.duration, inStream.time_base, outStream.time_base)
 		packet.pos = -1
+
 		ret = C.av_interleaved_write_frame(outputCtx, packet)
 		if ret < 0 {
 			return fmt.Errorf("failed to write frame: %s", ffmpegError(ret))

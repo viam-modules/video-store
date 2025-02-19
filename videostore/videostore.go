@@ -2,7 +2,6 @@
 package videostore
 
 /*
-#cgo pkg-config: libavcodec libavutil libswscale
 #include <libavutil/frame.h>
 */
 import "C"
@@ -204,7 +203,7 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 		return nil, err
 	}
 
-	concater, err := newRTPConcater(
+	concater, err := newConcater(
 		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
