@@ -48,16 +48,14 @@ BUILD_DIR := build/$(TARGET_OS)-$(TARGET_ARCH)
 SRCS := $(shell find $(SRC_DIR) -name '*.c')
 OBJS := $(subst $(SRC_DIR), $(BUILD_DIR), $(SRCS:.c=.o))
 PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
-CFLAGS ?= $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS))
+CGO_CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS)) -I$(BUILD_DIR)
 ifeq ($(SOURCE_OS),linux)
-	LDFLAGS ?= $(subst -lx264, -l:libx264.a,$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS)))
-	# LDFLAGS ?= $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))
+	SUBST = -l:libx264.a
 endif
 ifeq ($(SOURCE_OS),darwin)
-	LDFLAGS = $(subst -lx264,,$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a -liconv
+	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
 endif
-CGO_CFLAGS = "-I$(FFMPEG_BUILD)/include -I$(BUILD_DIR)"
-CGO_LDFLAGS = $(LDFLAGS) -L$(BUILD_DIR) -lviamav
+CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) -L$(BUILD_DIR) -lviamav 
 export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 .PHONY: lint tool-install test clean module build 
@@ -66,12 +64,12 @@ all: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a $(BIN_OUTPUT_PATH)/concat-
 
 $(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_DIR)/libviamav.a $(BUILD_TAG_FILE)
 	go mod tidy
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
 	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
 
 $(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD) $(BUILD_DIR)/libviamav.a $(BUILD_TAG_FILE)
 	go mod tidy
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/concat cmd/concat/cmd.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/concat cmd/concat/cmd.go
 	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
 
 AR = ar
@@ -82,12 +80,12 @@ $(BIN_OUTPUT_PATH)/concat-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | 
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
 	rm -f $(BIN_OUTPUT_PATH)/concat-c
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(OBJS) $(LDFLAGS) -ldl $(CFLAGS) -o $(BIN_OUTPUT_PATH)/concat-c
+	$(CC) $(OBJS) $(CGO_LDFLAGS) -ldl $(CGO_CFLAGS) -o $(BIN_OUTPUT_PATH)/concat-c
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo "-------- Make $(@) --------"
 	rm -f $@
-	$(CC) $(LDFLAGS) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CGO_LDFLAGS) $(CGO_CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR):
 	@echo "-------- mkdir $(@) --------"
