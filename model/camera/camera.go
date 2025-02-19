@@ -1,12 +1,6 @@
 // Package camera contains the implementation of the video storage camera component.
 package camera
 
-/*
-#cgo pkg-config: libavcodec libavutil libswscale
-#include <libavutil/frame.h>
-*/
-import "C"
-
 import (
 	"context"
 	"encoding/base64"
@@ -47,8 +41,6 @@ const (
 	asyncTimeout          = 60               // seconds
 	numFetchFrameAttempts = 3                // iterations
 	tempPath              = "/tmp"
-
-	mimeTypeYUYV = "image/yuyv422"
 )
 
 type component struct {

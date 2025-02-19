@@ -81,8 +81,6 @@ func (rs *rawSegmenter) initH264(sps, pps []byte) error {
 		return errors.New("failed to allocate stream")
 	}
 	stream.id = C.int(fmtCtx.nb_streams) - 1
-	// stream.time_base.num = 1
-	// stream.time_base.den = 1
 
 	// Set the codec parameters for the output stream.
 	codec := C.avcodec_find_encoder(C.AV_CODEC_ID_H264)
@@ -95,13 +93,8 @@ func (rs *rawSegmenter) initH264(sps, pps []byte) error {
 		return errors.New("failed to allocate codec context")
 	}
 
-	// TODO(seanp); Size and pixel format is hardcoded for now. Need to make this dynamic.
-	// Maybe we can get this from ONVIF or the RTSP stream SDP.
 	codecCtx.width = C.int(hsps.Width())
 	codecCtx.height = C.int(hsps.Height())
-	// codecCtx.pix_fmt = C.AV_PIX_FMT_YUV420P
-	// codecCtx.time_base.num = 1
-	// stream.time_base.den = 1
 
 	// Set up the extradata for the codec context. This allows the muxer to know how to
 	// decode the stream without having to read the SPS/PPS from the stream.
@@ -165,9 +158,6 @@ func (rs *rawSegmenter) initH264(sps, pps []byte) error {
 		return fmt.Errorf("failed to write header: %s", ffmpegError(ret))
 	}
 
-	// stream.time_base.num = 1
-	// stream.time_base.den = 1
-
 	return nil
 }
 
@@ -226,6 +216,7 @@ func (rs *rawSegmenter) close() {
 		rs.logger.Errorf("failed to write trailer", "error", ffmpegError(ret))
 	}
 	C.avformat_free_context(rs.outCtx)
+	rs.outCtx = nil
 }
 
 /*
