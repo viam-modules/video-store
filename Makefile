@@ -80,12 +80,12 @@ $(BIN_OUTPUT_PATH)/concat-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | 
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
 	rm -f $(BIN_OUTPUT_PATH)/concat-c
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(OBJS) $(CGO_LDFLAGS) -ldl $(CGO_CFLAGS) -o $(BIN_OUTPUT_PATH)/concat-c
+	$(CC) $(OBJS) $(CGO_LDFLAGS) -ldl $(CGO_CFLAGS) -g -o $(BIN_OUTPUT_PATH)/concat-c
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo "-------- Make $(@) --------"
 	rm -f $@
-	$(CC) $(CGO_LDFLAGS) $(CGO_CFLAGS) -c -o $@ $<
+	$(CC) $(CGO_LDFLAGS) $(CGO_CFLAGS) -g -c -o $@ $<
 
 $(BUILD_DIR):
 	@echo "-------- mkdir $(@) --------"
@@ -161,3 +161,6 @@ clean-ffmpeg: clean
 
 clean-all: clean clean-ffmpeg
 	git clean -fxd
+
+valgrind:
+	valgrind --error-exitcode=1 --leak-check=full --track-origins=yes -v ./bin/linux-arm64/concat-c ./concat_file.txt out.mp4
