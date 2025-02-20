@@ -1,8 +1,7 @@
 package videostore
 
 /*
-#include "../src/concat.h"
-#include <stdlib.h>
+#include "../src/concat.c"
 */
 import "C"
 
