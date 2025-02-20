@@ -48,7 +48,7 @@ BUILD_DIR := build/$(TARGET_OS)-$(TARGET_ARCH)
 SRCS := $(shell find $(SRC_DIR) -name '*.c')
 OBJS := $(subst $(SRC_DIR), $(BUILD_DIR), $(SRCS:.c=.o))
 PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
-CGO_CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS)) -I$(BUILD_DIR)
+CGO_CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS))
 ifeq ($(SOURCE_OS),linux)
 	SUBST = -l:libx264.a
 endif
@@ -80,7 +80,7 @@ $(BIN_OUTPUT_PATH)/concat-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | 
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
 	rm -f $(BIN_OUTPUT_PATH)/concat-c
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(OBJS) ./cmd/concat/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  -g -o $(BIN_OUTPUT_PATH)/concat-c
+	$(CC) $(OBJS) ./cmd/concat-c/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  -g -o $(BIN_OUTPUT_PATH)/concat-c
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo "-------- Make $(@) --------"
