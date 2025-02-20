@@ -148,7 +148,7 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 	if err != nil {
 		return nil, err
 	}
-	vs.concater, err = newConcater(
+	vs.concater, err = newCConcater(
 		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
@@ -203,7 +203,7 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 		return nil, err
 	}
 
-	concater, err := newConcater(
+	concater, err := newCConcater(
 		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
@@ -360,32 +360,32 @@ func (vs *videostore) processFrames(ctx context.Context, encoder *encoder) {
 			// The code in this block is wrong.
 			// I've seen tests segfault with the following errors:
 			// \_ [segment @ 0x14af0d710] Opening '/Users/nicksanford/code/video-store/.artifact/data/2025-02-18_15-10-39.mp4' for writing
-			// 2025-02-18T20:10:49.702Z        DEBUG   rdk:component:camera/video-store-1      camera/camera.go:118    save command received   {"log_ts":"2025-02-18T20:10:49.701Z"}
-			// 2025-02-18T20:10:49.702Z        DEBUG   rdk:component:camera/video-store-1      videostore/videostore.go:270    save command received   {"log_ts":"2025-02-18T20:10:49.702Z"}
-			// 2025-02-18T20:10:49.703Z        DEBUG   rdk:component:camera/video-store-1      videostore/videostore.go:279    running save command asynchronously     {"log_ts":"2025-02-18T20:10:49.702Z"}
-			// 2025-02-18T20:10:49.916Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// DEBUG   rdk:component:camera/video-store-1      camera/camera.go:118    save command received
+			// DEBUG   rdk:component:camera/video-store-1      videostore/videostore.go:270    save command received
+			// DEBUG   rdk:component:camera/video-store-1      videostore/videostore.go:279    running save command asynchronously
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_ [segment @ 0x14af0d710] Opening '/Users/nicksanford/code/video-store/.artifact/data/2025-02-18_15-10-49.mp4' for writing
-			// 2025-02-18T20:10:49.971Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_ SIGSEGV: segmentation violation
-			// 2025-02-18T20:10:49.971Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_ PC=0x10589fc84 m=5 sigcode=2 addr=0x7ba986502470
-			// 2025-02-18T20:10:49.971Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_ signal arrived during cgo execution
-			// 2025-02-18T20:10:49.971Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_
-			// 2025-02-18T20:10:49.971Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_ goroutine 129 gp=0x140005d6e00 m=5 mp=0x14000100808 [syscall]:
-			// 2025-02-18T20:10:49.971Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_ runtime.cgocall(0x105775648, 0x14000818cd8)
-			// 2025-02-18T20:10:49.971Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_      /opt/homebrew/Cellar/go/1.23.6/libexec/src/runtime/cgocall.go:167 +0x44 fp=0x14000818ca0 sp=0x14000818c60 pc=0x104a6ebf4
-			// 2025-02-18T20:10:49.971Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_ github.com/viam-modules/video-store/videostore._Cfunc_avcodec_send_frame(0x14b80ae50, 0x14b80a9c0)
-			// 2025-02-18T20:10:49.971Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_      _cgo_gotypes.go:1270 +0x34 fp=0x14000818cd0 sp=0x14000818ca0 pc=0x105736b44
-			// 2025-02-18T20:10:49.971Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_ github.com/viam-modules/video-store/videostore.(*encoder).encode.func1(0x163?, 0x14b80a9c0)
-			// 2025-02-18T20:10:49.971Z        ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
+			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
 			// \_      /Users/nicksanford/code/video-store/videostore/encoder.go:178 +0x68 fp=0x14000818d10 sp=0x14000818cd0 pc=0x105738888
 
 			// the encoder and segmenter need to be moved into a single object with a single lifetime and not pass codecCtx

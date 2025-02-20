@@ -17,7 +17,7 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-type c_concater struct {
+type cConcater struct {
 	logger      logging.Logger
 	storagePath string
 	uploadPath  string
@@ -28,8 +28,8 @@ func newCConcater(
 	logger logging.Logger,
 	storagePath, uploadPath string,
 	segmentSeconds int,
-) (*c_concater, error) {
-	c := &c_concater{
+) (*cConcater, error) {
+	c := &cConcater{
 		logger:      logger,
 		storagePath: storagePath,
 		uploadPath:  uploadPath,
@@ -44,7 +44,7 @@ func newCConcater(
 
 // concat takes in from and to timestamps and concates the video files between them.
 // returns the path to the concated video file.
-func (c *c_concater) Concat(from, to time.Time, path string) error {
+func (c *cConcater) Concat(from, to time.Time, path string) error {
 	// Find the storage files that match the concat query.
 	storageFiles, err := getSortedFiles(c.storagePath)
 	if err != nil {
@@ -111,7 +111,7 @@ func (c *c_concater) Concat(from, to time.Time, path string) error {
 // cleanupConcatTxtFiles cleans up the concat txt files in the tmp directory.
 // This is precautionary to ensure that no dangling files are left behind if the
 // module is closed during a concat operation.
-func (c *c_concater) cleanupConcatTxtFiles() error {
+func (c *cConcater) cleanupConcatTxtFiles() error {
 	pattern := fmt.Sprintf(conactTxtFilePattern, "*")
 	files, err := filepath.Glob(filepath.Join(concatTxtDir, pattern))
 	if err != nil {
