@@ -1,31 +1,33 @@
+#include "concat.h"
 #include "libavcodec/packet.h"
 #include "libavutil/dict.h"
+#include "libavutil/log.h"
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <string.h>
-#include "concat.h"
 
 int video_store_concat(const char *concat_filepath, const char *output_path) {
-  int ret = 0;
+  int ret = VIDEO_STORE_CONCAT_RESP_ERROR;
   AVPacket *packet = av_packet_alloc();
   AVDictionary *options = NULL;
   AVFormatContext *inputCtx = NULL;
   AVFormatContext *outputCtx = NULL;
+  int outputPathOpened = 0;
   const AVInputFormat *inputFormat = av_find_input_format("concat");
   if (inputFormat == NULL) {
-    goto error;
+    goto cleanup;
   }
 
   if (packet == NULL) {
     av_log(NULL, AV_LOG_ERROR, "video_store_concat av_packet_alloc failed\n");
-    goto error;
+    goto cleanup;
   }
 
   ret = av_dict_set(&options, "safe", "0", 0);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "video_store_concat failed to set option: %s\n",
            av_err2str(ret));
-    goto error;
+    goto cleanup;
   }
 
   if ((ret = avformat_open_input(&inputCtx, concat_filepath, inputFormat,
@@ -33,7 +35,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_concat failed to open input format: %s\n",
            av_err2str(ret));
-    goto error;
+    goto cleanup;
   }
 
   ret = avformat_find_stream_info(inputCtx, NULL);
@@ -41,7 +43,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_concat failed to find stream info: %s\n",
            av_err2str(ret));
-    goto error;
+    goto cleanup;
   }
 
   ret = avformat_alloc_output_context2(&outputCtx, NULL, NULL, output_path);
@@ -49,7 +51,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_concat failed to allocate output context: %s\n",
            av_err2str(ret));
-    goto error;
+    goto cleanup;
   }
 
   for (unsigned int i = 0; i < inputCtx->nb_streams; i++) {
@@ -59,7 +61,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
              "video_store_concat failed to create ouput stream for input "
              "stream index %d, %s\n",
              i, av_err2str(ret));
-      goto error;
+      goto cleanup;
     }
 
     ret = avcodec_parameters_copy(outStream->codecpar,
@@ -69,19 +71,18 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
              "video_store_concat failed to copy input stream index %d codec "
              "parameters: %s",
              i, av_err2str(ret));
-      goto error;
+      goto cleanup;
     }
     // Let ffmpeg handle the codec tag for us.
     outStream->codecpar->codec_tag = 0;
   }
 
-  int outputPathOpened = 0;
   ret = avio_open(&outputCtx->pb, output_path, AVIO_FLAG_WRITE);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_concat failed to open output file: %s",
            av_err2str(ret));
-    goto error;
+    goto cleanup;
   }
   outputPathOpened = 1;
 
@@ -89,7 +90,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "video_store_concat failed to write header: %s",
            av_err2str(ret));
-    goto error;
+    goto cleanup;
   }
 
   int frame_ret = 0;
@@ -98,6 +99,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
   while (1) {
     frame_ret = av_read_frame(inputCtx, packet);
     if (frame_ret == AVERROR_EOF) {
+      av_packet_unref(packet);
       break;
     };
 
@@ -105,10 +107,12 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
       ret = frame_ret;
       av_log(NULL, AV_LOG_ERROR, "video_store_concat failed to read frame: %s",
              av_err2str(ret));
-      goto error;
+      av_packet_unref(packet);
+      goto cleanup;
     }
 
     if ((packet->flags & AV_PKT_FLAG_DISCARD) == AV_PKT_FLAG_DISCARD) {
+      av_packet_unref(packet);
       continue;
     }
     inStream = inputCtx->streams[packet->stream_index];
@@ -125,19 +129,24 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
     packet->pos = -1;
 
     if ((ret = av_interleaved_write_frame(outputCtx, packet))) {
+      av_packet_unref(packet);
       av_log(NULL, AV_LOG_ERROR, "video_store_concat failed to write frame: %s",
              av_err2str(ret));
-      goto error;
+      goto cleanup;
     }
+    av_packet_unref(packet);
   }
+  goto cleanup;
 
   if ((ret = av_write_trailer(outputCtx))) {
     av_log(NULL, AV_LOG_ERROR, "video_store_concat failed to write trailer: %s",
            av_err2str(ret));
-    goto error;
+    goto cleanup;
   }
-  return VIDEO_STORE_CONCAT_RESP_OK;
-error:
+  ret = VIDEO_STORE_CONCAT_RESP_OK;
+
+cleanup:
+  av_log(NULL, AV_LOG_INFO, "video_store_concat going to cleanup");
   if (outputCtx != NULL) {
     if (outputPathOpened) {
       int err = 0;
@@ -162,10 +171,5 @@ error:
     av_packet_free(&packet);
   }
 
-  // propagete ffmpeg error if ret < 0
-  if (ret < 0) {
-    return ret;
-  }
-  // otherwise propagate our own error
-  return VIDEO_STORE_CONCAT_RESP_ERROR;
+  return ret;
 }
