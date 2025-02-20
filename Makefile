@@ -55,19 +55,19 @@ endif
 ifeq ($(SOURCE_OS),darwin)
 	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
 endif
-CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) -L$(BUILD_DIR) -lviamav 
+CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
 export PATH := $(PATH):$(shell go env GOPATH)/bin
 
-.PHONY: lint tool-install test clean module build 
+.PHONY: lint tool-install test clean clean-all clean-ffmpeg module build valgrind
 
-all: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a $(BIN_OUTPUT_PATH)/concat-c $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
+all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat $(BIN_OUTPUT_PATH)/concat-c
 
-$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_DIR)/libviamav.a $(BUILD_TAG_FILE)
+$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
 	go mod tidy
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
 	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
 
-$(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD) $(BUILD_DIR)/libviamav.a $(BUILD_TAG_FILE)
+$(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
 	go mod tidy
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/concat cmd/concat/cmd.go
 	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
@@ -80,7 +80,7 @@ $(BIN_OUTPUT_PATH)/concat-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | 
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
 	rm -f $(BIN_OUTPUT_PATH)/concat-c
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(OBJS) $(CGO_LDFLAGS) -ldl $(CGO_CFLAGS) -g -o $(BIN_OUTPUT_PATH)/concat-c
+	$(CC) $(OBJS) $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS) -g -o $(BIN_OUTPUT_PATH)/concat-c
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo "-------- Make $(@) --------"

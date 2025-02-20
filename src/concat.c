@@ -15,6 +15,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
   int outputPathOpened = 0;
   const AVInputFormat *inputFormat = av_find_input_format("concat");
   if (inputFormat == NULL) {
+    av_log(NULL, AV_LOG_ERROR, "failed to find input format\n");
     goto cleanup;
   }
 
@@ -136,7 +137,6 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
     }
     av_packet_unref(packet);
   }
-  goto cleanup;
 
   if ((ret = av_write_trailer(outputCtx))) {
     av_log(NULL, AV_LOG_ERROR, "video_store_concat failed to write trailer: %s",
@@ -146,7 +146,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
   ret = VIDEO_STORE_CONCAT_RESP_OK;
 
 cleanup:
-  av_log(NULL, AV_LOG_INFO, "video_store_concat going to cleanup");
+  av_log(NULL, AV_LOG_DEBUG, "video_store_concat going to cleanup\n");
   if (outputCtx != NULL) {
     if (outputPathOpened) {
       int err = 0;
@@ -156,18 +156,22 @@ cleanup:
                av_err2str(err));
       };
     }
+    av_log(NULL, AV_LOG_DEBUG, "video_store_concat avformat_free_context\n");
     avformat_free_context(outputCtx);
   }
 
   if (inputCtx != NULL) {
+    av_log(NULL, AV_LOG_DEBUG, "video_store_concat avformat_close_input\n");
     avformat_close_input(&inputCtx);
   }
 
   if (options != NULL) {
+    av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_dict_free\n");
     av_dict_free(&options);
   }
 
   if (packet != NULL) {
+    av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_packet_free\n");
     av_packet_free(&packet);
   }
 
