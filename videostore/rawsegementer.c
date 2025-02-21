@@ -45,7 +45,6 @@ int video_store_raw_seg_init_h264(struct raw_seg_h264 **ppRS, // OUT
         av_err2str(ret));
     goto cleanup;
   }
-
   /* // Create new stream for the output context. */
   stream = avformat_new_stream(fmtCtx, NULL);
   if (stream == NULL) {
