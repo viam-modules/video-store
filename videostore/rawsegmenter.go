@@ -96,7 +96,7 @@ func (rs *rawSegmenter) initH264(sps, pps []byte) error {
 func (rs *rawSegmenter) writePacket(payload []byte, pts int64, isIDR bool) error {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	if rs.initialized {
+	if !rs.initialized {
 		return errors.New("writePacket called before initH264")
 	}
 
