@@ -139,7 +139,13 @@ cleanup:
       avformat_free_context(fmtCtx);
     }
   }
-  av_dict_free(&opts);
+  if (opts != NULL) {
+    av_dict_free(&opts);
+  }
+
+  if (codecCtx != NULL) {
+    avcodec_free_context(&codecCtx);
+  }
   return ret;
 }
 
