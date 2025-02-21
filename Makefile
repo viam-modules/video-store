@@ -60,7 +60,7 @@ export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 .PHONY: lint tool-install test clean clean-all clean-ffmpeg module build valgrind
 
-all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat $(BIN_OUTPUT_PATH)/concat-c $(BIN_OUTPUT_PATH)/raw-segmenter-c
+all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store #$(BIN_OUTPUT_PATH)/concat $(BIN_OUTPUT_PATH)/concat-c $(BIN_OUTPUT_PATH)/raw-segmenter-c
 
 $(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
 	go mod tidy
