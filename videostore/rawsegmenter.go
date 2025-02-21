@@ -43,7 +43,6 @@ func newRawSegmenter(
 	if err != nil {
 		return nil, err
 	}
-
 	return s, nil
 }
 
