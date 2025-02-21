@@ -86,7 +86,7 @@ $(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviam
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
 	rm -f $(BIN_OUTPUT_PATH)/raw-segmenter-c
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(OBJS) ./cmd/raw-segmenter-c/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav -lsqlite3 $(CGO_CFLAGS)  -g -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
+	$(CC) $(OBJS) ./cmd/raw-segmenter-c/main.c $(CGO_LDFLAGS) $(shell pkg-config --cflags sqlite3) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  $(shell pkg-config --libs sqlite3) -g -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
 
 # $(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) ./cmd/raw-segmenter-c/main.c | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
 # 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
@@ -200,9 +200,28 @@ endif
 # you need latest valgrind, otherwise you might not get line numbers in your valgrind output
 valgrind-run: 
 ifeq ($(SOURCE_OS),linux)
+	# valgrind --error-exitcode=1 --leak-check=full --track-origins=yes --dsymutil=yes  -v ./bin/linux-arm64/raw-segmenter-c my.db
 	valgrind --error-exitcode=1 --leak-check=full --track-origins=yes --dsymutil=yes  -v ./bin/linux-arm64/raw-segmenter-c my.db
 endif
 ifeq ($(SOURCE_OS),darwin)
 	echo "valgrind not supported on macos running in canon"
 	canon make clean ./bin/linux-arm64/raw-segmenter-c valgrind-run
+endif
+
+run:
+ifeq ($(SOURCE_OS),linux)
+	./bin/linux-arm64/raw-segmenter-c my.db
+endif
+ifeq ($(SOURCE_OS),darwin)
+	echo "valgrind not supported on macos running in canon"
+	canon make clean ./bin/linux-arm64/raw-segmenter-c run
+endif
+
+gdb-run: 
+ifeq ($(SOURCE_OS),linux)
+	gdb ./bin/linux-arm64/raw-segmenter-c 
+endif
+ifeq ($(SOURCE_OS),darwin)
+	echo "valgrind not supported on macos running in canon"
+	canon make clean ./bin/linux-arm64/raw-segmenter-c gdb-run
 endif

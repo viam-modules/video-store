@@ -1,9 +1,8 @@
 #include "rawsegementer.h"
 #include "libavcodec/packet.h"
+#include "libavutil/dict.h"
+#include "libavutil/log.h"
 #include "libavutil/mem.h"
-/* #include "libavcodec/packet.h" */
-/* #include "libavutil/dict.h" */
-/* #include "libavutil/log.h" */
 #include <libavcodec/avcodec.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -175,24 +174,27 @@ int video_store_raw_seg_write_h264_packet(struct raw_seg_h264 *rs,  // IN
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
 
-  // TODO: move this to init
   AVPacket *pkt = av_packet_alloc();
   if (pkt == NULL) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_raw_seg_write_h264_packet failed to allocate AVPacket");
-    return VIDEO_STORE_RAW_SEG_RESP_ERROR;
-  }
-  // after this point, success or failure we need to go to cleanup to free what
-  // we have allocated
-
-  pkt->data = av_malloc(payloadSize);
-  if (pkt->data == NULL) {
-    av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_write_h264_packet failed to allocate AVPacket "
-           "data");
+    ret = VIDEO_STORE_RAW_SEG_RESP_ERROR;
     goto cleanup;
   }
-  memcpy(pkt->data, payload, payloadSize);
+
+  uint8_t *data = av_malloc(payloadSize);
+  memcpy(data, payload, payloadSize);
+  ret = av_packet_from_data(pkt, data, (int)payloadSize);
+  if (ret != 0) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_raw_seg_write_h264_packet failed to create new "
+           "AVPacket from data");
+    // if av_packet_from_data returned an error then data is not owned by the
+    // packet and we need to free it outselves
+    av_free(data);
+    goto cleanup;
+  }
+
   pkt->size = (int)payloadSize;
   pkt->pts = pts;
   pkt->dts = pts;
@@ -211,7 +213,10 @@ int video_store_raw_seg_write_h264_packet(struct raw_seg_h264 *rs,  // IN
 
   ret = VIDEO_STORE_RAW_SEG_RESP_OK;
 cleanup:
-  av_packet_free(&pkt);
+  if (pkt != NULL) {
+    av_packet_unref(pkt);
+    av_packet_free(&pkt);
+  }
   return ret;
 }
 
