@@ -1,4 +1,4 @@
-#include "../../videostore/rawsegementer.h"
+#include "../../videostore/rawsegmenter.h"
 #include <sqlite3.h>
 #include <stdint.h>
 #include <stdio.h>

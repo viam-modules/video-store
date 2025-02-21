@@ -3,7 +3,7 @@
 #include <libavformat/avformat.h>
 typedef struct raw_seg_h264 {
   AVFormatContext *outCtx;
-} viam_carto;
+} raw_seg_h264;
 
 int video_store_raw_seg_init_h264(struct raw_seg_h264 **ppRS, // OUT
                                   const int segmentSeconds,   // IN
