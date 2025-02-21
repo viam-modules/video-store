@@ -60,7 +60,7 @@ export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 .PHONY: lint tool-install test clean clean-all clean-ffmpeg module build valgrind
 
-all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat $(BIN_OUTPUT_PATH)/concat-c
+all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat $(BIN_OUTPUT_PATH)/concat-c $(BIN_OUTPUT_PATH)/raw-segmenter-c
 
 $(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
 	go mod tidy
@@ -74,13 +74,29 @@ $(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD) $(BUI
 
 AR = ar
 $(BUILD_DIR)/libviamav.a:
-	$(AR) crs $@ $(BUILD_DIR)/concat.o
+	$(AR) crs $@ $(BUILD_DIR)/concat.o $(BUILD_DIR)/rawsegementer.o
 
 $(BIN_OUTPUT_PATH)/concat-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
 	rm -f $(BIN_OUTPUT_PATH)/concat-c
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(OBJS) ./cmd/concat-c/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  -g -o $(BIN_OUTPUT_PATH)/concat-c
+
+$(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
+	rm -f $(BIN_OUTPUT_PATH)/raw-segmenter-c
+	mkdir -p $(BUILD_DIR)
+	$(CC) $(OBJS) ./cmd/raw-segmenter-c/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  -g -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
+
+# $(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) ./cmd/raw-segmenter-c/main.c | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+# 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
+# 	rm -f $(BIN_OUTPUT_PATH)/raw-segmenter-c
+# 	mkdir -p $(BUILD_DIR)
+# 	$(CC) $(CGO_LDFLAGS) $(CGO_CFLAGS) -g -c -o $(BUILD_DIR)/rawsegementer.o ./videostore/rawsegementer.c
+# 	$(CC) $(CGO_LDFLAGS) $(CGO_CFLAGS) -g -c -o $(BUILD_DIR)/raw-segmenter-c-main.o ./cmd/raw-segmenter-c/main.c 
+# 	$(AR) crs $@ $(BUILD_DIR)/rawsegementer.o
+# 	$(CC) $(BUILD_DIR)/rawsegementer.o $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS) -g $(BUILD_DIR)/raw-segmenter-c-main.o -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
+
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo "-------- Make $(@) --------"
@@ -162,5 +178,23 @@ clean-ffmpeg: clean
 clean-all: clean clean-ffmpeg
 	git clean -fxd
 
+# you need latest valgrind, otherwise you might not get line numbers in your valgrind output
 valgrind:
+ifeq ($(shell which ffmpeg > /dev/null 2>&1; echo $$?), 1)
+ifeq ($(SOURCE_OS),linux)
+	wget https://sourceware.org/pub/valgrind/valgrind-3.24.0.tar.bz2
+	tar xzf valgrind-3.24.0.tar.bz2
+	rm -rf valgrind-3.24.0.tar.bz2
+	cd valgrind-3.24.0
+	./configure
+	make
+	sudo make install
+	rm -rf valgrind-3.24.0.tar.bz2
+	rm -rf valgrind-3.24.0
+endif
+ifeq ($(SOURCE_OS),darwin)
+	echo "valgrind not supported on macos"
+	exit 1
+endif
+endif
 	valgrind --error-exitcode=1 --leak-check=full --track-origins=yes -v ./bin/linux-arm64/concat-c ./concat_file.txt out.mp4
