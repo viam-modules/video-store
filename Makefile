@@ -5,12 +5,7 @@ TARGET_ARCH ?= $(SOURCE_ARCH)
 normalize_arch = $(if $(filter aarch64,$(1)),arm64,$(if $(filter x86_64,$(1)),amd64,$(1)))
 SOURCE_ARCH := $(call normalize_arch,$(SOURCE_ARCH))
 TARGET_ARCH := $(call normalize_arch,$(TARGET_ARCH))
-PPROF_ENABLED ?= false
 BUILD_TAGS ?=
-
-ifeq ($(PPROF_ENABLED),true)
-    BUILD_TAGS := $(BUILD_TAGS) pprof
-endif
 
 BIN_OUTPUT_PATH = bin/$(TARGET_OS)-$(TARGET_ARCH)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
@@ -20,6 +15,11 @@ FFMPEG_TAG ?= n6.1
 FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
 FFMPEG_VERSION_PLATFORM ?= $(FFMPEG_VERSION)/$(TARGET_OS)-$(TARGET_ARCH)
 FFMPEG_BUILD ?= $(FFMPEG_VERSION_PLATFORM)/build
+FFMPEG_LIBS=    libavformat                        \
+                libavcodec                         \
+                libavutil                          \
+                libswscale                          \
+
 FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --disable-shared \
                --disable-programs \
@@ -42,30 +42,74 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-bsf=h264_mp4toannexb \
                --enable-decoder=mjpeg
 
-CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lswscale -lz
+GOFLAGS := -buildvcs=false
+SRC_DIR := videostore
+BUILD_DIR := build/$(TARGET_OS)-$(TARGET_ARCH)
+SRCS := $(shell find $(SRC_DIR) -name '*.c')
+OBJS := $(subst $(SRC_DIR), $(BUILD_DIR), $(SRCS:.c=.o))
+PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
+CGO_CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS))
 ifeq ($(SOURCE_OS),linux)
-	CGO_LDFLAGS += -l:libx264.a
+	SUBST = -l:libx264.a
 endif
 ifeq ($(SOURCE_OS),darwin)
-	CGO_LDFLAGS += $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a -liconv
+	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
 endif
-
-CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
-GOFLAGS := -buildvcs=false
-export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
+CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
 export PATH := $(PATH):$(shell go env GOPATH)/bin
 
-.PHONY: lint tool-install test clean module build build-pprof
+.PHONY: lint tool-install test clean clean-all clean-ffmpeg module build valgrind
 
-build: $(BIN_OUTPUT_PATH)/video-store
+all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat $(BIN_OUTPUT_PATH)/concat-c $(BIN_OUTPUT_PATH)/raw-segmenter-c
 
-build-pprof:
-	$(MAKE) build PPROF_ENABLED=true
-
-$(BIN_OUTPUT_PATH)/video-store: *.go cam/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
+$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
 	go mod tidy
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store main.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
 	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
+
+$(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
+	go mod tidy
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/concat cmd/concat/cmd.go
+	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
+
+AR = ar
+$(BUILD_DIR)/libviamav.a:
+	$(AR) crs $@ $(BUILD_DIR)/concat.o $(BUILD_DIR)/rawsegmenter.o
+
+$(BIN_OUTPUT_PATH)/concat-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
+	rm -f $(BIN_OUTPUT_PATH)/concat-c
+	mkdir -p $(BUILD_DIR)
+	$(CC) $(OBJS) ./cmd/concat-c/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  -g -o $(BIN_OUTPUT_PATH)/concat-c
+
+$(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
+	rm -f $(BIN_OUTPUT_PATH)/raw-segmenter-c
+	mkdir -p $(BUILD_DIR)
+	$(CC) $(OBJS) ./cmd/raw-segmenter-c/main.c $(CGO_LDFLAGS) $(shell pkg-config --cflags sqlite3) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  $(shell pkg-config --libs sqlite3) -g -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
+
+# $(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) ./cmd/raw-segmenter-c/main.c | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+# 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
+# 	rm -f $(BIN_OUTPUT_PATH)/raw-segmenter-c
+# 	mkdir -p $(BUILD_DIR)
+# 	$(CC) $(CGO_LDFLAGS) $(CGO_CFLAGS) -g -c -o $(BUILD_DIR)/rawsegmenter.o ./videostore/rawsegmenter.c
+# 	$(CC) $(CGO_LDFLAGS) $(CGO_CFLAGS) -g -c -o $(BUILD_DIR)/raw-segmenter-c-main.o ./cmd/raw-segmenter-c/main.c 
+# 	$(AR) crs $@ $(BUILD_DIR)/rawsegmenter.o
+# 	$(CC) $(BUILD_DIR)/rawsegmenter.o $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS) -g $(BUILD_DIR)/raw-segmenter-c-main.o -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
+
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
+	@echo "-------- Make $(@) --------"
+	rm -f $@
+	$(CC) $(CGO_LDFLAGS) $(CGO_CFLAGS) -g -c -o $@ $<
+
+$(BUILD_DIR):
+	@echo "-------- mkdir $(@) --------"
+	mkdir -p $(BUILD_DIR)
+
+$(BIN_OUTPUT_PATH):
+	@echo "-------- mkdir $(@) --------"
+	mkdir -p $(BIN_OUTPUT_PATH)
 
 $(FFMPEG_VERSION_PLATFORM):
 	git clone https://github.com/FFmpeg/FFmpeg.git --depth 1 --branch $(FFMPEG_TAG) $(FFMPEG_VERSION_PLATFORM)
@@ -115,8 +159,8 @@ ifeq ($(shell which artifact > /dev/null 2>&1; echo $$?), 1)
 endif
 	artifact pull
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go test -v ./tests/ ./cam/
-	rm bin/video-store
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go test -v ./...
+	#rm bin/video-store
 
 module: $(BIN_OUTPUT_PATH)/video-store
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
@@ -124,7 +168,60 @@ module: $(BIN_OUTPUT_PATH)/video-store
 	rm bin/video-store
 
 clean:
-	rm -rf $(BIN_OUTPUT_PATH)
+	rm -rf bin
 	rm -f $(BUILD_TAG_FILE)
+	rm -rf build
+
+clean-ffmpeg: clean
 	rm -rf FFmpeg
+
+clean-all: clean clean-ffmpeg
 	git clean -fxd
+
+valgrind-setup: 
+ifeq ($(shell which valgrind > /dev/null 2>&1; echo $$?), 1)
+ifeq ($(SOURCE_OS),linux)
+	wget https://sourceware.org/pub/valgrind/valgrind-3.24.0.tar.bz2
+	tar xzf valgrind-3.24.0.tar.bz2
+	rm -rf valgrind-3.24.0.tar.bz2
+	cd valgrind-3.24.0
+	./configure
+	make
+	sudo make install
+	rm -rf valgrind-3.24.0.tar.bz2
+	rm -rf valgrind-3.24.0
+endif
+ifeq ($(SOURCE_OS),darwin)
+	echo "valgrind not supported on macos building in canon"
+	canon make valgrind-setup
+endif
+endif
+
+# you need latest valgrind, otherwise you might not get line numbers in your valgrind output
+valgrind-run: 
+ifeq ($(SOURCE_OS),linux)
+	# valgrind --error-exitcode=1 --leak-check=full --track-origins=yes --dsymutil=yes  -v ./bin/linux-arm64/raw-segmenter-c my.db
+	valgrind --error-exitcode=1 --leak-check=full --track-origins=yes --dsymutil=yes  -v ./bin/linux-arm64/raw-segmenter-c my.db
+endif
+ifeq ($(SOURCE_OS),darwin)
+	echo "valgrind not supported on macos running in canon"
+	canon make clean ./bin/linux-arm64/raw-segmenter-c valgrind-run
+endif
+
+run:
+ifeq ($(SOURCE_OS),linux)
+	./bin/linux-arm64/raw-segmenter-c my.db
+endif
+ifeq ($(SOURCE_OS),darwin)
+	echo "valgrind not supported on macos running in canon"
+	canon make clean ./bin/linux-arm64/raw-segmenter-c run
+endif
+
+gdb-run: 
+ifeq ($(SOURCE_OS),linux)
+	gdb ./bin/linux-arm64/raw-segmenter-c 
+endif
+ifeq ($(SOURCE_OS),darwin)
+	echo "valgrind not supported on macos running in canon"
+	canon make clean ./bin/linux-arm64/raw-segmenter-c gdb-run
+endif

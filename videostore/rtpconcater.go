@@ -15,28 +15,22 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/google/uuid"
 	"go.viam.com/rdk/logging"
 )
 
-const (
-	conactTxtFilePattern = "concat_%s.txt"
-	concatTxtDir         = "/tmp"
-)
-
-type concater struct {
+type rtpconcater struct {
 	logger      logging.Logger
 	storagePath string
 	uploadPath  string
 	segmentDur  time.Duration
 }
 
-func newConcater(
+func newRTPConcater(
 	logger logging.Logger,
 	storagePath, uploadPath string,
 	segmentSeconds int,
-) (*concater, error) {
-	c := &concater{
+) (*rtpconcater, error) {
+	c := &rtpconcater{
 		logger:      logger,
 		storagePath: storagePath,
 		uploadPath:  uploadPath,
@@ -51,7 +45,9 @@ func newConcater(
 
 // concat takes in from and to timestamps and concates the video files between them.
 // returns the path to the concated video file.
-func (c *concater) concat(from, to time.Time, path string) error {
+func (c *rtpconcater) Concat(from, to time.Time, path string) error {
+	c.logger.Info("Concat START")
+	defer c.logger.Info("Concat END")
 	// Find the storage files that match the concat query.
 	storageFiles, err := getSortedFiles(c.storagePath)
 	if err != nil {
@@ -70,18 +66,28 @@ func (c *concater) concat(from, to time.Time, path string) error {
 		return errors.New("no matching video data to save")
 	}
 
+	c.logger.Infof("matching files: %#v", matchingFiles)
+
 	// Create a temporary file to store the list of files to concatenate.
 	concatFilePath := generateConcatFilePath()
 	concatTxtFile, err := os.Create(concatFilePath)
 	if err != nil {
 		return err
 	}
+
+	defer concatTxtFile.Close()
 	for _, file := range matchingFiles {
 		_, err := concatTxtFile.WriteString(file + "\n")
 		if err != nil {
 			return err
 		}
 	}
+	c.logger.Infof("concatFilePath: %#v", concatFilePath)
+	concatFileContents, err := os.ReadFile(concatFilePath)
+	if err != nil {
+		return err
+	}
+	c.logger.Infof("concatFileContents: %s", string(concatFileContents))
 
 	concatFilePathCStr := C.CString(concatFilePath)
 	concatCStr := C.CString("concat")
@@ -136,6 +142,7 @@ func (c *concater) concat(from, to time.Time, path string) error {
 		return fmt.Errorf("failed to allocate output context: %s", ffmpegError(ret))
 	}
 
+	c.logger.Infof("streams len: %d", int(inputCtx.nb_streams))
 	// Copy codec info from input to output context. This is necessary to ensure
 	// we do not decode and re-encode the video data.
 	for i := range int(inputCtx.nb_streams) {
@@ -150,8 +157,6 @@ func (c *concater) concat(from, to time.Time, path string) error {
 		if ret < 0 {
 			return fmt.Errorf("failed to copy codec parameters: %s", ffmpegError(ret))
 		}
-		// Let ffmpeg handle the codec tag for us.
-		outStream.codecpar.codec_tag = 0
 	}
 
 	// Open the output file and write the header.
@@ -169,7 +174,10 @@ func (c *concater) concat(from, to time.Time, path string) error {
 	// instead of packet by packet.
 	packet := C.av_packet_alloc()
 	defer C.av_packet_free(&packet)
+	i := 0
 	for {
+		c.logger.Infof("iteration: %d", i)
+		i++
 		ret := C.av_read_frame(inputCtx, packet)
 		if ret == C.AVERROR_EOF {
 			c.logger.Debug("Concatenation complete. Hit EOF.")
@@ -179,22 +187,18 @@ func (c *concater) concat(from, to time.Time, path string) error {
 		if ret < 0 {
 			return fmt.Errorf("failed to read frame: %s", ffmpegError(ret))
 		}
-		// Can have multiple streams, so need to adjust each packet based on the
-		// stream it belongs to.
-		inputStreamsBase := unsafe.Pointer(inputCtx.streams)
-		inputStreamOffset := uintptr(packet.stream_index) * unsafe.Sizeof(inputCtx.streams)
-		inStream := *(**C.AVStream)(unsafe.Pointer(uintptr(inputStreamsBase) + inputStreamOffset))
-		outputStreamsBase := unsafe.Pointer(outputCtx.streams)
-		outputStreamOffset := uintptr(packet.stream_index) * unsafe.Sizeof(outputCtx.streams)
-		outStream := *(**C.AVStream)(unsafe.Pointer(uintptr(outputStreamsBase) + outputStreamOffset))
-
-		packet.pts = C.av_rescale_q_rnd(packet.pts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
-		packet.dts = C.av_rescale_q_rnd(packet.dts, inStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|C.AV_ROUND_PASS_MINMAX)
-		packet.duration = C.av_rescale_q(packet.duration, inStream.time_base, outStream.time_base)
-		packet.pos = -1
+		c.logger.Infof("av_read_frame ret: %d", int(ret))
+		c.logger.Infof("pts: %d, dts: %d, pos: %d, duration: %d, stream_index: %d, time_base: %d, packet.flags: %d",
+			packet.pts, packet.dts, packet.pos, packet.duration, packet.stream_index, packet.time_base, packet.flags)
+		if int(packet.flags)&(C.AV_PKT_FLAG_DISCARD) == (C.AV_PKT_FLAG_DISCARD) {
+			c.logger.Info("packet is to be discarded")
+			continue
+		}
 		ret = C.av_interleaved_write_frame(outputCtx, packet)
 		if ret < 0 {
-			return fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
+			err := fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
+			c.logger.Error(err.Error())
+			return err
 		}
 	}
 
@@ -215,7 +219,7 @@ func (c *concater) concat(from, to time.Time, path string) error {
 // cleanupConcatTxtFiles cleans up the concat txt files in the tmp directory.
 // This is precautionary to ensure that no dangling files are left behind if the
 // module is closed during a concat operation.
-func (c *concater) cleanupConcatTxtFiles() error {
+func (c *rtpconcater) cleanupConcatTxtFiles() error {
 	pattern := fmt.Sprintf(conactTxtFilePattern, "*")
 	files, err := filepath.Glob(filepath.Join(concatTxtDir, pattern))
 	if err != nil {
@@ -228,13 +232,4 @@ func (c *concater) cleanupConcatTxtFiles() error {
 		}
 	}
 	return nil
-}
-
-// generateConcatFilePath generates a unique file name for concat txt reference file.
-// This allows multiple concats to be run concurrently without conflicts.
-func generateConcatFilePath() string {
-	uniqueID := uuid.New().String()
-	fileName := fmt.Sprintf(conactTxtFilePattern, uniqueID)
-	filePath := filepath.Join(concatTxtDir, fileName)
-	return filePath
 }
