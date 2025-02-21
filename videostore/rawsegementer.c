@@ -7,9 +7,10 @@
 #include <libavcodec/avcodec.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 int video_store_raw_seg_init_h264(struct raw_seg_h264 **ppRS, // OUT
-                                  const char *segmentSeconds, // IN
+                                  const int segmentSeconds,   // IN
                                   const char *outputPattern,  // IN
                                   const char *extradata,      // IN
                                   const size_t extradataSize, // IN
@@ -88,10 +89,10 @@ int video_store_raw_seg_init_h264(struct raw_seg_h264 **ppRS, // OUT
     goto cleanup;
   }
 
-  // Segment options are passed as opts to avformat_write_header. This only
-  // needs
-  // to be done once, and not for every segment file. */
-  ret = av_dict_set(&opts, "segment_time", segmentSeconds, 0);
+  char stackSegmentSecondsStr[30];
+  snprintf(stackSegmentSecondsStr, sizeof(stackSegmentSecondsStr), "%d",
+           segmentSeconds);
+  ret = av_dict_set(&opts, "segment_time", stackSegmentSecondsStr, 0);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_raw_seg_init_h264 failed to set segment_time");

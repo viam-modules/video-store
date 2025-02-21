@@ -6,7 +6,7 @@ typedef struct raw_seg_h264 {
 } viam_carto;
 
 int video_store_raw_seg_init_h264(struct raw_seg_h264 **ppRS, // OUT
-                                  const char *segmentSeconds, // IN
+                                  const int segmentSeconds,   // IN
                                   const char *outputPattern,  // IN
                                   const char *extradata,      // IN
                                   const size_t extradataSize, // IN
