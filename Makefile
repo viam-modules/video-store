@@ -204,5 +204,5 @@ ifeq ($(SOURCE_OS),linux)
 endif
 ifeq ($(SOURCE_OS),darwin)
 	echo "valgrind not supported on macos running in canon"
-	canon make valgrind-run
+	canon make clean ./bin/linux-arm64/raw-segmenter-c valgrind-run
 endif
