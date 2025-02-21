@@ -86,7 +86,7 @@ $(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviam
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
 	rm -f $(BIN_OUTPUT_PATH)/raw-segmenter-c
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(OBJS) ./cmd/raw-segmenter-c/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  -g -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
+	$(CC) $(OBJS) ./cmd/raw-segmenter-c/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav -lsqlite3 $(CGO_CFLAGS)  -g -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
 
 # $(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) ./cmd/raw-segmenter-c/main.c | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
 # 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
@@ -178,9 +178,8 @@ clean-ffmpeg: clean
 clean-all: clean clean-ffmpeg
 	git clean -fxd
 
-# you need latest valgrind, otherwise you might not get line numbers in your valgrind output
-valgrind:
-ifeq ($(shell which ffmpeg > /dev/null 2>&1; echo $$?), 1)
+valgrind-setup: 
+ifeq ($(shell which valgrind > /dev/null 2>&1; echo $$?), 1)
 ifeq ($(SOURCE_OS),linux)
 	wget https://sourceware.org/pub/valgrind/valgrind-3.24.0.tar.bz2
 	tar xzf valgrind-3.24.0.tar.bz2
@@ -193,8 +192,17 @@ ifeq ($(SOURCE_OS),linux)
 	rm -rf valgrind-3.24.0
 endif
 ifeq ($(SOURCE_OS),darwin)
-	echo "valgrind not supported on macos"
-	exit 1
+	echo "valgrind not supported on macos building in canon"
+	canon make valgrind-setup
 endif
 endif
-	valgrind --error-exitcode=1 --leak-check=full --track-origins=yes -v ./bin/linux-arm64/concat-c ./concat_file.txt out.mp4
+
+# you need latest valgrind, otherwise you might not get line numbers in your valgrind output
+valgrind-run: 
+ifeq ($(SOURCE_OS),linux)
+	valgrind --error-exitcode=1 --leak-check=full --track-origins=yes --dsymutil=yes  -v ./bin/linux-arm64/raw-segmenter-c my.db
+endif
+ifeq ($(SOURCE_OS),darwin)
+	echo "valgrind not supported on macos running in canon"
+	canon make valgrind-run
+endif
