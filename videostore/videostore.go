@@ -148,7 +148,7 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 	if err != nil {
 		return nil, err
 	}
-	vs.concater, err = newCConcater(
+	vs.concater, err = newConcater(
 		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
@@ -203,7 +203,7 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 		return nil, err
 	}
 
-	concater, err := newCConcater(
+	concater, err := newConcater(
 		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
