@@ -5,11 +5,9 @@ TARGET_ARCH ?= $(SOURCE_ARCH)
 normalize_arch = $(if $(filter aarch64,$(1)),arm64,$(if $(filter x86_64,$(1)),amd64,$(1)))
 SOURCE_ARCH := $(call normalize_arch,$(SOURCE_ARCH))
 TARGET_ARCH := $(call normalize_arch,$(TARGET_ARCH))
-BUILD_TAGS ?=
 
 BIN_OUTPUT_PATH = bin/$(TARGET_OS)-$(TARGET_ARCH)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
-BUILD_TAG_FILE := .build_tags
 
 FFMPEG_TAG ?= n6.1
 FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
@@ -64,13 +62,11 @@ all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
 
 $(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
 	go mod tidy
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
-	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
 
 $(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
 	go mod tidy
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -tags "$(BUILD_TAGS)" -o $(BIN_OUTPUT_PATH)/concat cmd/concat/cmd.go
-	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_OUTPUT_PATH)/concat cmd/concat/cmd.go
 
 AR = ar
 $(BUILD_DIR)/libviamav.a:
@@ -120,10 +116,6 @@ ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
 endif
 endif
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
-
-# Force rebuild if BUILD_TAGS change
-$(BUILD_TAG_FILE):
-	echo "$(BUILD_TAGS)" > $(BUILD_TAG_FILE)
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \

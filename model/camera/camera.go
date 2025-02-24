@@ -129,7 +129,6 @@ func (c *component) DoCommand(ctx context.Context, command map[string]interface{
 		return ret, nil
 	case "fetch":
 		c.logger.Debug("fetch command received")
-		// vs.logger.Debug("video bytes: ", len(videoBytes))
 		req, err := ToFetchCommand(command)
 		if err != nil {
 			return nil, err
