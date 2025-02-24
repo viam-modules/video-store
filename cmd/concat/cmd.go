@@ -30,21 +30,9 @@ func main() {
 	if err != nil {
 		logger.Fatal(err.Error())
 	}
-	var vs videostore.VideoStore
-	switch os.Args[3] {
-	case "frame":
-		vs, err = videostore.NewFramePollingVideoStore(ctx, config, logger)
-		if err != nil {
-			logger.Fatal(err.Error())
-		}
-	case "rtp":
-		config.Type = videostore.SourceTypeH264RTPPacket
-		vs, err = videostore.NewH264RTPVideoStore(ctx, config, logger)
-		if err != nil {
-			logger.Fatal(err.Error())
-		}
-	default:
-		logger.Fatal("invalid arg 3, options: frame|rtp")
+	vs, err := videostore.NewH264RTPVideoStore(ctx, config, logger)
+	if err != nil {
+		logger.Fatal(err.Error())
 	}
 
 	req, err := camera.ToFetchCommand(rawReq)
@@ -57,7 +45,7 @@ func main() {
 	}
 
 	//nolint:mnd
-	if err := os.WriteFile(fmt.Sprintf("%s_%s.mp4", os.Args[2], os.Args[3]), res.Video, 0o600); err != nil {
+	if err := os.WriteFile(fmt.Sprintf("%s.mp4", os.Args[2]), res.Video, 0o600); err != nil {
 		logger.Fatal(err.Error())
 	}
 }
