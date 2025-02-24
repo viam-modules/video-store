@@ -142,7 +142,7 @@ endif
 	artifact pull
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go test -v ./...
-	#rm bin/video-store
+	rm bin/video-store
 
 module: $(BIN_OUTPUT_PATH)/video-store
 	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
