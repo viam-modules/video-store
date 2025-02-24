@@ -35,12 +35,11 @@ const (
 	defaultUploadPath     = ".viam/capture/video-upload"
 	defaultStoragePath    = ".viam/video-storage"
 
-	maxGRPCSize           = 1024 * 1024 * 32 // bytes
-	deleterInterval       = 10               // minutes
-	retryInterval         = 1                // seconds
-	asyncTimeout          = 60               // seconds
-	numFetchFrameAttempts = 3                // iterations
-	tempPath              = "/tmp"
+	maxGRPCSize     = 1024 * 1024 * 32 // bytes
+	deleterInterval = 10               // minutes
+	retryInterval   = 1                // seconds
+	asyncTimeout    = 60               // seconds
+	tempPath        = "/tmp"
 )
 
 type component struct {
