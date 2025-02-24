@@ -222,14 +222,31 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 		return nil, err
 	}
 
-	return &videostore{
+	vs := &videostore{
 		typ:          config.Type,
 		concater:     concater,
 		rawSegmenter: rawSegmenter,
 		logger:       logger,
 		config:       config,
 		workers:      utils.NewBackgroundStoppableWorkers(),
-	}, nil
+	}
+	vs.workers.Add(func(ctx context.Context) {
+		ticker := time.NewTicker(deleterInterval * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				// Perform the deletion of the oldest clip
+				if err := rawSegmenter.cleanupStorage(); err != nil {
+					vs.logger.Error("failed to clean up storage", err)
+					continue
+				}
+			}
+		}
+	})
+	return vs, nil
 }
 
 func (vs *videostore) InitH264(sps, pps []byte) error {
