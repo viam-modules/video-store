@@ -182,7 +182,6 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 		}
 
 		if int(packet.flags)&(C.AV_PKT_FLAG_DISCARD) == (C.AV_PKT_FLAG_DISCARD) {
-			// c.logger.Info("packet is to be discarded")
 			continue
 		}
 		// Can have multiple streams, so need to adjust each packet based on the
