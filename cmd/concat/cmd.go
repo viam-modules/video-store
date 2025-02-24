@@ -4,7 +4,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/viam-modules/video-store/model/camera"
@@ -45,7 +44,7 @@ func main() {
 	}
 
 	//nolint:mnd
-	if err := os.WriteFile(fmt.Sprintf("%s.mp4", os.Args[2]), res.Video, 0o600); err != nil {
+	if err := os.WriteFile(os.Args[2]+".mp4", res.Video, 0o600); err != nil {
 		logger.Fatal(err.Error())
 	}
 }
