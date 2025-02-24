@@ -28,8 +28,6 @@ int main(int argc, char *argv[]) {
   struct raw_seg_h264 *rs;
   int ret = 0;
   sqlite3_stmt *statement;
-  /* char **extradata = NULL; */
-  /* int *extradataSize = NULL; */
   /* Compile the SELECT statement into a virtual machine. */
   printf("Performing query...\n");
   if ((rc = sqlite3_prepare_v2(db, "SELECT data FROM extradata;", -1,
@@ -75,12 +73,10 @@ int main(int argc, char *argv[]) {
   int isIDR = 0;
   int failed = 0;
   while (1) {
-    /* printf("running sqlite3_step\n"); */
     rc = sqlite3_step(statement);
     if (rc != SQLITE_ROW) {
       break;
     }
-    /* id = sqlite3_column_int(statement, 0); */
     pts = sqlite3_column_int64(statement, 1);
     isIDR = sqlite3_column_int(statement, 2);
     ret = video_store_raw_seg_write_h264_packet(

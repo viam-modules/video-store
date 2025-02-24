@@ -88,16 +88,6 @@ $(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviam
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(OBJS) ./cmd/raw-segmenter-c/main.c $(CGO_LDFLAGS) $(shell pkg-config --cflags sqlite3) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  $(shell pkg-config --libs sqlite3) -g -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
 
-# $(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) ./cmd/raw-segmenter-c/main.c | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
-# 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
-# 	rm -f $(BIN_OUTPUT_PATH)/raw-segmenter-c
-# 	mkdir -p $(BUILD_DIR)
-# 	$(CC) $(CGO_LDFLAGS) $(CGO_CFLAGS) -g -c -o $(BUILD_DIR)/rawsegmenter.o ./videostore/rawsegmenter.c
-# 	$(CC) $(CGO_LDFLAGS) $(CGO_CFLAGS) -g -c -o $(BUILD_DIR)/raw-segmenter-c-main.o ./cmd/raw-segmenter-c/main.c 
-# 	$(AR) crs $@ $(BUILD_DIR)/rawsegmenter.o
-# 	$(CC) $(BUILD_DIR)/rawsegmenter.o $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS) -g $(BUILD_DIR)/raw-segmenter-c-main.o -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
-
-
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo "-------- Make $(@) --------"
 	rm -f $@
@@ -200,7 +190,6 @@ endif
 # you need latest valgrind, otherwise you might not get line numbers in your valgrind output
 valgrind-run: 
 ifeq ($(SOURCE_OS),linux)
-	# valgrind --error-exitcode=1 --leak-check=full --track-origins=yes --dsymutil=yes  -v ./bin/linux-arm64/raw-segmenter-c my.db
 	valgrind --error-exitcode=1 --leak-check=full --track-origins=yes --dsymutil=yes  -v ./bin/linux-arm64/raw-segmenter-c my.db
 endif
 ifeq ($(SOURCE_OS),darwin)

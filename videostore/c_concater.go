@@ -97,11 +97,9 @@ func (c *cConcater) Concat(from, to time.Time, path string) error {
 
 	ret := C.video_store_concat(concatFilePathCStr, outputPathCStr)
 	switch ret {
-	// case C.VIDEO_STORE_CONCAT_RESP_OK:
-	case 0:
+	case C.VIDEO_STORE_CONCAT_RESP_OK:
 		return nil
-	// case C.VIDEO_STORE_CONCAT_RESP_ERROR:
-	case 1:
+	case C.VIDEO_STORE_CONCAT_RESP_ERROR:
 		return errors.New("failed to concat segment files")
 	default:
 		return fmt.Errorf("failed to concat segment files: error: %s", ffmpegError(ret))
