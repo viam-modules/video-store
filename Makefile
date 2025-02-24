@@ -60,11 +60,11 @@ export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
 
-$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
+$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
 
-$(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD) $(BUILD_TAG_FILE)
+$(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_OUTPUT_PATH)/concat cmd/concat/cmd.go
 
@@ -151,7 +151,6 @@ module: $(BIN_OUTPUT_PATH)/video-store
 
 clean:
 	rm -rf bin
-	rm -f $(BUILD_TAG_FILE)
 	rm -rf build
 
 clean-ffmpeg: clean
