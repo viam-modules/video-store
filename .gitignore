@@ -5,3 +5,6 @@ FFmpeg
 bin
 module.tar.gz
 .build_tags
+build
+.artifact/cache
+.artifact/data
