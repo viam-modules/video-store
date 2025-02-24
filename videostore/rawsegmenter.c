@@ -77,7 +77,7 @@ int video_store_raw_seg_init_h264(struct raw_seg_h264 **ppRS, // OUT
   // memcpy can't fail
   memcpy(codecCtx->extradata, extradata, extradataSize);
   /* // Copy the codec parameters from the input stream to the output
-   * stream. Thi is equivalent */
+   * stream. This is equivalent */
   /* // to -c:v copy in ffmpeg cli. This is needed to make sure we do not
    * re-encode the stream. */
   ret = avcodec_parameters_from_context(stream->codecpar, codecCtx);
