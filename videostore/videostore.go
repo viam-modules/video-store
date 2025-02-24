@@ -213,7 +213,11 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 		return nil, err
 	}
 
-	rawSegmenter, err := newRawSegmenter(logger, config.Storage.StoragePath, config.Storage.SegmentSeconds)
+	rawSegmenter, err := newRawSegmenter(logger,
+		config.Storage.SizeGB,
+		config.Storage.StoragePath,
+		config.Storage.SegmentSeconds,
+	)
 	if err != nil {
 		return nil, err
 	}

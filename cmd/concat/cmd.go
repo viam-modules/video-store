@@ -15,7 +15,9 @@ import (
 func main() {
 	videostore.SetLibAVLogLevel("debug")
 	ctx := context.Background()
+	//nolint:mnd
 	if len(os.Args) != 3 {
+		//nolint:forbidigo
 		fmt.Printf("usage: %s <fetch command json file> <resource name>\n", os.Args[0])
 		os.Exit(1)
 	}

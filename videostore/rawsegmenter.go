@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"errors"
+	"os"
 	"sync"
 	"unsafe"
 
@@ -22,11 +23,13 @@ type rawSegmenter struct {
 	mu             sync.Mutex
 	initialized    bool
 	closed         bool
+	maxStorageSize int64
 	cRawSeg        *C.raw_seg_h264
 }
 
 func newRawSegmenter(
 	logger logging.Logger,
+	storageSize int,
 	storagePath string,
 	segmentSeconds int,
 ) (*rawSegmenter, error) {
@@ -34,6 +37,7 @@ func newRawSegmenter(
 		logger:         logger,
 		storagePath:    storagePath,
 		segmentSeconds: segmentSeconds,
+		maxStorageSize: int64(storageSize) * gigabyte,
 	}
 	err := createDir(s.storagePath)
 	if err != nil {
@@ -193,4 +197,40 @@ func buildAVCExtradata(sps, pps []byte) ([]byte, error) {
 	// hexdump := hex.Dump(extradata)
 	// fmt.Println("extradata: \n", hexdump)
 	return extradata, nil
+}
+
+// cleanupStorage cleans up the storage directory by deleting the oldest files
+// until the storage size is below the max.
+func (rs *rawSegmenter) cleanupStorage() error {
+	rs.logger.Info("cleanupStorage start")
+	defer rs.logger.Info("cleanupStorage stop")
+	currStorageSize, err := getDirectorySize(rs.storagePath)
+	if err != nil {
+		return err
+	}
+	if currStorageSize < rs.maxStorageSize {
+		return nil
+	}
+	files, err := getSortedFiles(rs.storagePath)
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if currStorageSize < rs.maxStorageSize {
+			break
+		}
+		rs.logger.Debugf("deleting file: %s", file)
+		err := os.Remove(file)
+		if err != nil {
+			return err
+		}
+		rs.logger.Debugf("deleted file: %s", file)
+		// NOTE: This is going to be super slow
+		// we should speed this up
+		currStorageSize, err = getDirectorySize(rs.storagePath)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
