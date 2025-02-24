@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/viam-modules/video-store/model/camera"
@@ -14,6 +15,10 @@ import (
 func main() {
 	videostore.SetLibAVLogLevel("debug")
 	ctx := context.Background()
+	if len(os.Args) != 3 {
+		fmt.Printf("usage: %s <fetch command json file> <resource name>\n", os.Args[0])
+		os.Exit(1)
+	}
 	logger := logging.NewLogger(os.Args[0])
 	c := camera.Config{Storage: camera.Storage{SizeGB: 1}}
 	b, err := os.ReadFile(os.Args[1])
