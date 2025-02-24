@@ -181,9 +181,6 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 			return fmt.Errorf("failed to read frame: %s", ffmpegError(ret))
 		}
 
-		// c.logger.Infof("av_read_frame ret: %d", int(ret))
-		// c.logger.Infof("pts: %d, dts: %d, pos: %d, duration: %d, stream_index: %d, time_base: %d, packet.flags: %d",
-		// packet.pts, packet.dts, packet.pos, packet.duration, packet.stream_index, packet.time_base, packet.flags)
 		if int(packet.flags)&(C.AV_PKT_FLAG_DISCARD) == (C.AV_PKT_FLAG_DISCARD) {
 			// c.logger.Info("packet is to be discarded")
 			continue
