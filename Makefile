@@ -127,7 +127,7 @@ lint: tool-install $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml --timeout=2m
 
-test: $(BIN_OUTPUT_PATH)/video-store$(BIN_OUTPUT_PATH)/video-store
+test: $(BIN_OUTPUT_PATH)/video-store
 ifeq ($(shell which ffmpeg > /dev/null 2>&1; echo $$?), 1)
 ifeq ($(SOURCE_OS),linux)
 	sudo apt update && sudo apt install -y ffmpeg
