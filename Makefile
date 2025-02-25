@@ -60,7 +60,7 @@ export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
 
-$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD)
+$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go videostore/*.c $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
 
@@ -127,7 +127,7 @@ lint: tool-install $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml --timeout=2m
 
-test: $(BIN_OUTPUT_PATH)/video-store
+test: $(BIN_OUTPUT_PATH)/video-store$(BIN_OUTPUT_PATH)/video-store
 ifeq ($(shell which ffmpeg > /dev/null 2>&1; echo $$?), 1)
 ifeq ($(SOURCE_OS),linux)
 	sudo apt update && sudo apt install -y ffmpeg
