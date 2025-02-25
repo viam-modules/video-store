@@ -20,8 +20,8 @@ type Recorder struct {
 	db     *sql.DB
 }
 
-func NewRecorder(dbPath string, logger logging.Logger) (Recorder, error) {
-	return Recorder{dbPath: dbPath, logger: logger}, nil
+func NewRecorder(dbPath string, logger logging.Logger) (*Recorder, error) {
+	return &Recorder{dbPath: dbPath, logger: logger}, nil
 }
 
 func (rs *Recorder) Init(extradata []byte) error {
