@@ -15,7 +15,8 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
   int outputPathOpened = 0;
   const AVInputFormat *inputFormat = av_find_input_format("concat");
   if (inputFormat == NULL) {
-    av_log(NULL, AV_LOG_ERROR, "video_store_concat failed to find input format\n");
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_concat failed to find input format\n");
     goto cleanup;
   }
 
@@ -74,8 +75,6 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
              i, av_err2str(ret));
       goto cleanup;
     }
-    // Let ffmpeg handle the codec tag for us.
-    outStream->codecpar->codec_tag = 0;
   }
 
   ret = avio_open(&outputCtx->pb, output_path, AVIO_FLAG_WRITE);

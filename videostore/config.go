@@ -20,6 +20,8 @@ const (
 	SourceTypeFrame
 	// SourceTypeH264RTPPacket is a video store that creates a video from rtp packets.
 	SourceTypeH264RTPPacket
+	// SourceTypeH265RTPPacket is a video store that creates a video from rtp packets.
+	SourceTypeH265RTPPacket
 )
 
 func (t SourceType) String() string {
@@ -30,6 +32,8 @@ func (t SourceType) String() string {
 		return "VideoStoreTypeFrame"
 	case SourceTypeH264RTPPacket:
 		return "SourceTypeH264RTPPacket"
+	case SourceTypeH265RTPPacket:
+		return "SourceTypeH265RTPPacket"
 	default:
 		return "VideoStoreTypeUnknown"
 	}

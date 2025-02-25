@@ -25,6 +25,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --disable-everything \
                --enable-static \
                --enable-libx264 \
+               --enable-decoder=hevc \
                --enable-gpl \
                --enable-encoder=libx264 \
                --enable-muxer=segment \
@@ -34,10 +35,12 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-demuxer=mov \
                --enable-demuxer=mp4 \
                --enable-parser=h264 \
+               --enable-parser=hevc \
                --enable-protocol=file \
                --enable-protocol=concat \
                --enable-protocol=crypto \
                --enable-bsf=h264_mp4toannexb \
+               --enable-bsf=hevc_mp4toannexb \
                --enable-decoder=mjpeg
 
 GOFLAGS := -buildvcs=false
@@ -51,9 +54,9 @@ ifeq ($(SOURCE_OS),linux)
 	SUBST = -l:libx264.a
 endif
 ifeq ($(SOURCE_OS),darwin)
-	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
+	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a 
 endif
-CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
+CGO_LDFLAGS = $(subst -lx264, $(SUBST), $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS)))
 export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 .PHONY: lint tool-install test clean clean-all clean-ffmpeg module build valgrind

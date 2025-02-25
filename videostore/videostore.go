@@ -66,7 +66,7 @@ type videostore struct {
 
 	rawSegmenter *rawSegmenter
 	segmenter    *segmenter
-	concater     Concater
+	concater     *concater
 }
 
 // VideoStore stores video and provides APIs to request the stored video
@@ -76,16 +76,16 @@ type VideoStore interface {
 	Close(ctx context.Context) error
 }
 
-// Concater concatinates video files within the time range
-type Concater interface {
-	Concat(from, to time.Time, path string) error
-}
+// // Concater concatinates video files within the time range
+// type Concater interface {
+// 	Concat(from, to time.Time, path string) error
+// }
 
-// H264RTPVideoStore stores h264 video derived from RTP packets and provides APIs to request the stored video
-type H264RTPVideoStore interface {
+// RTPVideoStore stores video derived from RTP packets and provides APIs to request the stored video
+type RTPVideoStore interface {
 	VideoStore
-	InitH264(sps, pps []byte) error
-	WritePacket(payload []byte, pts int64, isIDR bool) error
+	Init(width, height int) error
+	WritePacket(payload []byte, pts, dts int64, isIDR bool) error
 }
 
 // SaveRequest is the request to the Save method
@@ -190,10 +190,10 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 	return vs, nil
 }
 
-// NewH264RTPVideoStore returns a VideoStore that stores video it receives from the caller
-func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logger) (H264RTPVideoStore, error) {
-	if config.Type != SourceTypeH264RTPPacket {
-		return nil, fmt.Errorf("config type must be %s", SourceTypeFrame)
+// NewRTPVideoStore returns a VideoStore that stores video it receives from the caller
+func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, error) {
+	if config.Type != SourceTypeH264RTPPacket && config.Type != SourceTypeH265RTPPacket {
+		return nil, fmt.Errorf("config type must be %s or %s", SourceTypeH264RTPPacket, SourceTypeH265RTPPacket)
 	}
 	if err := config.Validate(); err != nil {
 		return nil, err
@@ -214,6 +214,7 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 	}
 
 	rawSegmenter, err := newRawSegmenter(logger,
+		config.Type,
 		config.Storage.SizeGB,
 		config.Storage.StoragePath,
 		config.Storage.SegmentSeconds,
@@ -249,18 +250,26 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 	return vs, nil
 }
 
-func (vs *videostore) InitH264(sps, pps []byte) error {
-	if vs.typ != SourceTypeH264RTPPacket {
-		return errors.New("InitH264 unimplmeented")
+func (vs *videostore) Init(width, height int) error {
+	switch vs.typ {
+	case SourceTypeH264RTPPacket, SourceTypeH265RTPPacket:
+		return vs.rawSegmenter.init(width, height)
+	case SourceTypeFrame:
+		fallthrough
+	default:
+		return errors.New("Init unimplmented")
 	}
-	return vs.rawSegmenter.initH264(sps, pps)
 }
 
-func (vs *videostore) WritePacket(payload []byte, pts int64, isIDR bool) error {
-	if vs.typ != SourceTypeH264RTPPacket {
-		return errors.New("WritePacket unimplmeented")
+func (vs *videostore) WritePacket(payload []byte, pts, dts int64, isIDR bool) error {
+	switch vs.typ {
+	case SourceTypeH264RTPPacket, SourceTypeH265RTPPacket:
+		return vs.rawSegmenter.writePacket(payload, pts, dts, isIDR)
+	case SourceTypeFrame:
+		fallthrough
+	default:
+		return errors.New("WritePacket unimplmented")
 	}
-	return vs.rawSegmenter.writePacket(payload, pts, isIDR)
 }
 
 func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse, error) {
@@ -497,3 +506,59 @@ func (vs *videostore) Close(_ context.Context) error {
 	}
 	return nil
 }
+
+///*
+//	aligned(8) class AVCDecoderConfigurationRecord {
+//		   unsigned int(8) configurationVersion = 1;
+//		   unsigned int(8) AVCProfileIndication;
+//		   unsigned int(8) profile_compatibility;
+//		   unsigned int(8) AVCLevelIndication;
+//		   bit(6) reserved = ‘111111’b;
+//		   unsigned int(2) lengthSizeMinusOne;
+//		   bit(3) reserved = ‘111’b;
+//		   unsigned int(5) numOfSequenceParameterSets;
+//		   for (i=0; i< numOfSequenceParameterSets;  i++) {
+//		      unsigned int(16) sequenceParameterSetLength ;
+//		  bit(8*sequenceParameterSetLength) sequenceParameterSetNALUnit;
+//		 }
+//		   unsigned int(8) numOfPictureParameterSets;
+//		   for (i=0; i< numOfPictureParameterSets;  i++) {
+//		  unsigned int(16) pictureParameterSetLength;
+//		  bit(8*pictureParameterSetLength) pictureParameterSetNALUnit;
+//		 }
+//		}
+//*/
+//// BuildAVCExtradata builds the AVCDecoderConfigurationRecord extradata from the SPS and PPS data.
+//// The SPS and PPS data are expected to be packed into the format listed above.
+//func BuildAVCExtradata(sps, pps []byte) ([]byte, error) {
+//	if len(sps) < 4 || len(pps) < 1 {
+//		return nil, errors.New("invalid SPS/PPS data")
+//	}
+//	extradata := []byte{}
+//	// configurationVersion
+//	extradata = append(extradata, 1)
+//	// AVCProfileIndication, profile_compatibility, AVCLevelIndication (from SPS)
+//	extradata = append(extradata, sps[1], sps[2], sps[3])
+//	// 6 bits reserved (111111) + 2 bits lengthSizeMinusOne (3 for 4 bytes)
+//	//nolint:mnd
+//	extradata = append(extradata, 0xFF)
+//	// 3 bits reserved (111) + 5 bits numOfSequenceParameterSets (usually 1)
+//	//nolint:mnd
+//	extradata = append(extradata, 0xE1)
+//	// SPS length (2 bytes big-endian)
+//	spsLen := uint16(len(sps))
+//	//nolint:mnd
+//	extradata = append(extradata, byte(spsLen>>8), byte(spsLen&0xff))
+//	// SPS data
+//	extradata = append(extradata, sps...)
+//	// Number of Picture Parameter Sets (usually 1)
+//	extradata = append(extradata, 1)
+//	// PPS length (2 bytes big-endian)
+//	ppsLen := uint16(len(pps))
+//	//nolint:mnd
+//	extradata = append(extradata, byte(ppsLen>>8), byte(ppsLen&0xff))
+//	// PPS data
+//	extradata = append(extradata, pps...)
+
+//	return extradata, nil
+//}
