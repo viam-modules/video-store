@@ -20,7 +20,7 @@ type Recorder struct {
 	db     *sql.DB
 }
 
-func New(dbPath string, logger logging.Logger) (Recorder, error) {
+func NewRecorder(dbPath string, logger logging.Logger) (Recorder, error) {
 	return Recorder{dbPath: dbPath, logger: logger}, nil
 }
 

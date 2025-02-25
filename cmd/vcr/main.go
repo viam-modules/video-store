@@ -13,7 +13,7 @@ func main() {
 		fmt.Printf("usage: %s <db file path>\n", os.Args[0])
 		os.Exit(1)
 	}
-	r, err := vcr.New(os.Args[1], logging.NewLogger("h265recorder"))
+	r, err := vcr.NewRecorder(os.Args[1], logging.NewLogger("h265recorder"))
 	if err != nil {
 		panic(err.Error())
 	}
