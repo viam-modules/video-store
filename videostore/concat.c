@@ -55,18 +55,32 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
     goto cleanup;
   }
 
+  // Store codec parameters of the first input stream for comparison
+  AVCodecParameters *firstCodecPar = inputCtx->streams[0]->codecpar;
+
   for (unsigned int i = 0; i < inputCtx->nb_streams; i++) {
+    AVStream *inStream = inputCtx->streams[i];
     AVStream *outStream = avformat_new_stream(outputCtx, NULL);
     if (outStream == NULL) {
       av_log(NULL, AV_LOG_ERROR,
-             "video_store_concat failed to create ouput stream for input "
+             "video_store_concat failed to create output stream for input "
              "stream index %d, %s\n",
              i, av_err2str(ret));
       goto cleanup;
     }
 
-    ret = avcodec_parameters_copy(outStream->codecpar,
-                                  inputCtx->streams[i]->codecpar);
+    // Check for codec parameter mismatches
+    if (inStream->codecpar->codec_id != firstCodecPar->codec_id ||
+        inStream->codecpar->width != firstCodecPar->width ||
+        inStream->codecpar->height != firstCodecPar->height) {
+      av_log(NULL, AV_LOG_ERROR,
+             "video_store_concat codec parameter mismatch for input stream index %d\n",
+             i);
+      ret = AVERROR(EINVAL);
+      goto write_trailer;
+    }
+
+    ret = avcodec_parameters_copy(outStream->codecpar, inStream->codecpar);
     if (ret < 0) {
       av_log(NULL, AV_LOG_ERROR,
              "video_store_concat failed to copy input stream index %d codec "
@@ -109,7 +123,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
       av_log(NULL, AV_LOG_ERROR, "video_store_concat failed to read frame: %s",
              av_err2str(ret));
       av_packet_unref(packet);
-      goto cleanup;
+      goto write_trailer;
     }
 
     if ((packet->flags & AV_PKT_FLAG_DISCARD) == AV_PKT_FLAG_DISCARD) {
@@ -133,17 +147,18 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
       av_packet_unref(packet);
       av_log(NULL, AV_LOG_ERROR, "video_store_concat failed to write frame: %s",
              av_err2str(ret));
-      goto cleanup;
+      goto write_trailer;
     }
     av_packet_unref(packet);
   }
 
+write_trailer:
   if ((ret = av_write_trailer(outputCtx))) {
     av_log(NULL, AV_LOG_ERROR, "video_store_concat failed to write trailer: %s",
            av_err2str(ret));
-    goto cleanup;
+  } else {
+    ret = VIDEO_STORE_CONCAT_RESP_OK;
   }
-  ret = VIDEO_STORE_CONCAT_RESP_OK;
 
 cleanup:
   av_log(NULL, AV_LOG_DEBUG, "video_store_concat going to cleanup\n");
