@@ -5,7 +5,6 @@ import (
 	"os"
 	"path"
 	"sync"
-	"time"
 
 	"database/sql"
 
@@ -14,36 +13,38 @@ import (
 	"go.viam.com/rdk/utils"
 )
 
-type H265Recorder struct {
-	Dirpath string
-	Logger  logging.Logger
-	dbPath  string
-	mu      sync.Mutex
-	db      *sql.DB
+type Recorder struct {
+	logger logging.Logger
+	dbPath string
+	mu     sync.Mutex
+	db     *sql.DB
 }
 
-func (rs *H265Recorder) Init(extradata []byte) error {
+func New(dbPath string, logger logging.Logger) (Recorder, error) {
+	return Recorder{dbPath: dbPath, logger: logger}, nil
+}
+
+func (rs *Recorder) Init(extradata []byte) error {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	if rs.db != nil {
 		return errors.New("InitH265 called multiple times")
 	}
 
-	if err := os.MkdirAll(rs.Dirpath, 0o755); err != nil {
+	if err := os.MkdirAll(path.Dir(rs.dbPath), 0o755); err != nil {
 		return err
 	}
-	dbPath := path.Join(rs.Dirpath, time.Now().Format(time.RFC3339)+".db")
-	rs.Logger.Infof("opening: %s\n", dbPath)
-	db, err := sql.Open("sqlite3", dbPath)
+
+	db, err := sql.Open("sqlite3", rs.dbPath)
 	if err != nil {
 		return err
 	}
 	g := utils.NewGuard(func() {
 		if cErr := db.Close(); cErr != nil {
-			rs.Logger.Error(cErr.Error())
+			rs.logger.Error(cErr.Error())
 		}
-		if cErr := os.Remove(dbPath); cErr != nil {
-			rs.Logger.Error(cErr.Error())
+		if cErr := os.Remove(rs.dbPath); cErr != nil {
+			rs.logger.Error(cErr.Error())
 		}
 	})
 
@@ -61,18 +62,17 @@ func (rs *H265Recorder) Init(extradata []byte) error {
 	}
 	g.Success()
 	rs.db = db
-	rs.dbPath = dbPath
 	return nil
 }
 
-func (rs *H265Recorder) Packet(payload []byte, pts int64, isIDR bool) error {
+func (rs *Recorder) Packet(payload []byte, pts int64, isIDR bool) error {
 	if _, err := rs.db.Exec("INSERT INTO packet(pts, isIDR, data) VALUES(?, ?, ?);", pts, isIDR, payload); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (rs *H265Recorder) Close() error {
+func (rs *Recorder) Close() error {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	if rs.db == nil {
