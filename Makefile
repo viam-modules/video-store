@@ -84,6 +84,12 @@ $(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviam
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(OBJS) ./cmd/raw-segmenter-c/main.c $(CGO_LDFLAGS) $(shell pkg-config --cflags sqlite3) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  $(shell pkg-config --libs sqlite3) -g -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
 
+$(BIN_OUTPUT_PATH)/duration-c: $(FFMPEG_BUILD) $(OBJS) | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+	@echo "-------- Make $(BIN_OUTPUT_PATH)/duration-c --------"
+	rm -f $(BIN_OUTPUT_PATH)/duration-c
+	mkdir -p $(BUILD_DIR)
+	$(CC) $(OBJS) ./cmd/duration-c/main.c $(CGO_LDFLAGS) -ldl $(CGO_CFLAGS) -g -o $(BIN_OUTPUT_PATH)/duration-c
+
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo "-------- Make $(@) --------"
 	rm -f $@
