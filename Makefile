@@ -35,12 +35,12 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-demuxer=mov \
                --enable-demuxer=mp4 \
                --enable-parser=h264 \
-							 --enable-parser=hevc \
+               --enable-parser=hevc \
                --enable-protocol=file \
                --enable-protocol=concat \
                --enable-protocol=crypto \
                --enable-bsf=h264_mp4toannexb \
-							 --enable-bsf=hevc_mp4toannexb \
+               --enable-bsf=hevc_mp4toannexb \
                --enable-decoder=mjpeg
 
 GOFLAGS := -buildvcs=false
