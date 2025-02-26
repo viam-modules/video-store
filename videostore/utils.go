@@ -1,6 +1,7 @@
 package videostore
 
 /*
+#include "utils.h"
 #include <libavutil/error.h>
 #include <libavutil/opt.h>
 #include <libavcodec/avcodec.h>
@@ -17,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unsafe"
 )
 
 // SetLibAVLogLevel sets the libav log level.
@@ -219,12 +221,15 @@ func formatDateTimeToString(dateTime time.Time) string {
 }
 
 // matchStorageToRange returns a list of files that fall within the provided time range.
-// Includes trimming video files to the time range if they overlap. Assumes that all video
-// files have the same duration.
-func matchStorageToRange(files []string, start, end time.Time, duration time.Duration) []string {
+// Includes trimming video files to the time range if they overlap.
+func matchStorageToRange(files []string, start, end time.Time) []string {
 	var matchedFiles []string
 	for _, file := range files {
 		dateTime, err := extractDateTimeFromFilename(file)
+		if err != nil {
+			continue
+		}
+		duration, err := getVideoDuration(file)
 		if err != nil {
 			continue
 		}
@@ -289,4 +294,18 @@ func validateTimeRange(files []string, start, end time.Time) error {
 		return errors.New("time range is outside of storage range")
 	}
 	return nil
+}
+
+// getVideoDuration returns the duration of the video file in seconds.
+func getVideoDuration(filePath string) (time.Duration, error) {
+	cFilePath := C.CString(filePath)
+	defer C.free(unsafe.Pointer(cFilePath))
+
+	duration := C.get_video_duration(cFilePath)
+	if duration < 0 {
+		return 0, fmt.Errorf("failed to get video duration for file: %s", filePath)
+	}
+
+	// Convert duration from AV_TIME_BASE units to time.Duration
+	return time.Duration(duration) * time.Microsecond, nil
 }
