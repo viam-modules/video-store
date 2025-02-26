@@ -147,7 +147,7 @@ int video_store_raw_seg_init_h264(struct raw_seg **ppRS,      // OUT
                                   const int width,            // IN
                                   const int height            // IN
 ) {
-  const struct AVCodec *codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+  const struct AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H264);
   if (codec == NULL) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_raw_seg_init_h264 failed to find codec");
@@ -166,7 +166,7 @@ int video_store_raw_seg_init_h265(struct raw_seg **ppRS,      // OUT
                                   const int width,            // IN
                                   const int height            // IN
 ) {
-  const struct AVCodec *codec = avcodec_find_encoder(AV_CODEC_ID_H265);
+  const struct AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H265);
   if (codec == NULL) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_raw_seg_init_h265 failed to find codec");
