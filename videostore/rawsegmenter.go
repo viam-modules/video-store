@@ -24,7 +24,7 @@ type rawSegmenter struct {
 	initialized    bool
 	closed         bool
 	maxStorageSize int64
-	cRawSeg        *C.raw_seg_h264
+	cRawSeg        *C.raw_seg
 }
 
 func newRawSegmenter(
@@ -72,7 +72,7 @@ func (rs *rawSegmenter) initH264(sps, pps []byte) error {
 		rs.logger.Error("failed to build extradata: ", err)
 		return err
 	}
-	var cRS *C.raw_seg_h264
+	var cRS *C.raw_seg
 	// Allocate output context for segmenter. The "segment" format is a special format
 	// that allows for segmenting output files. The output pattern is a strftime pattern
 	// that specifies the output file name. The pattern is set to the current time.

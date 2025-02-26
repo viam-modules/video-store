@@ -1,4 +1,5 @@
 #include "../../videostore/rawsegmenter.h"
+#include "libavutil/log.h"
 #include <sqlite3.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -17,6 +18,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  av_log_set_level(AV_LOG_DEBUG);
   sqlite3 *db = NULL;
   int rc = 0;
 
@@ -25,7 +27,7 @@ int main(int argc, char *argv[]) {
     return 1;
   };
 
-  struct raw_seg_h264 *rs;
+  struct raw_seg *rs;
   int ret = 0;
   sqlite3_stmt *statement;
   /* Compile the SELECT statement into a virtual machine. */
@@ -42,12 +44,12 @@ int main(int argc, char *argv[]) {
     return rc;
   }
 
-  ret = video_store_raw_seg_init_h264(
+  ret = video_store_raw_seg_init_h265(
       &rs, 30, "./mp4s/%Y-%m-%d_%H-%M-%S.mp4",
       sqlite3_column_blob(statement, 0),
-      (size_t)sqlite3_column_bytes(statement, 0), 2560, 1440);
+      (size_t)sqlite3_column_bytes(statement, 0), 2960, 1668);
   if (ret != VIDEO_STORE_RAW_SEG_RESP_OK) {
-    printf("video_store_raw_seg_init_h264 failed: %d\n", ret);
+    printf("video_store_raw_seg_init_h265 failed: %d\n", ret);
     rc = sqlite3_finalize(statement);
     if (rc != SQLITE_OK) {
       printf("sqlite3_finalize failed: %d\n", rc);
@@ -79,12 +81,12 @@ int main(int argc, char *argv[]) {
     }
     pts = sqlite3_column_int64(statement, 1);
     isIDR = sqlite3_column_int(statement, 2);
-    ret = video_store_raw_seg_write_h264_packet(
+    ret = video_store_raw_seg_write_h265_packet(
         rs, sqlite3_column_blob(statement, 3),
         (size_t)sqlite3_column_bytes(statement, 3), pts, isIDR);
     if (ret != VIDEO_STORE_RAW_SEG_RESP_OK) {
       failed = 1;
-      printf("video_store_raw_seg_write_h264_packet failed: %d\n", ret);
+      printf("video_store_raw_seg_write_h265_packet failed: %d\n", ret);
       break;
     }
   }
@@ -107,7 +109,9 @@ int main(int argc, char *argv[]) {
   }
 
   if (failed) {
+    printf("failed: %d\n", failed);
     return 1;
   }
+  printf("succeeded\n");
   return 0;
 }

@@ -25,8 +25,10 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --disable-everything \
                --enable-static \
                --enable-libx264 \
+               --enable-libx265 \
                --enable-gpl \
                --enable-encoder=libx264 \
+               --enable-encoder=libx265 \
                --enable-muxer=segment \
                --enable-muxer=mp4 \
                --enable-demuxer=segment \
@@ -34,10 +36,12 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-demuxer=mov \
                --enable-demuxer=mp4 \
                --enable-parser=h264 \
+               --enable-parser=h265 \
                --enable-protocol=file \
                --enable-protocol=concat \
                --enable-protocol=crypto \
                --enable-bsf=h264_mp4toannexb \
+               --enable-bsf=hevc_mp4toannexb \
                --enable-decoder=mjpeg
 
 GOFLAGS := -buildvcs=false
@@ -106,6 +110,9 @@ ifeq ($(SOURCE_OS),linux)
 ifeq ($(shell dpkg -l | grep -w x264 > /dev/null; echo $$?), 1)
 	sudo apt update && sudo apt install -y libx264-dev
 endif
+ifeq ($(shell dpkg -l | grep -w x265 > /dev/null; echo $$?), 1)
+	sudo apt update && sudo apt install -y libx265-dev
+endif
 ifeq ($(SOURCE_ARCH),amd64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
 endif
@@ -113,6 +120,9 @@ endif
 ifeq ($(SOURCE_OS),darwin)
 ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
 	brew update && brew install x264
+endif
+ifeq ($(shell brew list | grep -w x265 > /dev/null; echo $$?), 1)
+	brew update && brew install x265
 endif
 endif
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
