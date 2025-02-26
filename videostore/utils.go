@@ -301,11 +301,15 @@ func getVideoDuration(filePath string) (time.Duration, error) {
 	cFilePath := C.CString(filePath)
 	defer C.free(unsafe.Pointer(cFilePath))
 
-	duration := C.get_video_duration(cFilePath)
-	if duration < 0 {
+	var duration C.int64_t
+	ret := C.get_video_duration(&duration, cFilePath)
+	switch ret {
+	case C.VIDEO_STORE_DURATION_RESP_OK:
+		// Convert duration from AV_TIME_BASE units to time.Duration
+		return time.Duration(duration) * time.Microsecond, nil
+	case C.VIDEO_STORE_DURATION_RESP_ERROR:
 		return 0, fmt.Errorf("failed to get video duration for file: %s", filePath)
+	default:
+		return 0, fmt.Errorf("failed to get video duration for file: %s with error: %s", filePath, ffmpegError(ret))
 	}
-
-	// Convert duration from AV_TIME_BASE units to time.Duration
-	return time.Duration(duration) * time.Microsecond, nil
 }

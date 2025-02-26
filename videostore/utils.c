@@ -1,15 +1,20 @@
 #include "utils.h"
 
-int64_t get_video_duration(const char *filename) {
+int get_video_duration(int64_t *duration, const char *filename) {
     AVFormatContext *fmt_ctx = NULL;
-    if (avformat_open_input(&fmt_ctx, filename, NULL, NULL) < 0) {
-        return VIDEO_STORE_DURATION_RESP_ERROR;
+    int ret;
+    if ((ret = avformat_open_input(&fmt_ctx, filename, NULL, NULL)) < 0) {
+        return ret;
     }
-    if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
+    if ((ret = avformat_find_stream_info(fmt_ctx, NULL)) < 0) {
+        avformat_close_input(&fmt_ctx);
+        return ret;
+    }
+    *duration = fmt_ctx->duration;
+    if (*duration == AV_NOPTS_VALUE) {
         avformat_close_input(&fmt_ctx);
         return VIDEO_STORE_DURATION_RESP_ERROR;
     }
-    int64_t duration = fmt_ctx->duration;
     avformat_close_input(&fmt_ctx);
-    return duration;
+    return VIDEO_STORE_DURATION_RESP_OK;
 }
