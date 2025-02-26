@@ -52,10 +52,10 @@ OBJS := $(subst $(SRC_DIR), $(BUILD_DIR), $(SRCS:.c=.o))
 PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
 CGO_CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS))
 ifeq ($(SOURCE_OS),linux)
-	SUBST = -l:libx264.a
+	SUBST = -l:libx264.a -l:libx265.a
 endif
 ifeq ($(SOURCE_OS),darwin)
-	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
+	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a $HOMEBREW_PREFIX/Cellar/x265/4.1/lib/libx265.a
 endif
 CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
 export PATH := $(PATH):$(shell go env GOPATH)/bin

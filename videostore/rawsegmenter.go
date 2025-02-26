@@ -115,7 +115,7 @@ func (rs *rawSegmenter) writePacket(payload []byte, pts int64, isIDR bool) error
 	if isIDR {
 		idr = C.int(1)
 	}
-	ret := C.video_store_raw_seg_write_h264_packet(
+	ret := C.video_store_raw_seg_write_packet(
 		rs.cRawSeg,
 		(*C.char)(payloadC),
 		C.size_t(len(payload)),
