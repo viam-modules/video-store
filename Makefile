@@ -25,10 +25,9 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --disable-everything \
                --enable-static \
                --enable-libx264 \
-               --enable-libx265 \
+							 --enable-decoder=hevc \
                --enable-gpl \
                --enable-encoder=libx264 \
-               --enable-encoder=libx265 \
                --enable-muxer=segment \
                --enable-muxer=mp4 \
                --enable-demuxer=segment \
@@ -36,13 +35,13 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-demuxer=mov \
                --enable-demuxer=mp4 \
                --enable-parser=h264 \
-               --enable-parser=h265 \
+							 --enable-parser=hevc \
                --enable-protocol=file \
                --enable-protocol=concat \
                --enable-protocol=crypto \
                --enable-bsf=h264_mp4toannexb \
                --enable-bsf=hevc_mp4toannexb \
-               --enable-decoder=mjpeg
+               --enable-decoder=mjpeg \
 
 GOFLAGS := -buildvcs=false
 SRC_DIR := videostore
@@ -52,12 +51,15 @@ OBJS := $(subst $(SRC_DIR), $(BUILD_DIR), $(SRCS:.c=.o))
 PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
 CGO_CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS))
 ifeq ($(SOURCE_OS),linux)
-	SUBST = -l:libx264.a -l:libx265.a
+	# SUBSTX264 = -l:libx264.a
+	# SUBSTX265 = -l:libx265.a -l:libnuma.a
 endif
-ifeq ($(SOURCE_OS),darwin)
-	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a $HOMEBREW_PREFIX/Cellar/x265/4.1/lib/libx265.a
-endif
-CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
+# ifeq ($(SOURCE_OS),darwin)
+# 	SUBSTX264 = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a 
+# endif
+# CGO_LDFLAGS = $(subst -lx265, $(SUBSTX265),$(subst -lx264, $(SUBSTX264), $(shell PKG_COFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))))
+# CGO_LDFLAGS = $(subst -lx264, $(SUBSTX264), $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS)))
+CGO_LDFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))
 export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 .PHONY: lint tool-install test clean clean-all clean-ffmpeg module build valgrind
@@ -110,9 +112,6 @@ ifeq ($(SOURCE_OS),linux)
 ifeq ($(shell dpkg -l | grep -w x264 > /dev/null; echo $$?), 1)
 	sudo apt update && sudo apt install -y libx264-dev
 endif
-ifeq ($(shell dpkg -l | grep -w x265 > /dev/null; echo $$?), 1)
-	sudo apt update && sudo apt install -y libx265-dev
-endif
 ifeq ($(SOURCE_ARCH),amd64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
 endif
@@ -120,9 +119,6 @@ endif
 ifeq ($(SOURCE_OS),darwin)
 ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
 	brew update && brew install x264
-endif
-ifeq ($(shell brew list | grep -w x265 > /dev/null; echo $$?), 1)
-	brew update && brew install x265
 endif
 endif
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
