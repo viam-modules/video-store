@@ -60,7 +60,7 @@ export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
 
-$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD)
+$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go videostore/*.c videostore/*.h $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
 
