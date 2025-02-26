@@ -1,4 +1,4 @@
-package videostore
+package videostore_test
 
 import (
 	"bytes"
@@ -76,6 +76,19 @@ func testVideoPlayback(t *testing.T, videoPath string) {
 	cmd := exec.Command("ffmpeg", "-v", "error", "-i", videoPath, "-f", "null", "-")
 	err = cmd.Run()
 	test.That(t, err, test.ShouldBeNil)
+}
+
+func testVideoDuration(t *testing.T, videoPath string, expectedDuration float64) {
+	cmd := exec.Command("ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", videoPath)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	test.That(t, err, test.ShouldBeNil)
+	durationStr := out.String()
+	var duration float64
+	_, err = fmt.Sscanf(durationStr, "%f", &duration)
+	test.That(t, err, test.ShouldBeNil)
+	test.That(t, duration, test.ShouldAlmostEqual, expectedDuration)
 }
 
 func TestModuleConfiguration(t *testing.T) {
