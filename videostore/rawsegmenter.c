@@ -21,7 +21,7 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,      // OUT
   struct raw_seg *rs = (struct raw_seg *)malloc(sizeof(struct raw_seg));
   if (rs == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init failed allocate a raw_seg_h264");
+           "video_store_raw_seg_init failed allocate a raw_seg_h264\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
   AVFormatContext *fmtCtx = NULL;
@@ -40,7 +40,7 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,      // OUT
   stream = avformat_new_stream(fmtCtx, NULL);
   if (stream == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init failed to allocate stream");
+           "video_store_raw_seg_init failed to allocate stream\n");
     ret = VIDEO_STORE_RAW_SEG_RESP_ERROR;
     goto cleanup;
   }
@@ -50,7 +50,7 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,      // OUT
   codecCtx = avcodec_alloc_context3(codec);
   if (codecCtx == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init failed to allocate codec context");
+           "video_store_raw_seg_init failed to allocate codec context\n");
     ret = VIDEO_STORE_RAW_SEG_RESP_ERROR;
     goto cleanup;
   }
@@ -60,7 +60,7 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,      // OUT
   codecCtx->extradata = av_malloc(extradataSize + AV_INPUT_BUFFER_PADDING_SIZE);
   if (codecCtx->extradata == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init failed to allocate extradata");
+           "video_store_raw_seg_init failed to allocate extradata\n");
     ret = VIDEO_STORE_RAW_SEG_RESP_ERROR;
     goto cleanup;
   }
@@ -75,7 +75,7 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,      // OUT
   ret = avcodec_parameters_from_context(stream->codecpar, codecCtx);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init failed to copy codec parameters");
+           "video_store_raw_seg_init failed to copy codec parameters\n");
     goto cleanup;
   }
 
@@ -85,28 +85,28 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,      // OUT
   ret = av_dict_set(&opts, "segment_time", stackSegmentSecondsStr, 0);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init failed to set segment_time");
+           "video_store_raw_seg_init failed to set segment_time\n");
     goto cleanup;
   }
 
   ret = av_dict_set(&opts, "segment_format", "mp4", 0);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init failed to set segment_format");
+           "video_store_raw_seg_init failed to set segment_format\n");
     goto cleanup;
   }
 
   ret = av_dict_set(&opts, "reset_timestamps", "1", 0);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init failed to set reset_timestamps");
+           "video_store_raw_seg_init failed to set reset_timestamps\n");
     goto cleanup;
   }
 
   ret = av_dict_set(&opts, "strftime", "1", 0);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init failed to set strftime");
+           "video_store_raw_seg_init failed to set strftime\n");
     goto cleanup;
   }
 
@@ -114,7 +114,7 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,      // OUT
   ret = avformat_write_header(fmtCtx, &opts);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init failed to write header");
+           "video_store_raw_seg_init failed to write header\n");
     goto cleanup;
   }
 
@@ -150,7 +150,7 @@ int video_store_raw_seg_init_h264(struct raw_seg **ppRS,      // OUT
   const struct AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H264);
   if (codec == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init_h264 failed to find codec");
+           "video_store_raw_seg_init_h264 failed to find codec\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
   return video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern,
@@ -169,7 +169,7 @@ int video_store_raw_seg_init_h265(struct raw_seg **ppRS,      // OUT
   const struct AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H265);
   if (codec == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_init_h265 failed to find codec");
+           "video_store_raw_seg_init_h265 failed to find codec\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
   return video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern,
@@ -186,27 +186,27 @@ int video_store_raw_seg_write_packet(struct raw_seg *rs,       // IN
   int ret = VIDEO_STORE_RAW_SEG_RESP_ERROR;
   if (payloadSize == 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_write_packet called with empty payload size");
+           "video_store_raw_seg_write_packet called with empty payload size\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
 
   if (payload == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_write_packet called with null payload");
+           "video_store_raw_seg_write_packet called with null payload\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
 
   if (rs->outCtx == NULL) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_raw_seg_write_packet called before "
-           "video_store_raw_seg_write_packet");
+           "video_store_raw_seg_write_packet\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
 
   AVPacket *pkt = av_packet_alloc();
   if (pkt == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_write_packet failed to allocate AVPacket");
+           "video_store_raw_seg_write_packet failed to allocate AVPacket\n");
     ret = VIDEO_STORE_RAW_SEG_RESP_ERROR;
     goto cleanup;
   }
@@ -217,7 +217,7 @@ int video_store_raw_seg_write_packet(struct raw_seg *rs,       // IN
   if (ret != 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_raw_seg_write_packet failed to create new "
-           "AVPacket from data");
+           "AVPacket from data\n");
     // if av_packet_from_data returned an error then data is not owned by the
     // packet and we need to free it outselves
     av_free(data);
@@ -236,7 +236,7 @@ int video_store_raw_seg_write_packet(struct raw_seg *rs,       // IN
   // Write the packet to the output file.
   if ((ret = av_interleaved_write_frame(rs->outCtx, pkt))) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_write_packet failed to write frame");
+           "video_store_raw_seg_write_packet failed to write frame\n");
     goto cleanup;
   }
 
@@ -253,19 +253,19 @@ int video_store_raw_seg_close(struct raw_seg **ppRS // OUT
 ) {
   if (ppRS == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_close called with null raw_seg_h264 **ppRS");
+           "video_store_raw_seg_close called with null raw_seg_h264 **ppRS\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
 
   if (*ppRS == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_close called with null raw_seg_h264 *ppRS");
+           "video_store_raw_seg_close called with null raw_seg_h264 *ppRS\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
   int ret = av_write_trailer((*ppRS)->outCtx);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_close called failed to write trailer");
+           "video_store_raw_seg_close called failed to write trailer\n");
     return ret;
   }
   avformat_free_context((*ppRS)->outCtx);
