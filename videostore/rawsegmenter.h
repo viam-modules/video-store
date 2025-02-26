@@ -14,13 +14,6 @@ int video_store_raw_seg_init_h264(struct raw_seg **ppRS,      // OUT
                                   const int height            // IN
 );
 
-int video_store_raw_seg_write_h264_packet(struct raw_seg *rs,       // IN
-                                          const char *payload,      // IN
-                                          const size_t payloadSize, // IN
-                                          const int64_t pts,        // IN
-                                          const int isIdr           // IN
-);
-
 int video_store_raw_seg_init_h265(struct raw_seg **ppRS,      // OUT
                                   const int segmentSeconds,   // IN
                                   const char *outputPattern,  // IN
@@ -30,11 +23,11 @@ int video_store_raw_seg_init_h265(struct raw_seg **ppRS,      // OUT
                                   const int height            // IN
 );
 
-int video_store_raw_seg_write_h265_packet(struct raw_seg *rs,       // IN
-                                          const char *payload,      // IN
-                                          const size_t payloadSize, // IN
-                                          const int64_t pts,        // IN
-                                          const int isIdr           // IN
+int video_store_raw_seg_write_packet(struct raw_seg *rs,       // IN
+                                     const char *payload,      // IN
+                                     const size_t payloadSize, // IN
+                                     const int64_t pts,        // IN
+                                     const int isIdr           // IN
 );
 
 int video_store_raw_seg_close(struct raw_seg **rs // OUT

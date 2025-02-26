@@ -81,12 +81,12 @@ int main(int argc, char *argv[]) {
     }
     pts = sqlite3_column_int64(statement, 1);
     isIDR = sqlite3_column_int(statement, 2);
-    ret = video_store_raw_seg_write_h265_packet(
+    ret = video_store_raw_seg_write_packet(
         rs, sqlite3_column_blob(statement, 3),
         (size_t)sqlite3_column_bytes(statement, 3), pts, isIDR);
     if (ret != VIDEO_STORE_RAW_SEG_RESP_OK) {
       failed = 1;
-      printf("video_store_raw_seg_write_h265_packet failed: %d\n", ret);
+      printf("video_store_raw_seg_write_packet failed: %d\n", ret);
       break;
     }
   }
