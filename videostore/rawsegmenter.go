@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"unsafe"
@@ -39,7 +40,7 @@ func newRawSegmenter(
 	case SourceTypeFrame:
 		fallthrough
 	default:
-		return nil, errors.New("unsupported SourceType")
+		return nil, fmt.Errorf("unsupported SourceType %d: %s", typ, typ)
 	}
 	s := &rawSegmenter{
 		typ:            typ,
