@@ -169,12 +169,10 @@ valgrind-setup:
 ifeq ($(shell which valgrind > /dev/null 2>&1; echo $$?), 1)
 ifeq ($(SOURCE_OS),linux)
 	wget https://sourceware.org/pub/valgrind/valgrind-3.24.0.tar.bz2
-	tar xzf valgrind-3.24.0.tar.bz2
+	tar xjf valgrind-3.24.0.tar.bz2
 	rm -rf valgrind-3.24.0.tar.bz2
 	cd valgrind-3.24.0
-	./configure
-	make
-	sudo make install
+	cd valgrind-3.24.0 && ./configure && make && sudo make install
 	rm -rf valgrind-3.24.0.tar.bz2
 	rm -rf valgrind-3.24.0
 endif
