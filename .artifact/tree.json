@@ -19,8 +19,24 @@
     "hash": "f49319e1bb705f6db371888b3300888c",
     "size": 3779515
   },
+  "2025-01-31_18-54-50.mp4": {
+    "hash": "3d7aadc68ae6ec536a0d07aa5f618c28",
+    "size": 1059104
+  },
+  "2025-01-31_18-55-00.mp4": {
+    "hash": "381de68bc370fa4867f5236bbb93d793",
+    "size": 1215884
+  },
+  "2025-01-31_18-55-10.mp4": {
+    "hash": "4ec26875070001b83e1985380f9239d1",
+    "size": 608214
+  },
   "malformed_file_name.mp4": {
     "hash": "6c62272e07bb014262b821756295c58d",
     "size": 0
+  },
+  "zero_duration_video.mp4": {
+    "hash": "b2c1383544e5d3f9b90be8f3cf46d479",
+    "size": 261
   }
 }
