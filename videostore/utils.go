@@ -19,6 +19,8 @@ import (
 	"strings"
 	"time"
 	"unsafe"
+
+	"go.viam.com/rdk/logging"
 )
 
 // SetLibAVLogLevel sets the libav log level.
@@ -222,15 +224,17 @@ func formatDateTimeToString(dateTime time.Time) string {
 
 // matchStorageToRange returns a list of files that fall within the provided time range.
 // Includes trimming video files to the time range if they overlap.
-func matchStorageToRange(files []string, start, end time.Time) []string {
+func matchStorageToRange(files []string, start, end time.Time, logger logging.Logger) []string {
 	var matchedFiles []string
 	for _, file := range files {
 		dateTime, err := extractDateTimeFromFilename(file)
 		if err != nil {
+			logger.Debugf("failed to extract datetime from filename: %s, error: %v", file, err)
 			continue
 		}
 		duration, err := getVideoDuration(file)
 		if err != nil {
+			logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
 			continue
 		}
 		fileEndTime := dateTime.Add(duration)

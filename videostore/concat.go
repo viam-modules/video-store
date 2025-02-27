@@ -66,7 +66,7 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 	if err != nil {
 		return err
 	}
-	matchingFiles := matchStorageToRange(storageFiles, from, to)
+	matchingFiles := matchStorageToRange(storageFiles, from, to, c.logger)
 	if len(matchingFiles) == 0 {
 		return errors.New("no matching video data to save")
 	}
