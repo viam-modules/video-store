@@ -183,9 +183,11 @@ endif
 endif
 
 # you need latest valgrind, otherwise you might not get line numbers in your valgrind output
+valgrind-run: TARGET=$(BIN_OUTPUT_PATH)/$(PROGRAM)
 valgrind-run: 
 ifeq ($(SOURCE_OS),linux)
-	valgrind --error-exitcode=1 --leak-check=full --track-origins=yes --dsymutil=yes  -v ./bin/linux-arm64/raw-segmenter-c my.db
+	sudo apt-get install libc6-dbg
+	valgrind --error-exitcode=1 --leak-check=full --track-origins=yes --dsymutil=yes -v $(TARGET) $(ARGS)
 endif
 ifeq ($(SOURCE_OS),darwin)
 	echo "valgrind not supported on macos running in canon"
