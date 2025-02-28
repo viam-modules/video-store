@@ -1,4 +1,4 @@
-package videostore
+package videostore_test
 
 import (
 	"context"
@@ -129,6 +129,7 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, filename, test.ShouldContainSubstring, "2024-09-06_15-00-33")
 		filePath := filepath.Join(testUploadPath, filename)
 		testVideoPlayback(t, filePath)
+		testVideoDuration(t, filePath, 60)
 	})
 
 	t.Run("Test Save DoCommand Invalid Range", func(t *testing.T) {

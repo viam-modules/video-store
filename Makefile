@@ -60,7 +60,7 @@ export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
 
-$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go $(FFMPEG_BUILD)
+$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go videostore/*.c videostore/*.h $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
 
@@ -83,6 +83,12 @@ $(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviam
 	rm -f $(BIN_OUTPUT_PATH)/raw-segmenter-c
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(OBJS) ./cmd/raw-segmenter-c/main.c $(CGO_LDFLAGS) $(shell pkg-config --cflags sqlite3) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  $(shell pkg-config --libs sqlite3) -g -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
+
+$(BIN_OUTPUT_PATH)/duration-c: $(FFMPEG_BUILD) $(OBJS) | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+	@echo "-------- Make $(BIN_OUTPUT_PATH)/duration-c --------"
+	rm -f $(BIN_OUTPUT_PATH)/duration-c
+	mkdir -p $(BUILD_DIR)
+	$(CC) $(OBJS) ./cmd/duration-c/main.c $(CGO_LDFLAGS) -ldl $(CGO_CFLAGS) -g -o $(BIN_OUTPUT_PATH)/duration-c
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo "-------- Make $(@) --------"
@@ -163,12 +169,10 @@ valgrind-setup:
 ifeq ($(shell which valgrind > /dev/null 2>&1; echo $$?), 1)
 ifeq ($(SOURCE_OS),linux)
 	wget https://sourceware.org/pub/valgrind/valgrind-3.24.0.tar.bz2
-	tar xzf valgrind-3.24.0.tar.bz2
+	tar xjf valgrind-3.24.0.tar.bz2
 	rm -rf valgrind-3.24.0.tar.bz2
 	cd valgrind-3.24.0
-	./configure
-	make
-	sudo make install
+	cd valgrind-3.24.0 && ./configure && make && sudo make install
 	rm -rf valgrind-3.24.0.tar.bz2
 	rm -rf valgrind-3.24.0
 endif
@@ -179,9 +183,11 @@ endif
 endif
 
 # you need latest valgrind, otherwise you might not get line numbers in your valgrind output
+valgrind-run: TARGET=$(BIN_OUTPUT_PATH)/$(PROGRAM)
 valgrind-run: 
 ifeq ($(SOURCE_OS),linux)
-	valgrind --error-exitcode=1 --leak-check=full --track-origins=yes --dsymutil=yes  -v ./bin/linux-arm64/raw-segmenter-c my.db
+	sudo apt-get install libc6-dbg
+	valgrind --error-exitcode=1 --leak-check=full --track-origins=yes --dsymutil=yes -v $(TARGET) $(ARGS)
 endif
 ifeq ($(SOURCE_OS),darwin)
 	echo "valgrind not supported on macos running in canon"

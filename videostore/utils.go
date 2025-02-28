@@ -1,6 +1,7 @@
 package videostore
 
 /*
+#include "utils.h"
 #include <libavutil/error.h>
 #include <libavutil/opt.h>
 #include <libavcodec/avcodec.h>
@@ -17,6 +18,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unsafe"
+
+	"go.viam.com/rdk/logging"
 )
 
 // SetLibAVLogLevel sets the libav log level.
@@ -219,13 +223,18 @@ func formatDateTimeToString(dateTime time.Time) string {
 }
 
 // matchStorageToRange returns a list of files that fall within the provided time range.
-// Includes trimming video files to the time range if they overlap. Assumes that all video
-// files have the same duration.
-func matchStorageToRange(files []string, start, end time.Time, duration time.Duration) []string {
+// Includes trimming video files to the time range if they overlap.
+func matchStorageToRange(files []string, start, end time.Time, logger logging.Logger) []string {
 	var matchedFiles []string
 	for _, file := range files {
 		dateTime, err := extractDateTimeFromFilename(file)
 		if err != nil {
+			logger.Debugf("failed to extract datetime from filename: %s, error: %v", file, err)
+			continue
+		}
+		duration, err := getVideoDuration(file)
+		if err != nil {
+			logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
 			continue
 		}
 		fileEndTime := dateTime.Add(duration)
@@ -289,4 +298,22 @@ func validateTimeRange(files []string, start, end time.Time) error {
 		return errors.New("time range is outside of storage range")
 	}
 	return nil
+}
+
+// getVideoDuration returns the duration of the video file in seconds.
+func getVideoDuration(filePath string) (time.Duration, error) {
+	cFilePath := C.CString(filePath)
+	defer C.free(unsafe.Pointer(cFilePath))
+
+	var duration C.int64_t
+	ret := C.get_video_duration(&duration, cFilePath)
+	switch ret {
+	case C.VIDEO_STORE_DURATION_RESP_OK:
+		// Convert duration from AV_TIME_BASE units to time.Duration
+		return time.Duration(duration) * time.Microsecond, nil
+	case C.VIDEO_STORE_DURATION_RESP_ERROR:
+		return 0, fmt.Errorf("failed to get video duration for file: %s", filePath)
+	default:
+		return 0, fmt.Errorf("failed to get video duration for file: %s with error: %s", filePath, ffmpegError(ret))
+	}
 }

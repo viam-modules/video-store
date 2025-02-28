@@ -1,4 +1,4 @@
-package videostore
+package videostore_test
 
 import (
 	"context"
