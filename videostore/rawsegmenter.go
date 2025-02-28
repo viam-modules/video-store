@@ -60,10 +60,6 @@ func newRawSegmenter(
 }
 
 func (rs *rawSegmenter) init(width, height int) error {
-	// if len(extradata) == 0 {
-	// 	return errors.New("extradata should not be empty")
-	// }
-
 	if width <= 0 || height <= 0 {
 		return errors.New("both width and height should be greater than zero")
 	}
@@ -83,8 +79,6 @@ func (rs *rawSegmenter) init(width, height int) error {
 	// that specifies the output file name. The pattern is set to the current time.
 	outputPatternCStr := C.CString(rs.storagePath + "/" + outputPattern)
 	defer C.free(unsafe.Pointer(outputPatternCStr))
-	// extradataCStr := C.CBytes(extradata)
-	// defer C.free(extradataCStr)
 	var ret C.int
 	switch rs.typ {
 	case SourceTypeH264RTPPacket:
@@ -92,8 +86,6 @@ func (rs *rawSegmenter) init(width, height int) error {
 			&cRS,
 			C.int(rs.segmentSeconds),
 			outputPatternCStr,
-			// (*C.char)(extradataCStr),
-			// C.size_t(len(extradata)),
 			C.int(width),
 			C.int(height))
 	case SourceTypeH265RTPPacket:
@@ -101,8 +93,6 @@ func (rs *rawSegmenter) init(width, height int) error {
 			&cRS,
 			C.int(rs.segmentSeconds),
 			outputPatternCStr,
-			// (*C.char)(extradataCStr),
-			// C.size_t(len(extradata)),
 			C.int(width),
 			C.int(height))
 	case SourceTypeFrame:
