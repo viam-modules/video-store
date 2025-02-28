@@ -12,7 +12,7 @@ func TestGetVideoDuration(t *testing.T) {
 	t.Run("Valid video file duration succeeds", func(t *testing.T) {
 		duration, err := getVideoDuration(artifactStoragePath + "2024-09-06_15-00-03.mp4")
 		test.That(t, err, test.ShouldBeNil)
-		test.That(t, duration.Seconds(), test.ShouldBeGreaterThan, 0.0)
+		test.That(t, duration.Seconds(), test.ShouldBeGreaterThanOrEqualTo, 30.0)
 	})
 	t.Run("No duration video file errors", func(t *testing.T) {
 		duration, err := getVideoDuration(artifactStoragePath + "zero_duration_video.mp4")
