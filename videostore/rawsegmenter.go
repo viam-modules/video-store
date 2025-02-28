@@ -35,15 +35,12 @@ func newRawSegmenter(
 	storagePath string,
 	segmentSeconds int,
 ) (*rawSegmenter, error) {
-	logger.Info("newRawSegmenter start")
 	switch typ {
 	case SourceTypeH264RTPPacket, SourceTypeH265RTPPacket:
 	case SourceTypeFrame:
-		logger.Errorf("newRawSegmenter got INVALID type %s", typ)
-		return nil, fmt.Errorf("unsupported SourceType %d: %s", typ, typ)
+		return nil, fmt.Errorf("newRawSegmenter called with unsupported SourceType %d: %s", typ, typ)
 	default:
-		logger.Errorf("newRawSegmenter got INVALID type %s", typ)
-		return nil, fmt.Errorf("unsupported SourceType %d: %s", typ, typ)
+		return nil, fmt.Errorf("newRawSegmenter called with unsupported SourceType %d: %s", typ, typ)
 	}
 	s := &rawSegmenter{
 		typ:            typ,
@@ -61,7 +58,7 @@ func newRawSegmenter(
 
 func (rs *rawSegmenter) init(width, height int) error {
 	if width <= 0 || height <= 0 {
-		return errors.New("both width and height should be greater than zero")
+		return errors.New("both width and height must be greater than zero")
 	}
 
 	rs.mu.Lock()
@@ -98,11 +95,13 @@ func (rs *rawSegmenter) init(width, height int) error {
 	case SourceTypeFrame:
 		fallthrough
 	default:
-		return errors.New("invalid source type")
+		return fmt.Errorf("rawSegmenter.init called on invalid SourceType %d: %s", rs.typ, rs.typ)
 	}
 
 	if ret != C.VIDEO_STORE_RAW_SEG_RESP_OK {
-		return errors.New("failed to initialize raw segmenter")
+		err := errors.New("failed to initialize raw segmenter")
+		rs.logger.Errorf("%s: %d", err.Error(), ret)
+		return err
 	}
 	rs.cRawSeg = cRS
 	rs.initialized = true
@@ -140,7 +139,9 @@ func (rs *rawSegmenter) writePacket(payload []byte, pts, dts int64, isIDR bool) 
 		C.int64_t(dts),
 		idr)
 	if ret != C.VIDEO_STORE_RAW_SEG_RESP_OK {
-		return errors.New("failed to write packet")
+		err := errors.New("failed to write packet")
+		rs.logger.Errorf("%s: %d", err.Error(), ret)
+		return err
 	}
 	return nil
 }
