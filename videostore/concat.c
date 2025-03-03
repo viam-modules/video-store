@@ -112,6 +112,10 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
       goto cleanup;
     }
 
+    if ((packet->flags & AV_PKT_FLAG_DISCARD) == AV_PKT_FLAG_DISCARD) {
+      av_packet_unref(packet);
+      continue;
+    }
     inStream = inputCtx->streams[packet->stream_index];
     outStream = outputCtx->streams[packet->stream_index];
     packet->pts =
@@ -124,10 +128,6 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
         packet->duration, inStream->time_base, outStream->time_base,
         AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
     packet->pos = -1;
-    if ((packet->flags & AV_PKT_FLAG_DISCARD) == AV_PKT_FLAG_DISCARD) {
-      av_packet_unref(packet);
-      continue;
-    }
 
     if (packet->dts <= prevDts) {
       av_log(NULL, AV_LOG_DEBUG,
