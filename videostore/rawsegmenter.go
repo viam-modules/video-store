@@ -100,7 +100,7 @@ func (rs *rawSegmenter) init(width, height int) error {
 
 	if ret != C.VIDEO_STORE_RAW_SEG_RESP_OK {
 		err := errors.New("failed to initialize raw segmenter")
-		rs.logger.Errorf("%s: %d", err.Error(), ret)
+		rs.logger.Errorf("%s: %d: %s", err.Error(), ret, ffmpegError(ret))
 		return err
 	}
 	rs.cRawSeg = cRS
