@@ -73,7 +73,7 @@ type videostore struct {
 type VideoStore interface {
 	Fetch(ctx context.Context, r *FetchRequest) (*FetchResponse, error)
 	Save(ctx context.Context, r *SaveRequest) (*SaveResponse, error)
-	Close(ctx context.Context) error
+	Close()
 }
 
 // RTPVideoStore stores video derived from RTP packets and provides APIs to request the stored video
@@ -487,7 +487,7 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 }
 
 // Close closes the video storage camera component.
-func (vs *videostore) Close(_ context.Context) error {
+func (vs *videostore) Close() {
 	if vs.workers != nil {
 		vs.workers.Stop()
 	}
@@ -497,5 +497,4 @@ func (vs *videostore) Close(_ context.Context) error {
 	if vs.rawSegmenter != nil {
 		vs.rawSegmenter.close()
 	}
-	return nil
 }
