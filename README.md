@@ -70,7 +70,6 @@ Additionally, make sure to add your configured data manager service to the `depe
 |                 | `bitrate`         | integer | no  | Throughput of encoder in bits per second. Higher for better quality video, and lower for better storage efficiency. |
 |                 | `preset`          | string  | no  | Name of codec video preset to use. See [here](https://trac.ffmpeg.org/wiki/Encode/H.264#a2.Chooseapresetandtune) for preset options.                                                                |
 | `framerate`     |                   | integer | no  | Frame rate of the video in frames per second. Default value is 20 if not set.                      |
-| `yuyv`          |                   | bool    | no  | Flag to request an "image/yuyv422" MIME type.                                                     |
 
 ### Example Configuration
 
