@@ -66,26 +66,21 @@ type videostore struct {
 
 	rawSegmenter *rawSegmenter
 	segmenter    *segmenter
-	concater     Concater
+	concater     *concater
 }
 
 // VideoStore stores video and provides APIs to request the stored video
 type VideoStore interface {
 	Fetch(ctx context.Context, r *FetchRequest) (*FetchResponse, error)
 	Save(ctx context.Context, r *SaveRequest) (*SaveResponse, error)
-	Close(ctx context.Context) error
+	Close()
 }
 
-// Concater concatinates video files within the time range
-type Concater interface {
-	Concat(from, to time.Time, path string) error
-}
-
-// H264RTPVideoStore stores h264 video derived from RTP packets and provides APIs to request the stored video
-type H264RTPVideoStore interface {
+// RTPVideoStore stores video derived from RTP packets and provides APIs to request the stored video
+type RTPVideoStore interface {
 	VideoStore
-	InitH264(sps, pps []byte) error
-	WritePacket(payload []byte, pts int64, isIDR bool) error
+	Init(width, height int) error
+	WritePacket(payload []byte, pts, dts int64, isIDR bool) error
 }
 
 // SaveRequest is the request to the Save method
@@ -190,10 +185,10 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 	return vs, nil
 }
 
-// NewH264RTPVideoStore returns a VideoStore that stores video it receives from the caller
-func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logger) (H264RTPVideoStore, error) {
-	if config.Type != SourceTypeH264RTPPacket {
-		return nil, fmt.Errorf("config type must be %s", SourceTypeFrame)
+// NewRTPVideoStore returns a VideoStore that stores video it receives from the caller
+func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, error) {
+	if config.Type != SourceTypeH264RTPPacket && config.Type != SourceTypeH265RTPPacket {
+		return nil, fmt.Errorf("config type must be %s or %s", SourceTypeH264RTPPacket, SourceTypeH265RTPPacket)
 	}
 	if err := config.Validate(); err != nil {
 		return nil, err
@@ -214,6 +209,7 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 	}
 
 	rawSegmenter, err := newRawSegmenter(logger,
+		config.Type,
 		config.Storage.SizeGB,
 		config.Storage.StoragePath,
 		config.Storage.SegmentSeconds,
@@ -249,18 +245,26 @@ func NewH264RTPVideoStore(_ context.Context, config Config, logger logging.Logge
 	return vs, nil
 }
 
-func (vs *videostore) InitH264(sps, pps []byte) error {
-	if vs.typ != SourceTypeH264RTPPacket {
-		return errors.New("InitH264 unimplmeented")
+func (vs *videostore) Init(width, height int) error {
+	switch vs.typ {
+	case SourceTypeH264RTPPacket, SourceTypeH265RTPPacket:
+		return vs.rawSegmenter.init(width, height)
+	case SourceTypeFrame:
+		fallthrough
+	default:
+		return fmt.Errorf("Init unimplmented for SourceType: %d: %s", vs.typ, vs.typ)
 	}
-	return vs.rawSegmenter.initH264(sps, pps)
 }
 
-func (vs *videostore) WritePacket(payload []byte, pts int64, isIDR bool) error {
-	if vs.typ != SourceTypeH264RTPPacket {
-		return errors.New("WritePacket unimplmeented")
+func (vs *videostore) WritePacket(payload []byte, pts, dts int64, isIDR bool) error {
+	switch vs.typ {
+	case SourceTypeH264RTPPacket, SourceTypeH265RTPPacket:
+		return vs.rawSegmenter.writePacket(payload, pts, dts, isIDR)
+	case SourceTypeFrame:
+		fallthrough
+	default:
+		return fmt.Errorf("WritePacket unimplmented for SourceType: %d: %s", vs.typ, vs.typ)
 	}
-	return vs.rawSegmenter.writePacket(payload, pts, isIDR)
 }
 
 func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse, error) {
@@ -483,9 +487,7 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 }
 
 // Close closes the video storage camera component.
-func (vs *videostore) Close(_ context.Context) error {
-	vs.logger.Infof("Close START")
-	defer vs.logger.Infof("Close END")
+func (vs *videostore) Close() {
 	if vs.workers != nil {
 		vs.workers.Stop()
 	}
@@ -495,5 +497,4 @@ func (vs *videostore) Close(_ context.Context) error {
 	if vs.rawSegmenter != nil {
 		vs.rawSegmenter.close()
 	}
-	return nil
 }

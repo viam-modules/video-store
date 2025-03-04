@@ -155,8 +155,9 @@ func (c *component) Properties(_ context.Context) (camera.Properties, error) {
 }
 
 // Close closes the video storage camera component.
-func (c *component) Close(ctx context.Context) error {
-	return c.videostore.Close(ctx)
+func (c *component) Close(_ context.Context) error {
+	c.videostore.Close()
+	return nil
 }
 
 // Unimplemented methods for the video storage camera component.

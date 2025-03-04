@@ -7,7 +7,6 @@ toolchain go1.23.1
 require (
 	github.com/AlekSi/gocov-xml v1.0.0
 	github.com/axw/gocov v1.1.0
-	github.com/bluenviron/mediacommon v1.9.2
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
 	github.com/fullstorydev/grpcurl v1.8.6
 	github.com/golangci/golangci-lint v1.61.0
@@ -60,6 +59,7 @@ require (
 	github.com/blackjack/webcam v0.6.1 // indirect
 	github.com/blizzy78/varnamelen v0.8.0 // indirect
 	github.com/bluenviron/gortsplib/v4 v4.8.0 // indirect
+	github.com/bluenviron/mediacommon v1.9.2 // indirect
 	github.com/bombsimon/wsl/v4 v4.4.1 // indirect
 	github.com/breml/bidichk v0.2.7 // indirect
 	github.com/breml/errchkjson v0.3.6 // indirect
