@@ -26,7 +26,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-static \
                --enable-libx264 \
                --enable-decoder=hevc \
-               --enable-decoder=libx264 \
+               --enable-decoder=h264 \
                --enable-gpl \
                --enable-encoder=libx264 \
                --enable-muxer=segment \
