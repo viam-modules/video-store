@@ -8,7 +8,6 @@ import (
 
 	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/components/camera"
-	"go.viam.com/rdk/gostream"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
@@ -157,11 +156,6 @@ func (c *component) Properties(_ context.Context) (camera.Properties, error) {
 // Close closes the video storage camera component.
 func (c *component) Close(ctx context.Context) error {
 	return c.videostore.Close(ctx)
-}
-
-// Unimplemented methods for the video storage camera component.
-func (c *component) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
-	return nil, errors.New("not implemented")
 }
 
 func (c *component) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
