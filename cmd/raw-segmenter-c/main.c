@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libavcodec/avcodec.h>
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
