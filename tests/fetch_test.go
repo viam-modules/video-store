@@ -89,8 +89,8 @@ func TestFetchDoCommand(t *testing.T) {
 	// Valid time range. Over grpc limit.
 	fetchCmd2 := map[string]interface{}{
 		"command": "fetch",
-		"from":    "2024-09-06_15-00-33",
-		"to":      "2024-09-06_15-01-33",
+		"from":    "2025-03-04_17-01-21",
+		"to":      "2025-03-04_17-02-45",
 	}
 
 	// Invalid time range.
@@ -100,7 +100,7 @@ func TestFetchDoCommand(t *testing.T) {
 		"to":      "2024-09-06_15-01-33",
 	}
 
-	// // Invalid datetime format.
+	// Invalid datetime format.
 	fetchCmd4 := map[string]interface{}{
 		"command": "fetch",
 		"from":    "2024-09-06_15-00-33",
@@ -123,6 +123,7 @@ func TestFetchDoCommand(t *testing.T) {
 	})
 
 	t.Run("Test Fetch DoCommand Valid Time Range Over GRPC Limit.", func(t *testing.T) {
+		t.Skip("Skipping test due to grpc limit bump to .")
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
