@@ -89,8 +89,8 @@ func TestFetchDoCommand(t *testing.T) {
 	// Valid time range. Over grpc limit.
 	fetchCmd2 := map[string]interface{}{
 		"command": "fetch",
-		"from":    "2025-03-04_17-01-21",
-		"to":      "2025-03-04_17-02-34",
+		"from":    "2025-03-05_16-36-21",
+		"to":      "2025-03-05_16-37-21",
 	}
 
 	// Invalid time range.
