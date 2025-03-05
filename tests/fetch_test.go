@@ -90,7 +90,7 @@ func TestFetchDoCommand(t *testing.T) {
 	fetchCmd2 := map[string]interface{}{
 		"command": "fetch",
 		"from":    "2025-03-04_17-01-21",
-		"to":      "2025-03-04_17-02-45",
+		"to":      "2025-03-04_17-02-47",
 	}
 
 	// Invalid time range.
