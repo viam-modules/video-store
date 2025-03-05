@@ -123,7 +123,6 @@ func TestFetchDoCommand(t *testing.T) {
 	})
 
 	t.Run("Test Fetch DoCommand Valid Time Range Over GRPC Limit.", func(t *testing.T) {
-		t.Skip("Skipping test due to grpc limit bump to .")
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		r, err := setupViamServer(timeoutCtx, config1)
