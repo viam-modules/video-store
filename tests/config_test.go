@@ -31,12 +31,14 @@ const (
 func setupViamServer(ctx context.Context, configStr string) (robot.Robot, error) {
 	cleanVideoStoreDir()
 	logger := logging.NewLogger("video-store-module")
-	cfg, err := config.FromReader(ctx, "default.json", bytes.NewReader([]byte(configStr)), logger)
+
+	cfg, err := config.FromReader(ctx, "default.json", bytes.NewReader([]byte(configStr)), logger, nil)
 	if err != nil {
 		logger.Error("failed to parse config", err)
 		return nil, err
 	}
-	r, err := robotimpl.RobotFromConfig(ctx, cfg, logger)
+
+	r, err := robotimpl.RobotFromConfig(ctx, cfg, nil, logger)
 	if err != nil {
 		logger.Error("failed to create robot", err)
 		return nil, err
