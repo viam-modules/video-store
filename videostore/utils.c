@@ -20,3 +20,14 @@ int get_video_duration(int64_t *duration,   // OUT
     avformat_close_input(&fmt_ctx);
     return VIDEO_STORE_DURATION_RESP_OK;
 }
+
+void custom_av_log_callback(void *ptr, int level, const char *fmt, va_list vargs) {
+    // Default callback will handle log level filtering
+    av_log_default_callback(ptr, level, fmt, vargs);
+    // Default callback only prints to stderr
+    fflush(stderr);
+}
+
+void set_custom_av_log_callback() {
+    av_log_set_callback(custom_av_log_callback);
+}

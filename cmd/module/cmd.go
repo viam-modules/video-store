@@ -18,10 +18,12 @@ func main() {
 
 func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
 	if logger.GetLevel() == logging.DEBUG {
-		videostore.SetLibAVLogLevel("info")
+		videostore.SetLibAVLogLevel("debug")
 	} else {
 		videostore.SetLibAVLogLevel("error")
 	}
+	videostore.SetFFmpegLogCallback()
+
 	module, err := module.NewModuleFromArgs(ctx)
 	if err != nil {
 		return err
