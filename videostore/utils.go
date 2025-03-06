@@ -104,7 +104,7 @@ func ffmpegLogLevel(loglevel C.int) {
 	C.av_log_set_level(loglevel)
 }
 
-// ffmpegLogCallback sets the custom log callback for ffmpeg.
+// SetFFmpegLogCallback sets the custom log callback for ffmpeg.
 func SetFFmpegLogCallback() {
 	C.set_custom_av_log_callback()
 }
