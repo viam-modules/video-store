@@ -31,10 +31,3 @@ void custom_av_log_callback(void *ptr, int level, const char *fmt, va_list vargs
 void set_custom_av_log_callback() {
     av_log_set_callback(custom_av_log_callback);
 }
-
-void test_av_log() {
-    av_log(NULL, AV_LOG_ERROR, "This is an error message\n");
-    av_log(NULL, AV_LOG_INFO, "This is an info message\n");
-    av_log(NULL, AV_LOG_DEBUG, "This is a debug message\n");
-    av_log(NULL, AV_LOG_TRACE, "This is a trace message\n");
-}
