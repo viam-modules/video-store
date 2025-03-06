@@ -28,7 +28,7 @@ import (
 // valid inputs are "info", "warn", "error", "debug"
 // https://www.ffmpeg.org/doxygen/2.5/group__lavu__log__constants.html
 func SetLibAVLogLevel(level string) {
-	ffmppegLogLevel(lookupLogID(level))
+	ffmpegLogLevel(lookupLogID(level))
 }
 
 type codecType int
@@ -99,9 +99,14 @@ func ffmpegError(ret C.int) string {
 	return C.GoString(&errbuf[0])
 }
 
-// ffmppegLogLevel sets the log level for ffmpeg logger.
-func ffmppegLogLevel(loglevel C.int) {
+// ffmpegLogLevel sets the log level for ffmpeg logger.
+func ffmpegLogLevel(loglevel C.int) {
 	C.av_log_set_level(loglevel)
+}
+
+// ffmpegLogCallback sets the custom log callback for ffmpeg.
+func SetFFmpegLogCallback() {
+	C.set_custom_av_log_callback()
 }
 
 // lookupLogID returns the log ID for the provided log level.
