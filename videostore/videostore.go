@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"go.viam.com/rdk/components/camera"
@@ -61,8 +61,9 @@ type videostore struct {
 	config Config
 	logger logging.Logger
 
-	latestFrame atomic.Pointer[C.AVFrame]
-	workers     *utils.StoppableWorkers
+	latestFrame   *C.AVFrame
+	latestFrameMu sync.Mutex
+	workers       *utils.StoppableWorkers
 
 	rawSegmenter *rawSegmenter
 	segmenter    *segmenter
@@ -339,27 +340,32 @@ func (vs *videostore) fetchFrames(ctx context.Context, cam camera.Camera) {
 				time.Sleep(retryInterval * time.Second)
 				continue
 			}
-			var frame *C.AVFrame
-
-			mimetype, _ := rutils.CheckLazyMIMEType(metadata.MimeType)
-			switch mimetype {
-			case mimeTypeYUYV:
-				frame, err = mimeHandler.yuyvToYUV420p(bytes)
-				if err != nil {
-					vs.logger.Error("failed to convert yuyv422 to yuv420p", err)
-					continue
+			// Transform image bytes to yuv420p based on the mimetype.
+			func() {
+				vs.latestFrameMu.Lock()
+				defer vs.latestFrameMu.Unlock()
+				var frame *C.AVFrame
+				mimetype, _ := rutils.CheckLazyMIMEType(metadata.MimeType)
+				switch mimetype {
+				case mimeTypeYUYV:
+					frame, err = mimeHandler.yuyvToYUV420p(bytes)
+					if err != nil {
+						vs.logger.Error("failed to convert yuyv422 to yuv420p", err)
+						return
+					}
+				case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
+					frame, err = mimeHandler.decodeJPEG(bytes)
+					if err != nil {
+						vs.logger.Error("failed to decode jpeg", err)
+						return
+					}
+				default:
+					vs.logger.Warn("unsupported image format", metadata.MimeType)
+					return
 				}
-			case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
-				frame, err = mimeHandler.decodeJPEG(bytes)
-				if err != nil {
-					vs.logger.Error("failed to decode jpeg", err)
-					continue
-				}
-			default:
-				vs.logger.Warn("unsupported image format", metadata.MimeType)
-				continue
-			}
-			vs.latestFrame.Store(frame)
+				// Only reached on success.
+				vs.latestFrame = frame
+			}()
 		}
 	}
 }
@@ -376,46 +382,14 @@ func (vs *videostore) processFrames(ctx context.Context, encoder *encoder) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			latestFrame := vs.latestFrame.Load()
-			if latestFrame == nil {
+			vs.latestFrameMu.Lock()
+			if vs.latestFrame == nil {
 				vs.logger.Debug("latest frame is not available yet")
+				vs.latestFrameMu.Unlock()
 				continue
 			}
-			// NOTE(Nick S): BEGIN
-			// The code in this block is wrong.
-			// I've seen tests segfault with the following errors:
-			// \_ [segment @ 0x14af0d710] Opening '/Users/nicksanford/code/video-store/.artifact/data/2025-02-18_15-10-39.mp4' for writing
-			// DEBUG   rdk:component:camera/video-store-1      camera/camera.go:118    save command received
-			// DEBUG   rdk:component:camera/video-store-1      videostore/videostore.go:270    save command received
-			// DEBUG   rdk:component:camera/video-store-1      videostore/videostore.go:279    running save command asynchronously
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_ [segment @ 0x14af0d710] Opening '/Users/nicksanford/code/video-store/.artifact/data/2025-02-18_15-10-49.mp4' for writing
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_ SIGSEGV: segmentation violation
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_ PC=0x10589fc84 m=5 sigcode=2 addr=0x7ba986502470
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_ signal arrived during cgo execution
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_ goroutine 129 gp=0x140005d6e00 m=5 mp=0x14000100808 [syscall]:
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_ runtime.cgocall(0x105775648, 0x14000818cd8)
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_      /opt/homebrew/Cellar/go/1.23.6/libexec/src/runtime/cgocall.go:167 +0x44 fp=0x14000818ca0 sp=0x14000818c60 pc=0x104a6ebf4
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_ github.com/viam-modules/video-store/videostore._Cfunc_avcodec_send_frame(0x14b80ae50, 0x14b80a9c0)
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_      _cgo_gotypes.go:1270 +0x34 fp=0x14000818cd0 sp=0x14000818ca0 pc=0x105736b44
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_ github.com/viam-modules/video-store/videostore.(*encoder).encode.func1(0x163?, 0x14b80a9c0)
-			// ERROR   video-store-module.modmanager.video-storage.StdErr      pexec/managed_process.go:277
-			// \_      /Users/nicksanford/code/video-store/videostore/encoder.go:178 +0x68 fp=0x14000818d10 sp=0x14000818cd0 pc=0x105738888
-
-			// the encoder and segmenter need to be moved into a single object with a single lifetime and not pass codecCtx
-			// between go objects
-			result, err := encoder.encode(latestFrame)
+			result, err := encoder.encode(vs.latestFrame)
+			vs.latestFrameMu.Unlock()
 			if err != nil {
 				vs.logger.Debug("failed to encode frame", err)
 				continue
@@ -436,7 +410,6 @@ func (vs *videostore) processFrames(ctx context.Context, encoder *encoder) {
 				vs.logger.Debug("failed to segment frame", err)
 				continue
 			}
-			// END
 		}
 	}
 }
