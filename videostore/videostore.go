@@ -12,12 +12,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
-	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -69,9 +66,10 @@ type videostore struct {
 	workers     *utils.StoppableWorkers
 
 	// rawSegmenter *rawSegmenter
-	videoStoreMuxer *rawSegmenterMux
-	segmenter       *segmenter
-	concater        *concater
+	rawSeg *RawSegmenter
+	// videoStoreMuxer *rawSegmenterMux
+	segmenter *segmenter
+	concater  *concater
 }
 
 // VideoStore stores video and provides APIs to request the stored video
@@ -105,17 +103,10 @@ func (t CodecType) String() string {
 	}
 }
 
-type RTPSegmenter interface {
-	SupportedCodecs() map[CodecType]struct{}
-	SDPParams(codec CodecType, au [][]byte) error
-	WritePacket(codec CodecType, au [][]byte, pts int64) error
-	CloseSegmenter() error
-}
-
 // RTPVideoStore stores video derived from RTP packets and provides APIs to request the stored video
 type RTPVideoStore interface {
 	VideoStore
-	RTPSegmenter
+	Segmenter() *RawSegmenter
 }
 
 // SaveRequest is the request to the Save method
@@ -286,10 +277,10 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	vs := &videostore{
 		typ:      config.Type,
 		concater: concater,
-		videoStoreMuxer: &rawSegmenterMux{
-			rawSeg: rawSegmenter,
-			logger: logger,
-		},
+		rawSeg:   rawSegmenter,
+		// videoStoreMuxer: &rawSegmenterMux{
+		// 	logger: logger,
+		// },
 		logger:  logger,
 		config:  config,
 		workers: utils.NewBackgroundStoppableWorkers(),
@@ -299,35 +290,8 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	return vs, nil
 }
 
-func (vs *videostore) SupportedCodecs() map[CodecType]struct{} {
-	return map[CodecType]struct{}{
-		CodecTypeH264: {},
-		CodecTypeH265: {},
-	}
-}
-
-func (vs *videostore) SDPParams(codec CodecType, au [][]byte) error {
-	if vs.typ != SourceTypeRTP {
-		return fmt.Errorf("Init unimplmented for SourceType: %d: %s", vs.typ, vs.typ)
-	}
-	return vs.videoStoreMuxer.sdpParams(codec, au)
-}
-
-func (vs *videostore) WritePacket(codec CodecType, au [][]byte, pts int64) error {
-	if vs.typ != SourceTypeRTP {
-		return fmt.Errorf("WritePacket unimplmented for SourceType: %d: %s", vs.typ, vs.typ)
-	}
-	return vs.videoStoreMuxer.writePacket(codec, au, pts)
-}
-
-func (vs *videostore) CloseSegmenter() error {
-	if vs.typ != SourceTypeRTP {
-		return fmt.Errorf("CloseSegmenter unimplmented for SourceType: %d: %s", vs.typ, vs.typ)
-	}
-	if err := vs.videoStoreMuxer.close(); err != nil {
-		return err
-	}
-	return nil
+func (vs *videostore) Segmenter() *RawSegmenter {
+	return vs.rawSeg
 }
 
 func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse, error) {
@@ -593,359 +557,7 @@ func (vs *videostore) Close() {
 	if vs.segmenter != nil {
 		vs.segmenter.close()
 	}
-	if vs.videoStoreMuxer != nil {
-		vs.videoStoreMuxer.close()
+	if vs.rawSeg != nil {
+		vs.rawSeg.Close()
 	}
-}
-
-type extractor interface {
-	Extract(au [][]byte, pts int64) (int64, error)
-}
-
-type rawSegmenterMux struct {
-	codec        CodecType
-	width        int
-	height       int
-	vps          []byte
-	sps          []byte
-	pps          []byte
-	dtsExtractor extractor
-	spsUnChanged bool
-	mu           sync.Mutex
-	rawSeg       *rawSegmenter
-	logger       logging.Logger
-}
-
-func (e *rawSegmenterMux) sdpParams(codec CodecType, au [][]byte) error {
-	if e.codec != CodecTypeUnknown {
-		return fmt.Errorf("SDPParams called when codec already set to %s", e.codec)
-	}
-	switch codec {
-	case CodecTypeH264:
-		for _, nalu := range au {
-			//nolint:mnd
-			typ := h264.NALUType(nalu[0] & 0x1F)
-			switch typ {
-			case h264.NALUTypeSPS:
-				e.sps = nalu
-			case h264.NALUTypePPS:
-				e.pps = nalu
-			default:
-				return errors.New("invalid nalu")
-			}
-		}
-	case CodecTypeH265:
-		for _, nalu := range au {
-			//nolint:mnd
-			typ := h265.NALUType((nalu[0] >> 1) & 0b111111)
-			switch typ {
-			case h265.NALUType_VPS_NUT:
-				e.vps = nalu
-
-			case h265.NALUType_SPS_NUT:
-				e.sps = nalu
-
-			case h265.NALUType_PPS_NUT:
-				e.pps = nalu
-			default:
-				return errors.New("invalid nalu")
-			}
-		}
-	default:
-		return errors.New("invalid codec")
-	}
-	e.codec = codec
-	return nil
-}
-
-func (e *rawSegmenterMux) writePacket(codec CodecType, au [][]byte, pts int64) error {
-	if e.codec == CodecTypeUnknown {
-		return errors.New("WritePacket called before SDPParams")
-	}
-
-	if e.codec != codec {
-		return errors.New("WritePacket called with different codec than SDPParams")
-	}
-
-	switch codec {
-	case CodecTypeH264:
-		return e.writeH264(au, pts)
-	case CodecTypeH265:
-		return e.writeH265(au, pts)
-	default:
-		return errors.New("invalid codec")
-	}
-}
-
-func (e *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	var filteredAU [][]byte
-
-	isRandomAccess := false
-
-	for _, nalu := range au {
-		//nolint:mnd
-		typ := h265.NALUType((nalu[0] >> 1) & 0b111111)
-		switch typ {
-		case h265.NALUType_VPS_NUT:
-			e.vps = nalu
-			continue
-
-		case h265.NALUType_SPS_NUT:
-			e.sps = nalu
-			e.spsUnChanged = false
-			continue
-
-		case h265.NALUType_PPS_NUT:
-			e.pps = nalu
-			continue
-
-		case h265.NALUType_AUD_NUT:
-			continue
-
-		case h265.NALUType_IDR_W_RADL, h265.NALUType_IDR_N_LP, h265.NALUType_CRA_NUT:
-			isRandomAccess = true
-		case h265.NALUType_TRAIL_N,
-			h265.NALUType_TRAIL_R,
-			h265.NALUType_TSA_N,
-			h265.NALUType_TSA_R,
-			h265.NALUType_STSA_N,
-			h265.NALUType_STSA_R,
-			h265.NALUType_RADL_N,
-			h265.NALUType_RADL_R,
-			h265.NALUType_RASL_N,
-			h265.NALUType_RASL_R,
-			h265.NALUType_RSV_VCL_N10,
-			h265.NALUType_RSV_VCL_N12,
-			h265.NALUType_RSV_VCL_N14,
-			h265.NALUType_RSV_VCL_R11,
-			h265.NALUType_RSV_VCL_R13,
-			h265.NALUType_RSV_VCL_R15,
-			h265.NALUType_BLA_W_LP,
-			h265.NALUType_BLA_W_RADL,
-			h265.NALUType_BLA_N_LP,
-			h265.NALUType_RSV_IRAP_VCL22,
-			h265.NALUType_RSV_IRAP_VCL23,
-			h265.NALUType_EOS_NUT,
-			h265.NALUType_EOB_NUT,
-			h265.NALUType_FD_NUT,
-			h265.NALUType_PREFIX_SEI_NUT,
-			h265.NALUType_SUFFIX_SEI_NUT,
-			h265.NALUType_AggregationUnit,
-			h265.NALUType_FragmentationUnit,
-			h265.NALUType_PACI:
-		default:
-			return errors.New("invalid nalu")
-		}
-
-		filteredAU = append(filteredAU, nalu)
-	}
-
-	au = filteredAU
-
-	if au == nil {
-		return nil
-	}
-
-	if err := e.maybeReInitVideoStore(); err != nil {
-		e.logger.Debugf("unable to init video store: %s", err.Error())
-		return nil
-	}
-
-	// add VPS, SPS and PPS before random access au
-	if isRandomAccess {
-		au = append([][]byte{e.vps, e.sps, e.pps}, au...)
-	}
-
-	if e.dtsExtractor == nil {
-		// skip samples silently until we find one with a IDR
-		if !isRandomAccess {
-			return nil
-		}
-		e.dtsExtractor = h265.NewDTSExtractor2()
-	}
-
-	dts, err := e.dtsExtractor.Extract(au, pts)
-	if err != nil {
-		e.logger.Errorf("error extracting dts: %s", err)
-		return nil
-	}
-
-	// h265 uses the same annexb format as h264
-	nalu, err := h264.AnnexBMarshal(au)
-	if err != nil {
-		e.logger.Errorf("failed to marshal annex b: %s", err)
-		return err
-	}
-	err = e.rawSeg.writePacket(nalu, pts, dts, isRandomAccess) //WritePacket(nalu, pts, dts, isRandomAccess)
-	if err != nil {
-		e.logger.Errorf("error writing packet to segmenter: %s", err)
-	}
-	return nil
-}
-
-func (e *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	var filteredAU [][]byte
-	nonIDRPresent := false
-	idrPresent := false
-
-	for _, nalu := range au {
-		//nolint:mnd
-		typ := h264.NALUType(nalu[0] & 0x1F)
-		switch typ {
-		case h264.NALUTypeSPS:
-			e.sps = nalu
-			e.spsUnChanged = false
-			continue
-
-		case h264.NALUTypePPS:
-			e.pps = nalu
-			continue
-
-		case h264.NALUTypeAccessUnitDelimiter:
-			continue
-
-		case h264.NALUTypeIDR:
-			idrPresent = true
-
-		case h264.NALUTypeNonIDR:
-			nonIDRPresent = true
-		case h264.NALUTypeDataPartitionA,
-			h264.NALUTypeDataPartitionB,
-			h264.NALUTypeDataPartitionC,
-			h264.NALUTypeSEI,
-			h264.NALUTypeEndOfSequence,
-			h264.NALUTypeEndOfStream,
-			h264.NALUTypeFillerData,
-			h264.NALUTypeSPSExtension,
-			h264.NALUTypePrefix,
-			h264.NALUTypeSubsetSPS,
-			h264.NALUTypeReserved16,
-			h264.NALUTypeReserved17,
-			h264.NALUTypeReserved18,
-			h264.NALUTypeSliceLayerWithoutPartitioning,
-			h264.NALUTypeSliceExtension,
-			h264.NALUTypeSliceExtensionDepth,
-			h264.NALUTypeReserved22,
-			h264.NALUTypeReserved23,
-			h264.NALUTypeSTAPA,
-			h264.NALUTypeSTAPB,
-			h264.NALUTypeMTAP16,
-			h264.NALUTypeMTAP24,
-			h264.NALUTypeFUA,
-			h264.NALUTypeFUB:
-		default:
-			return errors.New("invalid nalu")
-		}
-
-		filteredAU = append(filteredAU, nalu)
-	}
-
-	au = filteredAU
-
-	if au == nil || (!nonIDRPresent && !idrPresent) {
-		return nil
-	}
-
-	if err := e.maybeReInitVideoStore(); err != nil {
-		e.logger.Debugf("unable to init video store: %s", err.Error())
-		return nil
-	}
-
-	// add SPS and PPS before access unit that contains an IDR
-	if idrPresent {
-		au = append([][]byte{e.sps, e.pps}, au...)
-	}
-
-	if e.dtsExtractor == nil {
-		// skip samples silently until we find one with a IDR
-		if !idrPresent {
-			return nil
-		}
-		e.dtsExtractor = h264.NewDTSExtractor2()
-	}
-
-	dts, err := e.dtsExtractor.Extract(au, pts)
-	if err != nil {
-		return nil
-	}
-
-	packed, err := h264.AnnexBMarshal(au)
-	if err != nil {
-		e.logger.Errorf("AnnexBMarshal err: %s", err.Error())
-		return err
-	}
-	err = e.rawSeg.writePacket(packed, pts, dts, idrPresent)
-	if err != nil {
-		e.logger.Errorf("error writing packet to segmenter: %s", err)
-	}
-	return nil
-}
-
-// // maybeReInitVideoStore assumes mu is held by caller.
-func (e *rawSegmenterMux) maybeReInitVideoStore() error {
-	if e.spsUnChanged {
-		return nil
-	}
-	var width, height int
-	switch e.codec {
-	case CodecTypeH265:
-		var hsps h265.SPS
-		if err := hsps.Unmarshal(e.sps); err != nil {
-			return err
-		}
-		width, height = hsps.Width(), hsps.Height()
-	case CodecTypeH264:
-		var hsps h264.SPS
-		if err := hsps.Unmarshal(e.sps); err != nil {
-			return err
-		}
-		width, height = hsps.Width(), hsps.Height()
-	default:
-		return errors.New("invalid videostore.CodecType")
-	}
-
-	if width <= 0 || height <= 0 {
-		return errors.New("width and height must both be greater than 0")
-	}
-	// if vs is initialized and the height & width have not changed,
-	// record the sps as unchanged and return
-	if e.rawSeg != nil && e.width == width && e.height == height {
-		e.spsUnChanged = true
-		return nil
-	}
-
-	// if initialized and the height & width have changed,
-	// close and nil out the videostore
-	if err := e.rawSeg.close(); err != nil {
-		return err
-	}
-
-	if err := e.rawSeg.init(e.codec, width, height); err != nil {
-		return err
-	}
-
-	e.width = width
-	e.height = height
-	e.spsUnChanged = true
-	return nil
-}
-
-func (e *rawSegmenterMux) close() error {
-	if err := e.rawSeg.close(); err != nil {
-		return err
-	}
-	e.codec = CodecTypeUnknown
-	e.width = 0
-	e.height = 0
-	e.vps = nil
-	e.sps = nil
-	e.pps = nil
-	e.dtsExtractor = nil
-	e.spsUnChanged = false
-	return nil
 }

@@ -15,21 +15,35 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-type rawSegmenter struct {
-	typ            SourceType
+type RawSegmenter struct {
 	logger         logging.Logger
 	storagePath    string
 	segmentSeconds int
-	mu             sync.Mutex
+	cRawSegMu      sync.Mutex
 	cRawSeg        *C.raw_seg
 }
+
+//  -----------------
+//  | State Machine |
+//  -----------------
+//    Uninitialized
+//     |         ^
+//     |         |
+//   (Init)   (Close)
+//     |         |
+//     v         |
+//     Initialized
+//       |     ^
+//       |     |
+//       -------
+//    (WritePacket)
 
 func newRawSegmenter(
 	logger logging.Logger,
 	storagePath string,
 	segmentSeconds int,
-) (*rawSegmenter, error) {
-	s := &rawSegmenter{
+) (*RawSegmenter, error) {
+	s := &RawSegmenter{
 		logger:         logger,
 		storagePath:    storagePath,
 		segmentSeconds: segmentSeconds,
@@ -41,13 +55,13 @@ func newRawSegmenter(
 	return s, nil
 }
 
-func (rs *rawSegmenter) init(codec CodecType, width, height int) error {
+func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 	if width <= 0 || height <= 0 {
 		return errors.New("both width and height must be greater than zero")
 	}
 
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
+	rs.cRawSegMu.Lock()
+	defer rs.cRawSegMu.Unlock()
 	if rs.cRawSeg != nil {
 		return errors.New("*rawSegmenter init called more than once")
 	}
@@ -88,9 +102,9 @@ func (rs *rawSegmenter) init(codec CodecType, width, height int) error {
 	return nil
 }
 
-func (rs *rawSegmenter) writePacket(payload []byte, pts, dts int64, isIDR bool) error {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
+func (rs *RawSegmenter) WritePacket(payload []byte, pts, dts int64, isIDR bool) error {
+	rs.cRawSegMu.Lock()
+	defer rs.cRawSegMu.Unlock()
 	if rs.cRawSeg == nil {
 		return errors.New("writePacket called before init")
 	}
@@ -121,11 +135,11 @@ func (rs *rawSegmenter) writePacket(payload []byte, pts, dts int64, isIDR bool) 
 	return nil
 }
 
-// close closes the segmenter and writes the trailer to prevent corruption
+// Close closes the segmenter and writes the trailer to prevent corruption
 // when exiting early in the middle of a segment.
-func (rs *rawSegmenter) close() error {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
+func (rs *RawSegmenter) Close() error {
+	rs.cRawSegMu.Lock()
+	defer rs.cRawSegMu.Unlock()
 	if rs.cRawSeg == nil {
 		return nil
 	}
