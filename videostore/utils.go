@@ -231,13 +231,15 @@ func formatDateTimeToString(dateTime time.Time) string {
 // Includes trimming video files to the time range if they overlap.
 func matchStorageToRange(files []string, start, end time.Time, logger logging.Logger) []string {
 	var matchedFiles []string
+	var firstWidth, firstHeight int
+	var firstCodec string
 	for _, file := range files {
 		dateTime, err := extractDateTimeFromFilename(file)
 		if err != nil {
 			logger.Debugf("failed to extract datetime from filename: %s, error: %v", file, err)
 			continue
 		}
-		duration, err := getVideoDuration(file)
+		duration, width, height, codec, err := getVideoInfo(file)
 		if err != nil {
 			logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
 			continue
@@ -245,6 +247,19 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 		fileEndTime := dateTime.Add(duration)
 		// Check if the file's time range intersects with [start, end)
 		if dateTime.Before(end) && fileEndTime.After(start) {
+			if firstWidth == 0 {
+				firstWidth = width
+			}
+			if firstHeight == 0 {
+				firstHeight = height
+			}
+			if firstCodec == "" {
+				firstCodec = codec
+			}
+			if firstWidth != width || firstHeight != height || firstCodec != codec {
+				logger.Debugf("video file %s has different resolution or codec, skipping", file)
+				continue
+			}
 			var inpoint, outpoint float64
 			inpointSet := false
 			outpointSet := false
@@ -305,20 +320,28 @@ func validateTimeRange(files []string, start, end time.Time) error {
 	return nil
 }
 
-// getVideoDuration returns the duration of the video file in seconds.
-func getVideoDuration(filePath string) (time.Duration, error) {
+// getVideoInfo calls the C function get_video_info to retrieve duration, width, height, and codec.
+func getVideoInfo(filePath string) (time.Duration, int, int, string, error) {
 	cFilePath := C.CString(filePath)
 	defer C.free(unsafe.Pointer(cFilePath))
 
-	var duration C.int64_t
-	ret := C.get_video_duration(&duration, cFilePath)
+	var cDuration C.int64_t
+	var cWidth, cHeight C.int
+	var cCodec [C.VIDEO_STORE_CODEC_NAME_LEN]C.char
+
+	ret := C.get_video_info(&cDuration, &cWidth, &cHeight, &cCodec[0], cFilePath)
 	switch ret {
-	case C.VIDEO_STORE_DURATION_RESP_OK:
-		// Convert duration from AV_TIME_BASE units to time.Duration
-		return time.Duration(duration) * time.Microsecond, nil
-	case C.VIDEO_STORE_DURATION_RESP_ERROR:
-		return 0, fmt.Errorf("failed to get video duration for file: %s", filePath)
+	case C.VIDEO_STORE_VIDEO_INFO_RESP_OK:
+		// Convert and return
+		duration := time.Duration(cDuration) * time.Microsecond
+		width := int(cWidth)
+		height := int(cHeight)
+		codec := C.GoString(&cCodec[0])
+		return duration, width, height, codec, nil
+	case C.VIDEO_STORE_VIDEO_INFO_RESP_ERROR:
+		return 0, 0, 0, "", fmt.Errorf("failed to get video info for file: %s", filePath)
 	default:
-		return 0, fmt.Errorf("failed to get video duration for file: %s with error: %s", filePath, ffmpegError(ret))
+		return 0, 0, 0, "", fmt.Errorf("failed to get video info for file: %s with error: %s",
+			filePath, ffmpegError(ret))
 	}
 }
