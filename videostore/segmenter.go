@@ -13,7 +13,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"sync"
 	"unsafe"
@@ -183,42 +182,6 @@ func (s *segmenter) writeEncodedFrame(encodedData []byte, pts, dts int64) error 
 		return fmt.Errorf("failed to write frame: %s", ffmpegError(ret))
 	}
 	s.frameCount++
-	return nil
-}
-
-// cleanupStorage cleans up the storage directory by deleting the oldest files
-// until the storage size is below the max.
-func (s *segmenter) cleanupStorage() error {
-	s.logger.Info("cleanupStorage start")
-	defer s.logger.Info("cleanupStorage stop")
-	currStorageSize, err := getDirectorySize(s.storagePath)
-	if err != nil {
-		return err
-	}
-	if currStorageSize < s.maxStorageSize {
-		return nil
-	}
-	files, err := getSortedFiles(s.storagePath)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
-		if currStorageSize < s.maxStorageSize {
-			break
-		}
-		s.logger.Debugf("deleting file: %s", file)
-		err := os.Remove(file)
-		if err != nil {
-			return err
-		}
-		s.logger.Debugf("deleted file: %s", file)
-		// NOTE: This is going to be super slow
-		// we should speed this up
-		currStorageSize, err = getDirectorySize(s.storagePath)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
