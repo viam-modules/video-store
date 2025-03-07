@@ -239,28 +239,27 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 			logger.Debugf("failed to extract datetime from filename: %s, error: %v", file, err)
 			continue
 		}
-		// return duration, width, height, codec, nil
 		duration, width, height, codec, err := getVideoInfo(file)
 		if err != nil {
 			logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
 			continue
 		}
-		if firstWidth == 0 {
-			firstWidth = width
-		}
-		if firstHeight == 0 {
-			firstHeight = height
-		}
-		if firstCodec == "" {
-			firstCodec = codec
-		}
-		if firstWidth != width || firstHeight != height || firstCodec != codec {
-			logger.Debugf("video file %s has different resolution or codec, skipping", file)
-			break
-		}
 		fileEndTime := dateTime.Add(duration)
 		// Check if the file's time range intersects with [start, end)
 		if dateTime.Before(end) && fileEndTime.After(start) {
+			if firstWidth == 0 {
+				firstWidth = width
+			}
+			if firstHeight == 0 {
+				firstHeight = height
+			}
+			if firstCodec == "" {
+				firstCodec = codec
+			}
+			if firstWidth != width || firstHeight != height || firstCodec != codec {
+				logger.Debugf("video file %s has different resolution or codec, skipping", file)
+				continue
+			}
 			var inpoint, outpoint float64
 			inpointSet := false
 			outpointSet := false
