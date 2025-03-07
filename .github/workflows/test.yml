@@ -6,11 +6,15 @@ on:
       - main
     paths:
       - '**/**.go'
+      - '**/**.c'
+      - '**/**.h'
       - 'Makefile'
       - '.github/workflows/test.yml'
   pull_request:
     paths:
       - '**/**.go'
+      - '**/**.c'
+      - '**/**.h'
       - 'Makefile'
       - '.github/workflows/test.yml'
 
