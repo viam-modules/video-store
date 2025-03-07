@@ -256,7 +256,7 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 		}
 		if firstWidth != width || firstHeight != height || firstCodec != codec {
 			logger.Debugf("video file %s has different resolution or codec, skipping", file)
-			continue
+			break
 		}
 		fileEndTime := dateTime.Add(duration)
 		// Check if the file's time range intersects with [start, end)
