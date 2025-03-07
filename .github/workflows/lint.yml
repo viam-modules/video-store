@@ -11,6 +11,8 @@ on:
   pull_request:
     paths:
       - '**/**.go'
+      - '**/**.c'
+      - '**/**.h'
       - 'Makefile'
       - '.github/workflows/lint.yml'
 
