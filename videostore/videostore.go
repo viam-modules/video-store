@@ -65,7 +65,7 @@ type videostore struct {
 	latestFrame atomic.Pointer[C.AVFrame]
 	workers     *utils.StoppableWorkers
 
-	rawSegmenter *rawSegmenter
+	rawSegmenter *RawSegmenter
 	segmenter    *segmenter
 	concater     *concater
 }
@@ -105,7 +105,7 @@ func (t CodecType) String() string {
 // RTPVideoStore stores video derived from RTP packets and provides APIs to request the stored video
 type RTPVideoStore interface {
 	VideoStore
-	Segmenter() *rawSegmenter
+	Segmenter() *RawSegmenter
 }
 
 // SaveRequest is the request to the Save method
@@ -286,7 +286,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	return vs, nil
 }
 
-func (vs *videostore) Segmenter() *rawSegmenter {
+func (vs *videostore) Segmenter() *RawSegmenter {
 	return vs.rawSegmenter
 }
 

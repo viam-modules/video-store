@@ -15,7 +15,8 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-type rawSegmenter struct {
+// RawSegmenter stores video in supported codecs to disk in segment video files
+type RawSegmenter struct {
 	logger         logging.Logger
 	storagePath    string
 	segmentSeconds int
@@ -42,8 +43,8 @@ func newRawSegmenter(
 	logger logging.Logger,
 	storagePath string,
 	segmentSeconds int,
-) (*rawSegmenter, error) {
-	s := &rawSegmenter{
+) (*RawSegmenter, error) {
+	s := &RawSegmenter{
 		logger:         logger,
 		storagePath:    storagePath,
 		segmentSeconds: segmentSeconds,
@@ -55,7 +56,10 @@ func newRawSegmenter(
 	return s, nil
 }
 
-func (rs *rawSegmenter) Init(codec CodecType, width, height int) error {
+// Init initializes the *RawSegmenter
+// Close must be called to free the resources taken during Init
+// Note: May write to disk
+func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 	if width <= 0 || height <= 0 {
 		err := errors.New("both width and height must be greater than zero")
 		rs.logger.Warn(err.Error())
@@ -108,7 +112,9 @@ func (rs *rawSegmenter) Init(codec CodecType, width, height int) error {
 	return nil
 }
 
-func (rs *rawSegmenter) WritePacket(payload []byte, pts, dts int64, isIDR bool) error {
+// WritePacket writes video data in the codec passed to Init to the current segment file.
+// Can't be called before Init is called
+func (rs *RawSegmenter) WritePacket(payload []byte, pts, dts int64, isIDR bool) error {
 	rs.cRawSegMu.Lock()
 	defer rs.cRawSegMu.Unlock()
 	if rs.cRawSeg == nil {
@@ -147,7 +153,8 @@ func (rs *rawSegmenter) WritePacket(payload []byte, pts, dts int64, isIDR bool) 
 
 // Close closes the segmenter and writes the trailer to prevent corruption
 // when exiting early in the middle of a segment.
-func (rs *rawSegmenter) Close() error {
+// Init may be called after Close
+func (rs *RawSegmenter) Close() error {
 	rs.cRawSegMu.Lock()
 	defer rs.cRawSegMu.Unlock()
 	err := rs.close()
@@ -159,7 +166,7 @@ func (rs *rawSegmenter) Close() error {
 }
 
 // close must be called while the caller holds cRawSegMu
-func (rs *rawSegmenter) close() error {
+func (rs *RawSegmenter) close() error {
 	if rs.cRawSeg == nil {
 		return nil
 	}
