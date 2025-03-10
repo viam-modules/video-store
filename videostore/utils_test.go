@@ -8,7 +8,7 @@ import (
 
 const artifactStoragePath = "../.artifact/data/"
 
-func TestGetVideoDuration(t *testing.T) {
+func TestGetVideoInfo(t *testing.T) {
 	t.Run("Valid video file succeeds", func(t *testing.T) {
 		duration, width, height, codec, err := getVideoInfo(artifactStoragePath + "2024-09-06_15-00-03.mp4")
 		test.That(t, err, test.ShouldBeNil)
