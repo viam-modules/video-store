@@ -245,7 +245,8 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 			continue
 		}
 		fileEndTime := dateTime.Add(duration)
-		// Check if the file's time range intersects with [start, end)
+		// Check if the segment file's time range intersects
+		// with the match request time range [start, end)
 		if dateTime.Before(end) && fileEndTime.After(start) {
 			if firstWidth == 0 {
 				firstWidth = width
