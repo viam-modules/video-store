@@ -239,6 +239,10 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 			logger.Debugf("failed to extract datetime from filename: %s, error: %v", file, err)
 			continue
 		}
+		// TODO("RSDK-???"): Only fetch video info if the file is within the time range.
+		// We could use a 30 second max segment duration to avoid fetching video info for all files.
+		// If within 30 seconds of match we can then start to look up actual video stats
+		// by probing the mp4 file video stream info.
 		duration, width, height, codec, err := getVideoInfo(file)
 		if err != nil {
 			logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
