@@ -80,7 +80,7 @@ func TestMatchStorageToRange(t *testing.T) {
 		}
 	})
 
-	t.Run("Match request spanning two segments", func(t *testing.T) {
+	t.Run("Match request spanning multiple segments", func(t *testing.T) {
 		fileList := []string{
 			artifactStoragePath + "2024-09-06_15-00-03.mp4",
 			artifactStoragePath + "2024-09-06_15-00-33.mp4",
@@ -99,6 +99,28 @@ func TestMatchStorageToRange(t *testing.T) {
 		}
 		matchedFiles := matchStorageToRange(fileList, startTime, endTime, logger)
 		test.That(t, matchedFiles, test.ShouldHaveLength, 4)
+		for i, exp := range expected {
+			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
+		}
+	})
+
+	t.Run("Match request along segment boundary", func(t *testing.T) {
+		fileList := []string{
+			artifactStoragePath + "2024-09-06_15-00-03.mp4",
+			artifactStoragePath + "2024-09-06_15-00-33.mp4",
+			artifactStoragePath + "2024-09-06_15-01-03.mp4",
+			artifactStoragePath + "2024-09-06_15-01-33.mp4",
+		}
+		startTime, err := ParseDateTimeString("2024-09-06_15-00-33")
+		test.That(t, err, test.ShouldBeNil)
+		endTime, err := ParseDateTimeString("2024-09-06_15-01-33")
+		test.That(t, err, test.ShouldBeNil)
+		expected := []string{
+			"file '../.artifact/data/2024-09-06_15-00-33.mp4'",
+			"file '../.artifact/data/2024-09-06_15-01-03.mp4'",
+		}
+		matchedFiles := matchStorageToRange(fileList, startTime, endTime, logger)
+		test.That(t, matchedFiles, test.ShouldHaveLength, 2)
 		for i, exp := range expected {
 			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
 		}
@@ -141,20 +163,18 @@ func TestMatchStorageToRange(t *testing.T) {
 		}
 	})
 
-	t.Run("Match request along segment boundary", func(t *testing.T) {
+	t.Run("Match request start range in data gap", func(t *testing.T) {
 		fileList := []string{
-			artifactStoragePath + "2024-09-06_15-00-03.mp4",
-			artifactStoragePath + "2024-09-06_15-00-33.mp4",
-			artifactStoragePath + "2024-09-06_15-01-03.mp4",
-			artifactStoragePath + "2024-09-06_15-01-33.mp4",
+			artifactStoragePath + "2025-03-05_16-36-20.mp4",
+			artifactStoragePath + "2025-03-05_16-36-59.mp4",
 		}
-		startTime, err := ParseDateTimeString("2024-09-06_15-00-33")
+		startTime, err := ParseDateTimeString("2025-03-05_16-36-54")
 		test.That(t, err, test.ShouldBeNil)
-		endTime, err := ParseDateTimeString("2024-09-06_15-01-33")
+		endTime, err := ParseDateTimeString("2025-03-05_16-37-20")
 		test.That(t, err, test.ShouldBeNil)
 		expected := []string{
-			"file '../.artifact/data/2024-09-06_15-00-33.mp4'",
-			"file '../.artifact/data/2024-09-06_15-01-03.mp4'",
+			"file '../.artifact/data/2025-03-05_16-36-59.mp4'",
+			"outpoint 21.00",
 		}
 		matchedFiles := matchStorageToRange(fileList, startTime, endTime, logger)
 		test.That(t, matchedFiles, test.ShouldHaveLength, 2)
