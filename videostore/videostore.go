@@ -65,11 +65,9 @@ type videostore struct {
 	latestFrame atomic.Pointer[C.AVFrame]
 	workers     *utils.StoppableWorkers
 
-	// rawSegmenter *rawSegmenter
-	rawSeg *rawSegmenter
-	// videoStoreMuxer *rawSegmenterMux
-	segmenter *segmenter
-	concater  *concater
+	rawSegmenter *rawSegmenter
+	segmenter    *segmenter
+	concater     *concater
 }
 
 // VideoStore stores video and provides APIs to request the stored video
@@ -276,12 +274,12 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	}
 
 	vs := &videostore{
-		typ:      config.Type,
-		concater: concater,
-		rawSeg:   rawSegmenter,
-		logger:   logger,
-		config:   config,
-		workers:  utils.NewBackgroundStoppableWorkers(),
+		typ:          config.Type,
+		concater:     concater,
+		rawSegmenter: rawSegmenter,
+		logger:       logger,
+		config:       config,
+		workers:      utils.NewBackgroundStoppableWorkers(),
 	}
 
 	vs.workers.Add(vs.deleter)
@@ -289,7 +287,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 }
 
 func (vs *videostore) Segmenter() *rawSegmenter {
-	return vs.rawSeg
+	return vs.rawSegmenter
 }
 
 func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse, error) {
@@ -555,7 +553,7 @@ func (vs *videostore) Close() {
 	if vs.segmenter != nil {
 		vs.segmenter.close()
 	}
-	if vs.rawSeg != nil {
-		vs.rawSeg.Close()
+	if vs.rawSegmenter != nil {
+		vs.rawSegmenter.Close()
 	}
 }
