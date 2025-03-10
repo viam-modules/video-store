@@ -61,17 +61,13 @@ func newRawSegmenter(
 // Note: May write to disk
 func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 	if width <= 0 || height <= 0 {
-		err := errors.New("both width and height must be greater than zero")
-		rs.logger.Warn(err.Error())
-		return err
+		return errors.New("both width and height must be greater than zero")
 	}
 
 	rs.cRawSegMu.Lock()
 	defer rs.cRawSegMu.Unlock()
 	if rs.cRawSeg != nil {
-		err := errors.New("*rawSegmenter init called more than once")
-		rs.logger.Warn(err.Error())
-		return err
+		return errors.New("*rawSegmenter init called more than once")
 	}
 
 	var cRS *C.raw_seg
@@ -97,9 +93,7 @@ func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 			C.int(width),
 			C.int(height))
 	default:
-		err := fmt.Errorf("rawSegmenter.Init called on invalid codec %s", codec)
-		rs.logger.Warn(err.Error())
-		return err
+		return fmt.Errorf("rawSegmenter.Init called on invalid codec %s", codec)
 	}
 
 	if ret != C.VIDEO_STORE_RAW_SEG_RESP_OK {
@@ -118,15 +112,11 @@ func (rs *RawSegmenter) WritePacket(payload []byte, pts, dts int64, isIDR bool) 
 	rs.cRawSegMu.Lock()
 	defer rs.cRawSegMu.Unlock()
 	if rs.cRawSeg == nil {
-		err := errors.New("writePacket called before init")
-		rs.logger.Warn(err.Error())
-		return err
+		return errors.New("writePacket called before init")
 	}
 
 	if len(payload) == 0 {
-		err := errors.New("writePacket called with empty packet")
-		rs.logger.Warn(err.Error())
-		return err
+		return errors.New("writePacket called with empty packet")
 	}
 
 	payloadC := C.CBytes(payload)
@@ -157,16 +147,6 @@ func (rs *RawSegmenter) WritePacket(payload []byte, pts, dts int64, isIDR bool) 
 func (rs *RawSegmenter) Close() error {
 	rs.cRawSegMu.Lock()
 	defer rs.cRawSegMu.Unlock()
-	err := rs.close()
-	if err != nil {
-		rs.logger.Warnf("RawSegmenter.Close err: %s", err.Error())
-		return err
-	}
-	return nil
-}
-
-// close must be called while the caller holds cRawSegMu
-func (rs *RawSegmenter) close() error {
 	if rs.cRawSeg == nil {
 		return nil
 	}
