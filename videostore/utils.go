@@ -40,6 +40,9 @@ const (
 	codecH264
 	// CodecH265 represents the H.265 codec type.
 	codecH265
+
+	// maxSegmentLength defines the maximum clip duration in seconds.
+	maxSegmentLength = 30
 )
 
 func (c codecType) String() string {
@@ -236,7 +239,7 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 	var firstWidth, firstHeight int
 	var firstCodec string
 	for _, file := range files {
-		dateTime, err := extractDateTimeFromFilename(file)
+		fileStartTime, err := extractDateTimeFromFilename(file)
 		if err != nil {
 			logger.Debugf("failed to extract datetime from filename: %s, error: %v", file, err)
 			continue
@@ -245,15 +248,28 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 		// We could use a 30 second max segment duration to avoid fetching video info for all files.
 		// If within 30 seconds of match we can then start to look up actual video stats
 		// by probing the mp4 file video stream info.
-		duration, width, height, codec, err := getVideoInfo(file)
-		if err != nil {
-			logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
-			continue
-		}
-		fileEndTime := dateTime.Add(duration)
+
+		// fileEndTime := dateTime.Add(duration)
+		estimatedFileEndTime := fileStartTime.Add(time.Duration(maxSegmentLength) * time.Second)
 		// Check if the segment file's time range intersects
 		// with the match request time range [start, end)
-		if dateTime.Before(end) && fileEndTime.After(start) {
+		// if dateTime.Before(end) && fileEndTime.After(start) {
+		if fileStartTime.Before(end) && estimatedFileEndTime.After(start) {
+			// If the first video file in the matched set, cache the width, height, and codec
+			duration, width, height, codec, err := getVideoInfo(file)
+			if err != nil {
+				logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
+				continue
+			}
+			actualFileEndTime := fileStartTime.Add(duration)
+			// If the real file end time is before the start time, skip the file
+			if actualFileEndTime.Before(start) {
+				logger.Debugf(
+					"Skipping file %s. File ends before start time (end=%v, start=%v)",
+					file, actualFileEndTime, start,
+				)
+				continue
+			}
 			if firstWidth == 0 {
 				firstWidth = width
 			}
@@ -270,21 +286,23 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 				)
 				continue
 			}
+			logger.Debugf("Matched file %s", file)
 			var inpoint, outpoint float64
 			inpointSet := false
 			outpointSet := false
 			// Calculate inpoint if the file starts before the 'start' time and overlaps
-			if dateTime.Before(start) {
-				inpoint = start.Sub(dateTime).Seconds()
+			if fileStartTime.Before(start) {
+				inpoint = start.Sub(fileStartTime).Seconds()
 				inpointSet = true
 			}
 			// Calculate outpoint if the file ends after the 'end' time
-			if fileEndTime.After(end) {
-				outpoint = end.Sub(dateTime).Seconds()
+			// if fileEndTime.After(end) {
+			if actualFileEndTime.After(end) {
+				outpoint = end.Sub(fileStartTime).Seconds()
 				outpointSet = true
 			}
 			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", file))
-			if inpointSet {
+			if inpointSet && inpoint < duration.Seconds() {
 				logger.Debugf("Trimming file %s to inpoint %.2f", file, inpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("inpoint %.2f", inpoint))
 			}
