@@ -231,6 +231,8 @@ func formatDateTimeToString(dateTime time.Time) string {
 // Includes trimming video files to the time range if they overlap.
 func matchStorageToRange(files []string, start, end time.Time, logger logging.Logger) []string {
 	var matchedFiles []string
+	// Cache of the first matched video file's width, height, and codec
+	// to ensure every video in the matched files set have the same params.
 	var firstWidth, firstHeight int
 	var firstCodec string
 	for _, file := range files {
