@@ -56,14 +56,19 @@ func newRawSegmenter(
 }
 
 func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
+	rs.logger.Infof("RawSegmenter.Init START with: %s, %dx%d", codec, width, height)
 	if width <= 0 || height <= 0 {
-		return errors.New("both width and height must be greater than zero")
+		err := errors.New("both width and height must be greater than zero")
+		rs.logger.Warn(err.Error())
+		return err
 	}
 
 	rs.cRawSegMu.Lock()
 	defer rs.cRawSegMu.Unlock()
 	if rs.cRawSeg != nil {
-		return errors.New("*rawSegmenter init called more than once")
+		err := errors.New("*rawSegmenter init called more than once")
+		rs.logger.Warn(err.Error())
+		return err
 	}
 
 	var cRS *C.raw_seg
@@ -89,7 +94,9 @@ func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 			C.int(width),
 			C.int(height))
 	default:
-		return fmt.Errorf("rawSegmenter.init called on invalid codec %s", codec)
+		err := fmt.Errorf("rawSegmenter.init called on invalid codec %s", codec)
+		rs.logger.Warn(err.Error())
+		return err
 	}
 
 	if ret != C.VIDEO_STORE_RAW_SEG_RESP_OK {
@@ -99,18 +106,24 @@ func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 	}
 	rs.cRawSeg = cRS
 
+	rs.logger.Infof("RawSegmenter.Init SUCCEEDED with: %s, %dx%d", codec, width, height)
 	return nil
 }
 
 func (rs *RawSegmenter) WritePacket(payload []byte, pts, dts int64, isIDR bool) error {
+	rs.logger.Infof("RawSegmenter.WritePacket START with: len(payload): %d, pts: %d, dts: %d, isIDR: %t", len(payload), pts, dts, isIDR)
 	rs.cRawSegMu.Lock()
 	defer rs.cRawSegMu.Unlock()
 	if rs.cRawSeg == nil {
-		return errors.New("writePacket called before init")
+		err := errors.New("writePacket called before init")
+		rs.logger.Warn(err.Error())
+		return err
 	}
 
 	if len(payload) == 0 {
-		return errors.New("writePacket called with empty packet")
+		err := errors.New("writePacket called with empty packet")
+		rs.logger.Warn(err.Error())
+		return err
 	}
 
 	payloadC := C.CBytes(payload)
@@ -132,14 +145,27 @@ func (rs *RawSegmenter) WritePacket(payload []byte, pts, dts int64, isIDR bool) 
 		rs.logger.Errorf("%s: %d", err.Error(), ret)
 		return err
 	}
+	rs.logger.Infof("RawSegmenter.WritePacket SUCCEEDED with: len(payload): %d, pts: %d, dts: %d, isIDR: %t", len(payload), pts, dts, isIDR)
 	return nil
 }
 
 // Close closes the segmenter and writes the trailer to prevent corruption
 // when exiting early in the middle of a segment.
 func (rs *RawSegmenter) Close() error {
+	rs.logger.Info("RawSegmenter.Close START")
 	rs.cRawSegMu.Lock()
 	defer rs.cRawSegMu.Unlock()
+	err := rs.close()
+	if err != nil {
+		rs.logger.Warnf("RawSegmenter.Close err: %s", err.Error())
+		return err
+	}
+	rs.logger.Info("RawSegmenter.Close SUCCEEDED")
+	return nil
+}
+
+// close must be called while the caller holds cRawSegMu
+func (rs *RawSegmenter) close() error {
 	if rs.cRawSeg == nil {
 		return nil
 	}
