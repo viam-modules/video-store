@@ -231,20 +231,45 @@ func formatDateTimeToString(dateTime time.Time) string {
 // Includes trimming video files to the time range if they overlap.
 func matchStorageToRange(files []string, start, end time.Time, logger logging.Logger) []string {
 	var matchedFiles []string
+	// Cache of the first matched video file's width, height, and codec
+	// to ensure every video in the matched files set have the same params.
+	var firstWidth, firstHeight int
+	var firstCodec string
 	for _, file := range files {
 		dateTime, err := extractDateTimeFromFilename(file)
 		if err != nil {
 			logger.Debugf("failed to extract datetime from filename: %s, error: %v", file, err)
 			continue
 		}
-		duration, err := getVideoDuration(file)
+		// TODO("RSDK-???"): Only fetch video info if the file is within the time range.
+		// We could use a 30 second max segment duration to avoid fetching video info for all files.
+		// If within 30 seconds of match we can then start to look up actual video stats
+		// by probing the mp4 file video stream info.
+		duration, width, height, codec, err := getVideoInfo(file)
 		if err != nil {
 			logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
 			continue
 		}
 		fileEndTime := dateTime.Add(duration)
-		// Check if the file's time range intersects with [start, end)
+		// Check if the segment file's time range intersects
+		// with the match request time range [start, end)
 		if dateTime.Before(end) && fileEndTime.After(start) {
+			if firstWidth == 0 {
+				firstWidth = width
+			}
+			if firstHeight == 0 {
+				firstHeight = height
+			}
+			if firstCodec == "" {
+				firstCodec = codec
+			}
+			if firstWidth != width || firstHeight != height || firstCodec != codec {
+				logger.Debugf(
+					"Skipping file %s. Expected (width=%d, height=%d, codec=%s), got (width=%d, height=%d, codec=%s)",
+					file, firstWidth, firstHeight, firstCodec, width, height, codec,
+				)
+				continue
+			}
 			var inpoint, outpoint float64
 			inpointSet := false
 			outpointSet := false
@@ -260,10 +285,12 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 			}
 			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", file))
 			if inpointSet {
+				logger.Debugf("Trimming file %s to inpoint %.2f", file, inpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("inpoint %.2f", inpoint))
 			}
+			// Only include outpoint if it's less than the full duration
 			if outpointSet && outpoint < duration.Seconds() {
-				// Only include outpoint if it's less than the full duration
+				logger.Debugf("Trimming file %s to outpoint %.2f", file, outpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("outpoint %.2f", outpoint))
 			}
 		}
@@ -305,20 +332,28 @@ func validateTimeRange(files []string, start, end time.Time) error {
 	return nil
 }
 
-// getVideoDuration returns the duration of the video file in seconds.
-func getVideoDuration(filePath string) (time.Duration, error) {
+// getVideoInfo calls the C function get_video_info to retrieve duration, width, height, and codec.
+func getVideoInfo(filePath string) (time.Duration, int, int, string, error) {
 	cFilePath := C.CString(filePath)
 	defer C.free(unsafe.Pointer(cFilePath))
 
-	var duration C.int64_t
-	ret := C.get_video_duration(&duration, cFilePath)
+	var cDuration C.int64_t
+	var cWidth, cHeight C.int
+	var cCodec [C.VIDEO_STORE_CODEC_NAME_LEN]C.char
+
+	ret := C.get_video_info(&cDuration, &cWidth, &cHeight, &cCodec[0], cFilePath)
 	switch ret {
-	case C.VIDEO_STORE_DURATION_RESP_OK:
-		// Convert duration from AV_TIME_BASE units to time.Duration
-		return time.Duration(duration) * time.Microsecond, nil
-	case C.VIDEO_STORE_DURATION_RESP_ERROR:
-		return 0, fmt.Errorf("failed to get video duration for file: %s", filePath)
+	case C.VIDEO_STORE_VIDEO_INFO_RESP_OK:
+		// Convert and return
+		duration := time.Duration(cDuration) * time.Microsecond
+		width := int(cWidth)
+		height := int(cHeight)
+		codec := C.GoString(&cCodec[0])
+		return duration, width, height, codec, nil
+	case C.VIDEO_STORE_VIDEO_INFO_RESP_ERROR:
+		return 0, 0, 0, "", fmt.Errorf("failed to get video info for file: %s", filePath)
 	default:
-		return 0, fmt.Errorf("failed to get video duration for file: %s with error: %s", filePath, ffmpegError(ret))
+		return 0, 0, 0, "", fmt.Errorf("failed to get video info for file: %s with error: %s",
+			filePath, ffmpegError(ret))
 	}
 }
