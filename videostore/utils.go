@@ -247,7 +247,6 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 			logger.Debugf("failed to extract datetime from filename: %s, error: %v", file, err)
 			continue
 		}
-		// fileEndTime := dateTime.Add(duration)
 		estimatedFileEndTime := fileStartTime.Add(time.Duration(maxSegmentLength+keyFrameIntervalBuffer) * time.Second)
 		// Check if the segment file's time range intersects
 		// with the match request time range [start, end)
@@ -259,8 +258,8 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 				continue
 			}
 			actualFileEndTime := fileStartTime.Add(duration)
-			// If the real file end time is before the start time, skip the file
-			if actualFileEndTime.Before(start) {
+			// If the real file end time is exclusively before the start time, skip the file
+			if !actualFileEndTime.After(start) {
 				logger.Debugf(
 					"Skipping file %s. File ends before start time (end=%v, start=%v)",
 					file, actualFileEndTime, start,
@@ -293,7 +292,6 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 				inpointSet = true
 			}
 			// Calculate outpoint if the file ends after the 'end' time
-			// if fileEndTime.After(end) {
 			if actualFileEndTime.After(end) {
 				outpoint = end.Sub(fileStartTime).Seconds()
 				outpointSet = true
