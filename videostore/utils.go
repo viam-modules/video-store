@@ -43,6 +43,9 @@ const (
 
 	// maxSegmentLength defines the maximum clip duration in seconds.
 	maxSegmentLength = 30
+
+	// keyFrameIntervalBuffer defines max seconds between keyframes.
+	keyFrameIntervalBuffer = 4
 )
 
 func (c codecType) String() string {
@@ -244,16 +247,10 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 			logger.Debugf("failed to extract datetime from filename: %s, error: %v", file, err)
 			continue
 		}
-		// TODO("RSDK-???"): Only fetch video info if the file is within the time range.
-		// We could use a 30 second max segment duration to avoid fetching video info for all files.
-		// If within 30 seconds of match we can then start to look up actual video stats
-		// by probing the mp4 file video stream info.
-
 		// fileEndTime := dateTime.Add(duration)
-		estimatedFileEndTime := fileStartTime.Add(time.Duration(maxSegmentLength) * time.Second)
+		estimatedFileEndTime := fileStartTime.Add(time.Duration(maxSegmentLength+keyFrameIntervalBuffer) * time.Second)
 		// Check if the segment file's time range intersects
 		// with the match request time range [start, end)
-		// if dateTime.Before(end) && fileEndTime.After(start) {
 		if fileStartTime.Before(end) && estimatedFileEndTime.After(start) {
 			// If the first video file in the matched set, cache the width, height, and codec
 			duration, width, height, codec, err := getVideoInfo(file)
