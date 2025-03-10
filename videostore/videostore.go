@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -65,7 +66,7 @@ type videostore struct {
 	latestFrameMu sync.Mutex
 	workers       *utils.StoppableWorkers
 
-	rawSegmenter *rawSegmenter
+	rawSegmenter *RawSegmenter
 	segmenter    *segmenter
 	concater     *concater
 }
@@ -77,11 +78,35 @@ type VideoStore interface {
 	Close()
 }
 
+// CodecType repreasents a codec
+type CodecType int
+
+const (
+	// CodecTypeUnknown is an invalid type.
+	CodecTypeUnknown CodecType = iota
+	// CodecTypeH264 represents h264 codec
+	CodecTypeH264
+	// CodecTypeH265 represents h265 codec
+	CodecTypeH265
+)
+
+func (t CodecType) String() string {
+	switch t {
+	case CodecTypeUnknown:
+		return "CodecTypeUnknown"
+	case CodecTypeH264:
+		return "CodecTypeH264"
+	case CodecTypeH265:
+		return "CodecTypeH265"
+	default:
+		return "CodecTypeUnknown"
+	}
+}
+
 // RTPVideoStore stores video derived from RTP packets and provides APIs to request the stored video
 type RTPVideoStore interface {
 	VideoStore
-	Init(width, height int) error
-	WritePacket(payload []byte, pts, dts int64, isIDR bool) error
+	Segmenter() *RawSegmenter
 }
 
 // SaveRequest is the request to the Save method
@@ -186,10 +211,42 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 	return vs, nil
 }
 
+// NewReadOnlyVideoStore returns a VideoStore that can return stored video but doesn't create new video segements
+func NewReadOnlyVideoStore(config Config, logger logging.Logger) (VideoStore, error) {
+	if config.Type != SourceTypeReadOnly {
+		return nil, fmt.Errorf("config type must be %s", SourceTypeReadOnly)
+	}
+	if err := config.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := createDir(config.Storage.UploadPath); err != nil {
+		return nil, err
+	}
+
+	concater, err := newConcater(
+		logger,
+		config.Storage.StoragePath,
+		config.Storage.UploadPath,
+		config.Storage.SegmentSeconds,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &videostore{
+		typ:      config.Type,
+		concater: concater,
+		logger:   logger,
+		config:   config,
+		workers:  utils.NewBackgroundStoppableWorkers(),
+	}, nil
+}
+
 // NewRTPVideoStore returns a VideoStore that stores video it receives from the caller
 func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, error) {
-	if config.Type != SourceTypeH264RTPPacket && config.Type != SourceTypeH265RTPPacket {
-		return nil, fmt.Errorf("config type must be %s or %s", SourceTypeH264RTPPacket, SourceTypeH265RTPPacket)
+	if config.Type != SourceTypeRTP {
+		return nil, fmt.Errorf("config type must be %s", SourceTypeRTP)
 	}
 	if err := config.Validate(); err != nil {
 		return nil, err
@@ -210,8 +267,6 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	}
 
 	rawSegmenter, err := newRawSegmenter(logger,
-		config.Type,
-		config.Storage.SizeGB,
 		config.Storage.StoragePath,
 		config.Storage.SegmentSeconds,
 	)
@@ -227,45 +282,13 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		config:       config,
 		workers:      utils.NewBackgroundStoppableWorkers(),
 	}
-	vs.workers.Add(func(ctx context.Context) {
-		ticker := time.NewTicker(deleterInterval * time.Minute)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				// Perform the deletion of the oldest clip
-				if err := rawSegmenter.cleanupStorage(); err != nil {
-					vs.logger.Error("failed to clean up storage", err)
-					continue
-				}
-			}
-		}
-	})
+
+	vs.workers.Add(vs.deleter)
 	return vs, nil
 }
 
-func (vs *videostore) Init(width, height int) error {
-	switch vs.typ {
-	case SourceTypeH264RTPPacket, SourceTypeH265RTPPacket:
-		return vs.rawSegmenter.init(width, height)
-	case SourceTypeFrame:
-		fallthrough
-	default:
-		return fmt.Errorf("Init unimplmented for SourceType: %d: %s", vs.typ, vs.typ)
-	}
-}
-
-func (vs *videostore) WritePacket(payload []byte, pts, dts int64, isIDR bool) error {
-	switch vs.typ {
-	case SourceTypeH264RTPPacket, SourceTypeH265RTPPacket:
-		return vs.rawSegmenter.writePacket(payload, pts, dts, isIDR)
-	case SourceTypeFrame:
-		fallthrough
-	default:
-		return fmt.Errorf("WritePacket unimplmented for SourceType: %d: %s", vs.typ, vs.typ)
-	}
+func (vs *videostore) Segmenter() *RawSegmenter {
+	return vs.rawSegmenter
 }
 
 func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse, error) {
@@ -292,6 +315,9 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 }
 
 func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, error) {
+	if err := r.Validate(); err != nil {
+		return nil, err
+	}
 	vs.logger.Debug("save command received")
 	uploadFilePath := generateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
@@ -425,12 +451,45 @@ func (vs *videostore) deleter(ctx context.Context) {
 			return
 		case <-ticker.C:
 			// Perform the deletion of the oldest clip
-			if err := vs.segmenter.cleanupStorage(); err != nil {
+			if err := cleanupStorage(vs.config.Storage.StoragePath, vs.config.Storage.SizeGB, vs.logger); err != nil {
 				vs.logger.Error("failed to clean up storage", err)
 				continue
 			}
 		}
 	}
+}
+
+func cleanupStorage(storagePath string, maxStorageSizeGB int, logger logging.Logger) error {
+	maxStorageSize := int64(maxStorageSizeGB) * gigabyte
+	currStorageSize, err := getDirectorySize(storagePath)
+	if err != nil {
+		return err
+	}
+	if currStorageSize < maxStorageSize {
+		return nil
+	}
+	files, err := getSortedFiles(storagePath)
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if currStorageSize < maxStorageSize {
+			break
+		}
+		logger.Debugf("deleting file: %s", file)
+		err := os.Remove(file)
+		if err != nil {
+			return err
+		}
+		logger.Debugf("deleted file: %s", file)
+		// NOTE: This is going to be super slow
+		// we should speed this up
+		currStorageSize, err = getDirectorySize(storagePath)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // asyncSave command will run the concat operation in the background.
@@ -468,6 +527,6 @@ func (vs *videostore) Close() {
 		vs.segmenter.close()
 	}
 	if vs.rawSegmenter != nil {
-		vs.rawSegmenter.close()
+		vs.rawSegmenter.Close()
 	}
 }

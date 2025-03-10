@@ -18,10 +18,10 @@ const (
 	SourceTypeUnknown SourceType = iota
 	// SourceTypeFrame is a video store that creates a video from frames.
 	SourceTypeFrame
-	// SourceTypeH264RTPPacket is a video store that creates a video from rtp packets.
-	SourceTypeH264RTPPacket
-	// SourceTypeH265RTPPacket is a video store that creates a video from rtp packets.
-	SourceTypeH265RTPPacket
+	// SourceTypeRTP is a video store that creates a video from rtp packets.
+	SourceTypeRTP
+	// SourceTypeReadOnly is a video store that only reads already stored segment files.
+	SourceTypeReadOnly
 )
 
 func (t SourceType) String() string {
@@ -30,10 +30,10 @@ func (t SourceType) String() string {
 		return "VideoStoreTypeUnknown"
 	case SourceTypeFrame:
 		return "VideoStoreTypeFrame"
-	case SourceTypeH264RTPPacket:
-		return "SourceTypeH264RTPPacket"
-	case SourceTypeH265RTPPacket:
-		return "SourceTypeH265RTPPacket"
+	case SourceTypeRTP:
+		return "SourceTypeRTP"
+	case SourceTypeReadOnly:
+		return "SourceTypeReadOnly"
 	default:
 		return "VideoStoreTypeUnknown"
 	}
