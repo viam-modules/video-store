@@ -58,7 +58,7 @@ func TestGetVideoInfo(t *testing.T) {
 
 func TestMatchStorageToRange(t *testing.T) {
 	logger := logging.NewTestLogger(t)
-	t.Run("Basic match request within one segment", func(t *testing.T) {
+	t.Run("Match request within one segment", func(t *testing.T) {
 		fileList := []string{
 			artifactStoragePath + "2025-03-05_16-36-20.mp4",
 			artifactStoragePath + "2025-03-05_16-36-59.mp4",
@@ -80,6 +80,21 @@ func TestMatchStorageToRange(t *testing.T) {
 			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
 		}
 	})
+
+	t.Run("Match request within gap in data", func(t *testing.T) {
+		fileList := []string{
+			artifactStoragePath + "2025-03-05_16-36-20.mp4",
+			artifactStoragePath + "2025-03-05_16-36-59.mp4",
+			artifactStoragePath + "2025-03-05_16-37-38.mp4",
+		}
+		startTime, err := ParseDateTimeString("2025-03-05_16-36-53")
+		test.That(t, err, test.ShouldBeNil)
+		endTime, err := ParseDateTimeString("2025-03-05_16-36-55")
+		test.That(t, err, test.ShouldBeNil)
+		matchedFiles := matchStorageToRange(fileList, startTime, endTime, logger)
+		test.That(t, matchedFiles, test.ShouldBeEmpty)
+	})
+
 	t.Run("Match request spanning gap in segment data", func(t *testing.T) {
 		fileList := []string{
 			artifactStoragePath + "2025-03-05_16-36-20.mp4",
