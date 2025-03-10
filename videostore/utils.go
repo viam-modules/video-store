@@ -264,7 +264,10 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 				firstCodec = codec
 			}
 			if firstWidth != width || firstHeight != height || firstCodec != codec {
-				logger.Debugf("video file %s has different resolution or codec, skipping", file)
+				logger.Debugf(
+					"Skipping file %s. Expected (width=%d, height=%d, codec=%s), got (width=%d, height=%d, codec=%s)",
+					file, firstWidth, firstHeight, firstCodec, width, height, codec,
+				)
 				continue
 			}
 			var inpoint, outpoint float64
@@ -282,10 +285,12 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 			}
 			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", file))
 			if inpointSet {
+				logger.Debugf("Trimming file %s to inpoint %.2f", file, inpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("inpoint %.2f", inpoint))
 			}
+			// Only include outpoint if it's less than the full duration
 			if outpointSet && outpoint < duration.Seconds() {
-				// Only include outpoint if it's less than the full duration
+				logger.Debugf("Trimming file %s to outpoint %.2f", file, outpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("outpoint %.2f", outpoint))
 			}
 		}
