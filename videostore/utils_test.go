@@ -80,4 +80,27 @@ func TestMatchStorageToRange(t *testing.T) {
 			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
 		}
 	})
+	t.Run("Match request spanning gap in segment data", func(t *testing.T) {
+		fileList := []string{
+			artifactStoragePath + "2025-03-05_16-36-20.mp4",
+			artifactStoragePath + "2025-03-05_16-36-59.mp4",
+			artifactStoragePath + "2025-03-05_16-37-38.mp4",
+		}
+		startTime, err := ParseDateTimeString("2025-03-05_16-36-40")
+		test.That(t, err, test.ShouldBeNil)
+		endTime, err := ParseDateTimeString("2025-03-05_16-37-10")
+		test.That(t, err, test.ShouldBeNil)
+		matchedFiles := matchStorageToRange(fileList, startTime, endTime, logger)
+		// expected := "file '../.artifact/data/2025-03-05_16-36-20.mp4' inpoint 20.00 outpoint 30.00"
+		expected := []string{
+			"file '../.artifact/data/2025-03-05_16-36-20.mp4'",
+			"inpoint 20.00",
+			"file '../.artifact/data/2025-03-05_16-36-59.mp4'",
+			"outpoint 11.00",
+		}
+		test.That(t, matchedFiles, test.ShouldHaveLength, 4)
+		for i, exp := range expected {
+			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
+		}
+	})
 }
