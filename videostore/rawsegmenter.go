@@ -97,7 +97,7 @@ func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 			C.int(width),
 			C.int(height))
 	default:
-		err := fmt.Errorf("rawSegmenter.init called on invalid codec %s", codec)
+		err := fmt.Errorf("rawSegmenter.Init called on invalid codec %s", codec)
 		rs.logger.Warn(err.Error())
 		return err
 	}
