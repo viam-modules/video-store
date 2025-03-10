@@ -15,7 +15,7 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-type RawSegmenter struct {
+type rawSegmenter struct {
 	logger         logging.Logger
 	storagePath    string
 	segmentSeconds int
@@ -42,8 +42,8 @@ func newRawSegmenter(
 	logger logging.Logger,
 	storagePath string,
 	segmentSeconds int,
-) (*RawSegmenter, error) {
-	s := &RawSegmenter{
+) (*rawSegmenter, error) {
+	s := &rawSegmenter{
 		logger:         logger,
 		storagePath:    storagePath,
 		segmentSeconds: segmentSeconds,
@@ -55,8 +55,7 @@ func newRawSegmenter(
 	return s, nil
 }
 
-func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
-	rs.logger.Infof("RawSegmenter.Init START with: %s, %dx%d", codec, width, height)
+func (rs *rawSegmenter) Init(codec CodecType, width, height int) error {
 	if width <= 0 || height <= 0 {
 		err := errors.New("both width and height must be greater than zero")
 		rs.logger.Warn(err.Error())
@@ -106,12 +105,10 @@ func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 	}
 	rs.cRawSeg = cRS
 
-	rs.logger.Infof("RawSegmenter.Init SUCCEEDED with: %s, %dx%d", codec, width, height)
 	return nil
 }
 
-func (rs *RawSegmenter) WritePacket(payload []byte, pts, dts int64, isIDR bool) error {
-	rs.logger.Infof("RawSegmenter.WritePacket START with: len(payload): %d, pts: %d, dts: %d, isIDR: %t", len(payload), pts, dts, isIDR)
+func (rs *rawSegmenter) WritePacket(payload []byte, pts, dts int64, isIDR bool) error {
 	rs.cRawSegMu.Lock()
 	defer rs.cRawSegMu.Unlock()
 	if rs.cRawSeg == nil {
@@ -145,14 +142,12 @@ func (rs *RawSegmenter) WritePacket(payload []byte, pts, dts int64, isIDR bool) 
 		rs.logger.Errorf("%s: %d", err.Error(), ret)
 		return err
 	}
-	rs.logger.Infof("RawSegmenter.WritePacket SUCCEEDED with: len(payload): %d, pts: %d, dts: %d, isIDR: %t", len(payload), pts, dts, isIDR)
 	return nil
 }
 
 // Close closes the segmenter and writes the trailer to prevent corruption
 // when exiting early in the middle of a segment.
-func (rs *RawSegmenter) Close() error {
-	rs.logger.Info("RawSegmenter.Close START")
+func (rs *rawSegmenter) Close() error {
 	rs.cRawSegMu.Lock()
 	defer rs.cRawSegMu.Unlock()
 	err := rs.close()
@@ -160,12 +155,11 @@ func (rs *RawSegmenter) Close() error {
 		rs.logger.Warnf("RawSegmenter.Close err: %s", err.Error())
 		return err
 	}
-	rs.logger.Info("RawSegmenter.Close SUCCEEDED")
 	return nil
 }
 
 // close must be called while the caller holds cRawSegMu
-func (rs *RawSegmenter) close() error {
+func (rs *rawSegmenter) close() error {
 	if rs.cRawSeg == nil {
 		return nil
 	}

@@ -20,7 +20,7 @@ const (
 	SourceTypeFrame
 	// SourceTypeRTP is a video store that creates a video from rtp packets.
 	SourceTypeRTP
-	// SourceTypeReadOnly is a video store that only reads already stored segment files
+	// SourceTypeReadOnly is a video store that only reads already stored segment files.
 	SourceTypeReadOnly
 )
 

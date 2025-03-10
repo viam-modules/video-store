@@ -66,7 +66,7 @@ type videostore struct {
 	workers     *utils.StoppableWorkers
 
 	// rawSegmenter *rawSegmenter
-	rawSeg *RawSegmenter
+	rawSeg *rawSegmenter
 	// videoStoreMuxer *rawSegmenterMux
 	segmenter *segmenter
 	concater  *concater
@@ -79,14 +79,15 @@ type VideoStore interface {
 	Close()
 }
 
+// CodecType repreasents a codec
 type CodecType int
 
 const (
 	// CodecTypeUnknown is an invalid type.
 	CodecTypeUnknown CodecType = iota
-	// CodecTypeH264
+	// CodecTypeH264 represents h264 codec
 	CodecTypeH264
-	// CodecTypeH265 is a video store that creates a video from rtp packets.
+	// CodecTypeH265 represents h265 codec
 	CodecTypeH265
 )
 
@@ -99,14 +100,14 @@ func (t CodecType) String() string {
 	case CodecTypeH265:
 		return "CodecTypeH265"
 	default:
-		return "VideoStoreTypeUnknown"
+		return "CodecTypeUnknown"
 	}
 }
 
 // RTPVideoStore stores video derived from RTP packets and provides APIs to request the stored video
 type RTPVideoStore interface {
 	VideoStore
-	Segmenter() *RawSegmenter
+	Segmenter() *rawSegmenter
 }
 
 // SaveRequest is the request to the Save method
@@ -211,7 +212,7 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 	return vs, nil
 }
 
-// NewRTPVideoStore returns a VideoStore that stores video it receives from the caller
+// NewReadOnlyVideoStore returns a VideoStore that can return stored video but doesn't create new video segements
 func NewReadOnlyVideoStore(config Config, logger logging.Logger) (VideoStore, error) {
 	if config.Type != SourceTypeReadOnly {
 		return nil, fmt.Errorf("config type must be %s", SourceTypeReadOnly)
@@ -278,19 +279,16 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		typ:      config.Type,
 		concater: concater,
 		rawSeg:   rawSegmenter,
-		// videoStoreMuxer: &rawSegmenterMux{
-		// 	logger: logger,
-		// },
-		logger:  logger,
-		config:  config,
-		workers: utils.NewBackgroundStoppableWorkers(),
+		logger:   logger,
+		config:   config,
+		workers:  utils.NewBackgroundStoppableWorkers(),
 	}
 
 	vs.workers.Add(vs.deleter)
 	return vs, nil
 }
 
-func (vs *videostore) Segmenter() *RawSegmenter {
+func (vs *videostore) Segmenter() *rawSegmenter {
 	return vs.rawSeg
 }
 
