@@ -77,9 +77,6 @@ func applyVideoEncoderDefaults(c Video) videostore.EncoderConfig {
 
 func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, error) {
 	var zero videostore.StorageConfig
-	if c.SegmentSeconds == 0 {
-		c.SegmentSeconds = defaultSegmentSeconds
-	}
 	if c.UploadPath == "" {
 		home, err := getHomeDir()
 		if err != nil {
@@ -95,7 +92,7 @@ func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, err
 		c.StoragePath = filepath.Join(home, defaultStoragePath, name)
 	}
 	return videostore.StorageConfig{
-		SegmentSeconds:       c.SegmentSeconds,
+		SegmentSeconds:       defaultSegmentSeconds,
 		SizeGB:               c.SizeGB,
 		OutputFileNamePrefix: name,
 		UploadPath:           c.UploadPath,
