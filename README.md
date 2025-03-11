@@ -61,7 +61,7 @@ Additionally, make sure to add your configured data manager service to the `depe
 | `camera`        |                   | string  | no  | Name of the source camera to read images from. If not provided, video-store will not save video.  |
 | `sync`          |                   | string  | yes  | Name of the dependency datamanager service.                                                       |
 | `storage`       |                   | object  | yes  |                                                                                                   |
-|                 | `size_gb`         | integer | yes  | Total amount of allocated storage in gigabytes.                                                   |
+|                 | `size_gb`         | integer | yes  | Total amount of allocated storage in gigabytes. If you reduce the amound of allocated storage while the storage exceeds the allocated amount, the oldest clips get deleted until the storage size is below the configured max. |
 |                 | `storage_path`    | string  | no  | Custom path to use for video storage.                                                             |
 |                 | `upload_path`     | string  | no  | Custom path to use for uploading files. If not under `~/.viam/capture`, you will need to add to `additional_sync_paths` in datamanager service configuration. |
 | `video`         |                   | object  | no  |                                                                                                   |
