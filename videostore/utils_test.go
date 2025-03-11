@@ -202,4 +202,24 @@ func TestMatchStorageToRange(t *testing.T) {
 			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
 		}
 	})
+
+	t.Run("Match request spanning size change boundary", func(t *testing.T) {
+		fileList := []string{
+			artifactStoragePath + "2025-03-11_11-49-37.mp4",
+			artifactStoragePath + "2025-03-11_11-49-58.mp4",
+		}
+		startTime, err := ParseDateTimeString("2025-03-11_11-49-47")
+		test.That(t, err, test.ShouldBeNil)
+		endTime, err := ParseDateTimeString("2025-03-11_11-50-47")
+		test.That(t, err, test.ShouldBeNil)
+		expected := []string{
+			"file '../.artifact/data/2025-03-11_11-49-37.mp4'",
+			"inpoint 10.00",
+		}
+		matchedFiles := matchStorageToRange(fileList, startTime, endTime, logger)
+		test.That(t, matchedFiles, test.ShouldHaveLength, 2)
+		for i, exp := range expected {
+			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
+		}
+	})
 }
