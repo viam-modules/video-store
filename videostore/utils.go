@@ -48,6 +48,24 @@ const (
 	keyFrameIntervalBuffer = 4
 )
 
+// videoInfo in Go, corresponding to the C VideoInfo struct
+type videoInfo struct {
+	duration time.Duration
+	width    int
+	height   int
+	codec    string
+}
+
+// fromCVideoInfo converts a C.VideoInfo struct to a Go VideoInfo struct
+func fromCVideoInfo(cinfo C.VideoInfo) videoInfo {
+	return videoInfo{
+		duration: time.Duration(cinfo.duration) * time.Microsecond,
+		width:    int(cinfo.width),
+		height:   int(cinfo.height),
+		codec:    C.GoString(&cinfo.codec[0]),
+	}
+}
+
 func (c codecType) String() string {
 	switch c {
 	case codecH264:
@@ -239,8 +257,11 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 	var matchedFiles []string
 	// Cache of the first matched video file's width, height, and codec
 	// to ensure every video in the matched files set have the same params.
-	var firstWidth, firstHeight int
-	var firstCodec string
+	firstSeenVideoInfo := videoInfo{
+		width:  0,
+		height: 0,
+		codec:  "",
+	}
 	for _, file := range files {
 		fileStartTime, err := extractDateTimeFromFilename(file)
 		if err != nil {
@@ -252,12 +273,12 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 		// with the match request time range [start, end)
 		if fileStartTime.Before(end) && estimatedFileEndTime.After(start) {
 			// If the first video file in the matched set, cache the width, height, and codec
-			duration, width, height, codec, err := getVideoInfo(file)
+			videoFileInfo, err := getVideoInfo(file)
 			if err != nil {
 				logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
 				continue
 			}
-			actualFileEndTime := fileStartTime.Add(duration)
+			actualFileEndTime := fileStartTime.Add(videoFileInfo.duration)
 			// If the real file end time is exclusively before the start time, skip the file
 			if !actualFileEndTime.After(start) {
 				logger.Debugf(
@@ -266,19 +287,24 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 				)
 				continue
 			}
-			if firstWidth == 0 {
-				firstWidth = width
+			if firstSeenVideoInfo.width == 0 {
+				firstSeenVideoInfo.width = videoFileInfo.width
 			}
-			if firstHeight == 0 {
-				firstHeight = height
+			if firstSeenVideoInfo.height == 0 {
+				firstSeenVideoInfo.height = videoFileInfo.height
 			}
-			if firstCodec == "" {
-				firstCodec = codec
+			if firstSeenVideoInfo.codec == "" {
+				firstSeenVideoInfo.codec = videoFileInfo.codec
 			}
-			if firstWidth != width || firstHeight != height || firstCodec != codec {
+			// if firstWidth != width || firstHeight != height || firstCodec != codec {
+			if firstSeenVideoInfo.width != videoFileInfo.width ||
+				firstSeenVideoInfo.height != videoFileInfo.height ||
+				firstSeenVideoInfo.codec != videoFileInfo.codec {
 				logger.Debugf(
 					"Skipping file %s. Expected (width=%d, height=%d, codec=%s), got (width=%d, height=%d, codec=%s)",
-					file, firstWidth, firstHeight, firstCodec, width, height, codec,
+					file,
+					firstSeenVideoInfo.width, firstSeenVideoInfo.height, firstSeenVideoInfo.codec,
+					videoFileInfo.width, videoFileInfo.height, videoFileInfo.codec,
 				)
 				continue
 			}
@@ -297,12 +323,12 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 				outpointSet = true
 			}
 			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", file))
-			if inpointSet && inpoint < duration.Seconds() {
+			if inpointSet {
 				logger.Debugf("Trimming file %s to inpoint %.2f", file, inpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("inpoint %.2f", inpoint))
 			}
 			// Only include outpoint if it's less than the full duration
-			if outpointSet && outpoint < duration.Seconds() {
+			if outpointSet && outpoint < videoFileInfo.duration.Seconds() {
 				logger.Debugf("Trimming file %s to outpoint %.2f", file, outpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("outpoint %.2f", outpoint))
 			}
@@ -345,28 +371,20 @@ func validateTimeRange(files []string, start, end time.Time) error {
 	return nil
 }
 
-// getVideoInfo calls the C function get_video_info to retrieve duration, width, height, and codec.
-func getVideoInfo(filePath string) (time.Duration, int, int, string, error) {
+// getVideoInfo calls the C function get_video_info to retrieve
+// duration, width, height, and codec of a video file.
+func getVideoInfo(filePath string) (videoInfo, error) {
 	cFilePath := C.CString(filePath)
 	defer C.free(unsafe.Pointer(cFilePath))
-
-	var cDuration C.int64_t
-	var cWidth, cHeight C.int
-	var cCodec [C.VIDEO_STORE_CODEC_NAME_LEN]C.char
-
-	ret := C.get_video_info(&cDuration, &cWidth, &cHeight, &cCodec[0], cFilePath)
+	var cinfo C.VideoInfo
+	ret := C.get_video_info(&cinfo, cFilePath)
 	switch ret {
 	case C.VIDEO_STORE_VIDEO_INFO_RESP_OK:
-		// Convert and return
-		duration := time.Duration(cDuration) * time.Microsecond
-		width := int(cWidth)
-		height := int(cHeight)
-		codec := C.GoString(&cCodec[0])
-		return duration, width, height, codec, nil
+		return fromCVideoInfo(cinfo), nil
 	case C.VIDEO_STORE_VIDEO_INFO_RESP_ERROR:
-		return 0, 0, 0, "", fmt.Errorf("failed to get video info for file: %s", filePath)
+		return videoInfo{}, fmt.Errorf("get_video_info failed for file: %s", filePath)
 	default:
-		return 0, 0, 0, "", fmt.Errorf("failed to get video info for file: %s with error: %s",
+		return videoInfo{}, fmt.Errorf("get_video_info failed for fil: %s with error: %s",
 			filePath, ffmpegError(ret))
 	}
 }

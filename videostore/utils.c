@@ -1,12 +1,12 @@
 #include "utils.h"
 
-int get_video_info(int64_t *duration,   // OUT
-                   int *width,          // OUT
-                   int *height,         // OUT
-                   char *codec,         // OUT
-                   const char *filename // IN
-)
+int get_video_info(VideoInfo *info, const char *filename)
 {
+    info->duration = 0;
+    info->width = 0;
+    info->height = 0;
+    info->codec[0] = '\0';
+
     AVFormatContext *fmt_ctx = NULL;
     int ret;
 
@@ -18,37 +18,27 @@ int get_video_info(int64_t *duration,   // OUT
         return ret;
     }
 
-    *duration = fmt_ctx->duration;
-    if (*duration == AV_NOPTS_VALUE) {
+    info->duration = fmt_ctx->duration;
+    if (info->duration == AV_NOPTS_VALUE) {
         avformat_close_input(&fmt_ctx);
         return VIDEO_STORE_VIDEO_INFO_RESP_ERROR;
     }
 
-    *width = 0;
-    *height = 0;
-    codec[0] = '\0'; // make sure it's empty
-
-    // Choose first video stream and fetch parameters.
     for (unsigned i = 0; i < fmt_ctx->nb_streams; i++) {
         AVStream *st = fmt_ctx->streams[i];
         if (st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            *width = st->codecpar->width;
-            *height = st->codecpar->height;
+            info->width  = st->codecpar->width;
+            info->height = st->codecpar->height;
             const char *codecName = avcodec_get_name(st->codecpar->codec_id);
             if (codecName) {
-                strncpy(codec, codecName, VIDEO_STORE_CODEC_NAME_LEN- 1);
-                codec[VIDEO_STORE_CODEC_NAME_LEN - 1] = '\0'; // ensure null-termination
+                strncpy(info->codec, codecName, VIDEO_STORE_CODEC_NAME_LEN - 1);
+                info->codec[VIDEO_STORE_CODEC_NAME_LEN - 1] = '\0';
             }
             break;
         }
     }
 
-    if (*width == 0 || *height == 0) {
-        avformat_close_input(&fmt_ctx);
-        return VIDEO_STORE_VIDEO_INFO_RESP_ERROR;
-    }
-
-    if (codec[0] == '\0') {
+    if (info->width == 0 || info->height == 0 || info->codec[0] == '\0') {
         avformat_close_input(&fmt_ctx);
         return VIDEO_STORE_VIDEO_INFO_RESP_ERROR;
     }
