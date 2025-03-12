@@ -296,11 +296,10 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 			if firstSeenVideoInfo.codec == "" {
 				firstSeenVideoInfo.codec = videoFileInfo.codec
 			}
-			// if firstWidth != width || firstHeight != height || firstCodec != codec {
 			if firstSeenVideoInfo.width != videoFileInfo.width ||
 				firstSeenVideoInfo.height != videoFileInfo.height ||
 				firstSeenVideoInfo.codec != videoFileInfo.codec {
-				logger.Debugf(
+				logger.Warnf(
 					"Skipping file %s. Expected (width=%d, height=%d, codec=%s), got (width=%d, height=%d, codec=%s)",
 					file,
 					firstSeenVideoInfo.width, firstSeenVideoInfo.height, firstSeenVideoInfo.codec,
