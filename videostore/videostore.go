@@ -296,7 +296,6 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		return nil, err
 	}
 	vs.logger.Debug("fetch command received")
-
 	fetchFilePath := generateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
 		formatDateTimeToString(r.From),
@@ -310,6 +309,9 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 	videoBytes, err := readVideoFile(fetchFilePath)
 	if err != nil {
 		return nil, err
+	}
+	if err := os.Remove(fetchFilePath); err != nil {
+		vs.logger.Error("failed to delete temporary file", err)
 	}
 	return &FetchResponse{Video: videoBytes}, nil
 }
