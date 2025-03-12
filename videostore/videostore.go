@@ -306,8 +306,12 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 	// This handles error cases in Concat where it fails in the middle
 	// of writing.
 	defer func() {
+		if _, statErr := os.Stat(fetchFilePath); os.IsNotExist(statErr) {
+			vs.logger.Debugf("temporary file (%s) does not exist, skipping removal", fetchFilePath)
+			return
+		}
 		if err := os.Remove(fetchFilePath); err != nil {
-			vs.logger.Debugf("failed to delete temporary file (%s): %v", fetchFilePath, err)
+			vs.logger.Warnf("failed to delete temporary file (%s): %v", fetchFilePath, err)
 		}
 	}()
 	if err := vs.concater.Concat(r.From, r.To, fetchFilePath); err != nil {
