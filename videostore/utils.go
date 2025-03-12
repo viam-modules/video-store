@@ -383,7 +383,7 @@ func getVideoInfo(filePath string) (videoInfo, error) {
 	case C.VIDEO_STORE_VIDEO_INFO_RESP_ERROR:
 		return videoInfo{}, fmt.Errorf("get_video_info failed for file: %s", filePath)
 	default:
-		return videoInfo{}, fmt.Errorf("get_video_info failed for fil: %s with error: %s",
+		return videoInfo{}, fmt.Errorf("get_video_info failed for file: %s with error: %s",
 			filePath, ffmpegError(ret))
 	}
 }
