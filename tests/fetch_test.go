@@ -13,8 +13,8 @@ import (
 )
 
 // pathForFetchCmd constructs the .mp4 path based on the "from" field in the command.
-func pathForFetchCmd(cmd map[string]interface{}) string {
-	return "/tmp/" + videoStoreComponentName + "_" + cmd["from"].(string) + ".mp4"
+func pathForFetchCmd(fromTimestamp string) string {
+	return "/tmp/" + videoStoreComponentName + "_" + fromTimestamp + ".mp4"
 }
 
 // assertNoFile checks that the given file path does NOT exist.
@@ -132,7 +132,7 @@ func TestFetchDoCommand(t *testing.T) {
 		video, ok := res["video"].(string)
 		test.That(t, ok, test.ShouldBeTrue)
 		test.That(t, video, test.ShouldNotBeEmpty)
-		filePath := pathForFetchCmd(fetchCmd1)
+		filePath := pathForFetchCmd(fetchCmd1["from"].(string))
 		assertNoFile(t, filePath)
 	})
 
@@ -147,7 +147,7 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd2)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "grpc")
-		filePath := pathForFetchCmd(fetchCmd2)
+		filePath := pathForFetchCmd(fetchCmd2["from"].(string))
 		assertNoFile(t, filePath)
 	})
 
@@ -162,7 +162,7 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd3)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "range")
-		filePath := pathForFetchCmd(fetchCmd3)
+		filePath := pathForFetchCmd(fetchCmd3["from"].(string))
 		assertNoFile(t, filePath)
 	})
 
@@ -177,7 +177,7 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd4)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "parsing time")
-		filePath := pathForFetchCmd(fetchCmd4)
+		filePath := pathForFetchCmd(fetchCmd4["from"].(string))
 		assertNoFile(t, filePath)
 	})
 }
