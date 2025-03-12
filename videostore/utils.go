@@ -56,7 +56,7 @@ type videoInfo struct {
 	codec    string
 }
 
-// fromCVideoInfo converts a C.VideoInfo struct to a Go VideoInfo struct
+// fromCVideoInfo converts a C.VideoInfo struct to a Go videoInfo struct
 func fromCVideoInfo(cinfo C.VideoInfo) videoInfo {
 	return videoInfo{
 		duration: time.Duration(cinfo.duration) * time.Microsecond,
