@@ -12,6 +12,17 @@ import (
 	"go.viam.com/test"
 )
 
+// pathForFetchCmd constructs the .mp4 path based on the "from" field in the command
+func pathForFetchCmd(prefix string, cmd map[string]interface{}) string {
+	return "/tmp/" + prefix + "_" + cmd["from"].(string) + ".mp4"
+}
+
+// assertNoFile checks that the given file path does NOT exist
+func assertNoFile(t *testing.T, filePath string) {
+	_, err := os.Stat(filePath)
+	test.That(t, os.IsNotExist(err), test.ShouldBeTrue)
+}
+
 func TestFetchDoCommand(t *testing.T) {
 	storagePath, err := filepath.Abs(artifactStoragePath)
 	test.That(t, err, test.ShouldBeNil)
@@ -121,9 +132,8 @@ func TestFetchDoCommand(t *testing.T) {
 		video, ok := res["video"].(string)
 		test.That(t, ok, test.ShouldBeTrue)
 		test.That(t, video, test.ShouldNotBeEmpty)
-		path := "/tmp/" + videoStoreComponentName + "_" + fetchCmd1["from"].(string) + ".mp4"
-		_, err = os.Stat(path)
-		test.That(t, os.IsNotExist(err), test.ShouldBeTrue)
+		filePath := pathForFetchCmd(videoStoreComponentName, fetchCmd1)
+		assertNoFile(t, filePath)
 	})
 
 	t.Run("Test Fetch DoCommand Valid Time Range Over GRPC Limit.", func(t *testing.T) {
@@ -137,9 +147,8 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd2)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "grpc")
-		path := "/tmp/" + videoStoreComponentName + "_" + fetchCmd2["from"].(string) + ".mp4"
-		_, err = os.Stat(path)
-		test.That(t, os.IsNotExist(err), test.ShouldBeTrue)
+		filePath := pathForFetchCmd(videoStoreComponentName, fetchCmd2)
+		assertNoFile(t, filePath)
 	})
 
 	t.Run("Test Fetch DoCommand Invalid Time Range.", func(t *testing.T) {
@@ -153,9 +162,8 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd3)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "range")
-		path := "/tmp/" + videoStoreComponentName + "_" + fetchCmd3["from"].(string) + ".mp4"
-		_, err = os.Stat(path)
-		test.That(t, os.IsNotExist(err), test.ShouldBeTrue)
+		filePath := pathForFetchCmd(videoStoreComponentName, fetchCmd3)
+		assertNoFile(t, filePath)
 	})
 
 	t.Run("Test Fetch DoCommand Invalid Datetime Format.", func(t *testing.T) {
@@ -169,8 +177,7 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd4)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "parsing time")
-		path := "/tmp/" + videoStoreComponentName + "_" + fetchCmd4["from"].(string) + ".mp4"
-		_, err = os.Stat(path)
-		test.That(t, os.IsNotExist(err), test.ShouldBeTrue)
+		filePath := pathForFetchCmd(videoStoreComponentName, fetchCmd4)
+		assertNoFile(t, filePath)
 	})
 }
