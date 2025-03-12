@@ -27,6 +27,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-libx264 \
                --enable-decoder=hevc \
                --enable-decoder=h264 \
+               --enable-decoder=mpeg4 \
                --enable-gpl \
                --enable-encoder=libx264 \
                --enable-muxer=segment \
@@ -36,6 +37,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-demuxer=mov \
                --enable-demuxer=mp4 \
                --enable-parser=h264 \
+               --enable-parser=mpeg4 \
                --enable-parser=hevc \
                --enable-protocol=file \
                --enable-protocol=concat \

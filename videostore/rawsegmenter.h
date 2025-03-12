@@ -19,6 +19,20 @@ int video_store_raw_seg_init_h265(struct raw_seg **ppRS,     // OUT
                                   const int height           // IN
 );
 
+int video_store_raw_seg_init_mpeg4(struct raw_seg **ppRS,     // OUT
+                                  const int segmentSeconds,  // IN
+                                  const char *outputPattern, // IN
+                                  const int width,           // IN
+                                  const int height           // IN
+);
+
+int video_store_raw_seg_init_mjpeg(struct raw_seg **ppRS,     // OUT
+                                  const int segmentSeconds,  // IN
+                                  const char *outputPattern, // IN
+                                  const int width,           // IN
+                                  const int height           // IN
+);
+
 int video_store_raw_seg_write_packet(struct raw_seg *rs,       // IN
                                      const char *payload,      // IN
                                      const size_t payloadSize, // IN
