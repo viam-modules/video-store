@@ -307,7 +307,7 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 	// of writing.
 	defer func() {
 		if err := os.Remove(fetchFilePath); err != nil {
-			vs.logger.Debug("failed to delete temporary file", err)
+			vs.logger.Debugf("failed to delete temporary file (%s): %v", fetchFilePath, err)
 		}
 	}()
 	if err := vs.concater.Concat(r.From, r.To, fetchFilePath); err != nil {
