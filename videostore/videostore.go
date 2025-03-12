@@ -102,6 +102,9 @@ func (r *SaveRequest) Validate() error {
 	if r.From.After(r.To) {
 		return errors.New("'from' timestamp is after 'to' timestamp")
 	}
+	if r.Async && r.To.After(time.Now()) {
+		return errors.New("'to' timestamp is in the future")
+	}
 	return nil
 }
 

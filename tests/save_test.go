@@ -113,6 +113,15 @@ func TestSaveDoCommand(t *testing.T) {
 		"async":    true,
 	}
 
+	// Invalid async save with future timestamp
+	saveCmd5 := map[string]interface{}{
+		"command":  "save",
+		"from":     "2024-09-06_15-00-33",
+		"to":       "2025-09-06_15-00-33",
+		"metadata": "test-metadata",
+		"async":    true,
+	}
+
 	t.Run("Test Save DoCommand Valid Range", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
@@ -170,6 +179,19 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		_, ok := res["filename"].(string)
 		test.That(t, ok, test.ShouldBeTrue)
+	})
+
+	t.Run("Test Save DoCommand Async With Future Timestamp", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config1)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		vs, err := camera.FromRobot(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
+		_, err = vs.DoCommand(timeoutCtx, saveCmd5)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "'to' timestamp is in the future")
 	})
 
 	t.Run("Test leftover concat txt files are cleaned up", func(t *testing.T) {
