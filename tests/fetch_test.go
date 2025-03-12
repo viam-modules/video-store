@@ -12,12 +12,12 @@ import (
 	"go.viam.com/test"
 )
 
-// pathForFetchCmd constructs the .mp4 path based on the "from" field in the command
-func pathForFetchCmd(prefix string, cmd map[string]interface{}) string {
-	return "/tmp/" + prefix + "_" + cmd["from"].(string) + ".mp4"
+// pathForFetchCmd constructs the .mp4 path based on the "from" field in the command.
+func pathForFetchCmd(cmd map[string]interface{}) string {
+	return "/tmp/" + videoStoreComponentName + "_" + cmd["from"].(string) + ".mp4"
 }
 
-// assertNoFile checks that the given file path does NOT exist
+// assertNoFile checks that the given file path does NOT exist.
 func assertNoFile(t *testing.T, filePath string) {
 	_, err := os.Stat(filePath)
 	test.That(t, os.IsNotExist(err), test.ShouldBeTrue)
@@ -132,7 +132,7 @@ func TestFetchDoCommand(t *testing.T) {
 		video, ok := res["video"].(string)
 		test.That(t, ok, test.ShouldBeTrue)
 		test.That(t, video, test.ShouldNotBeEmpty)
-		filePath := pathForFetchCmd(videoStoreComponentName, fetchCmd1)
+		filePath := pathForFetchCmd(fetchCmd1)
 		assertNoFile(t, filePath)
 	})
 
@@ -147,7 +147,7 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd2)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "grpc")
-		filePath := pathForFetchCmd(videoStoreComponentName, fetchCmd2)
+		filePath := pathForFetchCmd(fetchCmd2)
 		assertNoFile(t, filePath)
 	})
 
@@ -162,7 +162,7 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd3)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "range")
-		filePath := pathForFetchCmd(videoStoreComponentName, fetchCmd3)
+		filePath := pathForFetchCmd(fetchCmd3)
 		assertNoFile(t, filePath)
 	})
 
@@ -177,7 +177,7 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd4)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "parsing time")
-		filePath := pathForFetchCmd(videoStoreComponentName, fetchCmd4)
+		filePath := pathForFetchCmd(fetchCmd4)
 		assertNoFile(t, filePath)
 	})
 }
