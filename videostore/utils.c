@@ -1,7 +1,8 @@
 #include "utils.h"
 
-int get_video_info(VideoInfo *info, const char *filename)
-{
+int get_video_info(VideoInfo *info,     // OUT
+                   const char *filename // IN
+) {
     info->duration = 0;
     info->width = 0;
     info->height = 0;
