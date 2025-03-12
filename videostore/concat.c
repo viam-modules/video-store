@@ -131,7 +131,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
 
     if (packet->dts <= prevDts) {
       av_log(NULL, AV_LOG_DEBUG,
-             "video_store_concat skipping non monotonically increaseing dts: "
+             "video_store_concat skipping non monotonically increasing dts: "
              "%ld, prevDts: %ld\n",
              packet->dts, prevDts);
       av_packet_unref(packet);
