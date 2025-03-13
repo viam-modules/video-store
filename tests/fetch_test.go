@@ -18,6 +18,7 @@ func pathForFetchCmd(fromTimestamp string) string {
 }
 
 // assertNoFile checks that the given file path does NOT exist.
+// used for testing that the temporary files created by fetch are being properly removed.
 func assertNoFile(t *testing.T, filePath string) {
 	_, err := os.Stat(filePath)
 	test.That(t, os.IsNotExist(err), test.ShouldBeTrue)
