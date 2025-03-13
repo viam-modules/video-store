@@ -44,7 +44,11 @@ const (
 	// maxSegmentLength defines the maximum clip duration in seconds.
 	maxSegmentLength = 30
 
-	// keyFrameIntervalBuffer defines max seconds between keyframes.
+	// keyFrameIntervalBuffer defines the maximum allowed seconds between keyframes.
+	// Because the viamrtsp videostore path does not always split exactly at 30 seconds,
+	// the segmenter may delay splitting until a keyframe appears, potentially extending
+	// beyond the configured segment time. This const adds a buffer length for the
+	// segment duration estimate during matching.
 	keyFrameIntervalBuffer = 4
 )
 
