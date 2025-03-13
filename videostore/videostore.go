@@ -497,7 +497,6 @@ func cleanupStorage(storagePath string, maxStorageSizeGB int, logger logging.Log
 // is written to storage before concatenation.
 // TODO: (seanp) Optimize this to immediately run as soon as the current segment is completed.
 func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path string) {
-	// TODO: change this to be hard coded
 	segmentDur := time.Duration(defaultSegmentSeconds) * time.Second
 	totalTimeout := time.Duration(asyncTimeout)*time.Second + segmentDur
 	ctx, cancel := context.WithTimeout(ctx, totalTimeout)
