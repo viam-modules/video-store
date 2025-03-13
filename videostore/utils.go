@@ -258,6 +258,7 @@ func formatDateTimeToString(dateTime time.Time) string {
 }
 
 // matchStorageToRange returns a list of files that fall within the provided time range.
+// The matcher assumes that the input files list is sorted by start time.
 // Includes trimming video files to the time range if they overlap.
 func matchStorageToRange(files []string, start, end time.Time, logger logging.Logger) []string {
 	var matchedFiles []string
