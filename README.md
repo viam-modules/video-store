@@ -45,7 +45,7 @@ Copy and paste the following attributes into your JSON configuration:
   "camera": "<source-camera-name>",
   "sync": "<data-manager-service-name>",
   "storage": {
-    "size_gb": <int>,
+    "size_gb": <int>
   }
 }
 ```
