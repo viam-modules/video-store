@@ -278,7 +278,6 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 		// Check if the segment file's time range intersects
 		// with the match request time range [start, end)
 		if fileStartTime.Before(end) && estimatedFileEndTime.After(start) {
-			// If the first video file in the matched set, cache the width, height, and codec
 			videoFileInfo, err := getVideoInfo(file)
 			if err != nil {
 				logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
@@ -293,15 +292,8 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 				)
 				continue
 			}
-			if firstSeenVideoInfo.width == 0 {
-				firstSeenVideoInfo.width = videoFileInfo.width
-			}
-			if firstSeenVideoInfo.height == 0 {
-				firstSeenVideoInfo.height = videoFileInfo.height
-			}
-			if firstSeenVideoInfo.codec == "" {
-				firstSeenVideoInfo.codec = videoFileInfo.codec
-			}
+			// If the first video file in the matched set, cache the width, height, and codec
+			cacheFirstVid(&firstSeenVideoInfo, videoFileInfo)
 			if firstSeenVideoInfo.width != videoFileInfo.width ||
 				firstSeenVideoInfo.height != videoFileInfo.height ||
 				firstSeenVideoInfo.codec != videoFileInfo.codec {
@@ -342,6 +334,18 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 	}
 
 	return matchedFiles
+}
+
+func cacheFirstVid(first *videoInfo, current videoInfo) {
+	if first.width == 0 {
+		first.width = current.width
+	}
+	if first.height == 0 {
+		first.height = current.height
+	}
+	if first.codec == "" {
+		first.codec = current.codec
+	}
 }
 
 // generateOutputFilename generates the output filename for the video file.
