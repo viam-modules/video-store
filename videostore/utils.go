@@ -63,6 +63,8 @@ type videoInfo struct {
 // fromCVideoInfo converts a C.VideoInfo struct to a Go videoInfo struct
 func fromCVideoInfo(cinfo C.VideoInfo) videoInfo {
 	return videoInfo{
+		// FFmpeg stores AVFormatContext->duration in AV_TIME_BASE units (1,000,000 ticks per second),
+		// so it effectively represents microseconds.
 		duration: time.Duration(cinfo.duration) * time.Microsecond,
 		width:    int(cinfo.width),
 		height:   int(cinfo.height),
