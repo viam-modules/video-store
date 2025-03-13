@@ -173,7 +173,7 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
-		config.Storage.SegmentSeconds,
+		defaultSegmentSeconds,
 	)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 		vs.segmenter, err = newSegmenter(
 			logger,
 			vs.config.Storage.SizeGB,
-			vs.config.Storage.SegmentSeconds,
+			defaultSegmentSeconds,
 			vs.config.Storage.StoragePath,
 			defaultVideoFormat,
 		)
@@ -228,7 +228,7 @@ func NewReadOnlyVideoStore(config Config, logger logging.Logger) (VideoStore, er
 		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
-		config.Storage.SegmentSeconds,
+		defaultSegmentSeconds,
 	)
 	if err != nil {
 		return nil, err
@@ -260,7 +260,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
-		config.Storage.SegmentSeconds,
+		defaultSegmentSeconds,
 	)
 	if err != nil {
 		return nil, err
@@ -268,7 +268,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 
 	rawSegmenter, err := newRawSegmenter(logger,
 		config.Storage.StoragePath,
-		config.Storage.SegmentSeconds,
+		defaultSegmentSeconds,
 	)
 	if err != nil {
 		return nil, err
@@ -498,7 +498,7 @@ func cleanupStorage(storagePath string, maxStorageSizeGB int, logger logging.Log
 // TODO: (seanp) Optimize this to immediately run as soon as the current segment is completed.
 func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path string) {
 	// TODO: change this to be hard coded
-	segmentDur := time.Duration(vs.config.Storage.SegmentSeconds) * time.Second
+	segmentDur := time.Duration(defaultSegmentSeconds) * time.Second
 	totalTimeout := time.Duration(asyncTimeout)*time.Second + segmentDur
 	ctx, cancel := context.WithTimeout(ctx, totalTimeout)
 	defer cancel()

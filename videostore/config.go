@@ -72,7 +72,6 @@ func (c *Config) Validate() error {
 
 // StorageConfig is the config for storage.
 type StorageConfig struct {
-	SegmentSeconds       int
 	SizeGB               int
 	OutputFileNamePrefix string
 	UploadPath           string
@@ -84,9 +83,6 @@ func (c StorageConfig) Validate() error {
 	var zero StorageConfig
 	if c == zero {
 		return errors.New("video config can't be empty")
-	}
-	if c.SegmentSeconds <= 0 {
-		return errors.New("segment_seconds can't be less than or equal to 0")
 	}
 
 	if c.SizeGB <= 0 {
