@@ -61,7 +61,7 @@ type videoInfo struct {
 }
 
 // fromCVideoInfo converts a C.VideoInfo struct to a Go videoInfo struct
-func fromCVideoInfo(cinfo C.VideoInfo) videoInfo {
+func fromCVideoInfo(cinfo C.video_store_video_info) videoInfo {
 	return videoInfo{
 		// FFmpeg stores AVFormatContext->duration in AV_TIME_BASE units (1,000,000 ticks per second),
 		// so it effectively represents microseconds.
@@ -136,7 +136,7 @@ func ffmpegLogLevel(loglevel C.int) {
 
 // SetFFmpegLogCallback sets the custom log callback for ffmpeg.
 func SetFFmpegLogCallback() {
-	C.set_custom_av_log_callback()
+	C.video_store_set_custom_av_log_callback()
 }
 
 // lookupLogID returns the log ID for the provided log level.
@@ -391,15 +391,15 @@ func validateTimeRange(files []string, start, end time.Time) error {
 func getVideoInfo(filePath string) (videoInfo, error) {
 	cFilePath := C.CString(filePath)
 	defer C.free(unsafe.Pointer(cFilePath))
-	var cinfo C.VideoInfo
-	ret := C.get_video_info(&cinfo, cFilePath)
+	var cinfo C.video_store_video_info
+	ret := C.video_store_get_video_info(&cinfo, cFilePath)
 	switch ret {
 	case C.VIDEO_STORE_VIDEO_INFO_RESP_OK:
 		return fromCVideoInfo(cinfo), nil
 	case C.VIDEO_STORE_VIDEO_INFO_RESP_ERROR:
-		return videoInfo{}, fmt.Errorf("get_video_info failed for file: %s", filePath)
+		return videoInfo{}, fmt.Errorf("video_store_get_video_info failed for file: %s", filePath)
 	default:
-		return videoInfo{}, fmt.Errorf("get_video_info failed for file: %s with error: %s",
+		return videoInfo{}, fmt.Errorf("video_store_get_video_info failed for file: %s with error: %s",
 			filePath, ffmpegError(ret))
 	}
 }
