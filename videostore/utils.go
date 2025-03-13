@@ -314,6 +314,7 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 				continue
 			}
 			logger.Debugf("Matched file %s", file)
+			// inpoint and outpoint define the start/end trimming offsets for the FFmpeg concat demuxer.
 			var inpoint, outpoint float64
 			inpointSet := false
 			outpointSet := false
