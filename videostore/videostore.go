@@ -296,13 +296,24 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		return nil, err
 	}
 	vs.logger.Debug("fetch command received")
-
 	fetchFilePath := generateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
 		formatDateTimeToString(r.From),
 		"",
 		tempPath)
 
+	// Always attempt to remove the concat file after the operation.
+	// This handles error cases in Concat where it fails in the middle
+	// of writing.
+	defer func() {
+		if _, statErr := os.Stat(fetchFilePath); os.IsNotExist(statErr) {
+			vs.logger.Debugf("temporary file (%s) does not exist, skipping removal", fetchFilePath)
+			return
+		}
+		if err := os.Remove(fetchFilePath); err != nil {
+			vs.logger.Warnf("failed to delete temporary file (%s): %v", fetchFilePath, err)
+		}
+	}()
 	if err := vs.concater.Concat(r.From, r.To, fetchFilePath); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err

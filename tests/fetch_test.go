@@ -3,6 +3,7 @@ package videostore_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -10,6 +11,18 @@ import (
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/test"
 )
+
+// pathForFetchCmd constructs the .mp4 path based on the "from" field in the command.
+func pathForFetchCmd(fromTimestamp string) string {
+	return "/tmp/" + videoStoreComponentName + "_" + fromTimestamp + ".mp4"
+}
+
+// assertNoFile checks that the given file path does NOT exist.
+// used for testing that the temporary files created by fetch are being properly removed.
+func assertNoFile(t *testing.T, filePath string) {
+	_, err := os.Stat(filePath)
+	test.That(t, os.IsNotExist(err), test.ShouldBeTrue)
+}
 
 func TestFetchDoCommand(t *testing.T) {
 	storagePath, err := filepath.Abs(artifactStoragePath)
@@ -119,6 +132,8 @@ func TestFetchDoCommand(t *testing.T) {
 		video, ok := res["video"].(string)
 		test.That(t, ok, test.ShouldBeTrue)
 		test.That(t, video, test.ShouldNotBeEmpty)
+		filePath := pathForFetchCmd(fetchCmd1["from"].(string))
+		assertNoFile(t, filePath)
 	})
 
 	t.Run("Test Fetch DoCommand Valid Time Range Over GRPC Limit.", func(t *testing.T) {
@@ -132,6 +147,8 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd2)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "grpc")
+		filePath := pathForFetchCmd(fetchCmd2["from"].(string))
+		assertNoFile(t, filePath)
 	})
 
 	t.Run("Test Fetch DoCommand Invalid Time Range.", func(t *testing.T) {
@@ -145,6 +162,8 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd3)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "range")
+		filePath := pathForFetchCmd(fetchCmd3["from"].(string))
+		assertNoFile(t, filePath)
 	})
 
 	t.Run("Test Fetch DoCommand Invalid Datetime Format.", func(t *testing.T) {
@@ -158,5 +177,7 @@ func TestFetchDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, fetchCmd4)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "parsing time")
+		filePath := pathForFetchCmd(fetchCmd4["from"].(string))
+		assertNoFile(t, filePath)
 	})
 }
