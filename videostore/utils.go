@@ -206,15 +206,14 @@ func getSortedFiles(path string) ([]fileWithDate, error) {
 	}
 	var filePaths []string
 	for _, file := range files {
-		filePath := filepath.Join(path, file.Name())
-		filePaths = append(filePaths, filePath)
+		filePaths = append(filePaths, filepath.Join(path, file.Name()))
 	}
-	return createAndSortFileWithDateList(filePaths)
+	return createAndSortFileWithDateList(filePaths), nil
 }
 
 // createAndSortFileWithDateList takes a list of file paths, extracts the date from each file name,
 // and returns a sorted list of fileWithDate.
-func createAndSortFileWithDateList(filePaths []string) ([]fileWithDate, error) {
+func createAndSortFileWithDateList(filePaths []string) []fileWithDate {
 	var validFiles []fileWithDate
 	for _, filePath := range filePaths {
 		date, err := extractDateTimeFromFilename(filePath)
@@ -223,7 +222,7 @@ func createAndSortFileWithDateList(filePaths []string) ([]fileWithDate, error) {
 		}
 	}
 	sortFilesByDate(validFiles)
-	return validFiles, nil
+	return validFiles
 }
 
 // sortFilesByDate sorts a slice of fileWithDate by their date field.
@@ -292,7 +291,7 @@ func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logg
 	for i := firstFileIndex; i < len(files); i++ {
 		fileStartTime := files[i].date
 		fileName := files[i].name
-		// If the file starts after the query end time, we can stop searching.n
+		// If the file starts after the query end time, we can stop searching.
 		if fileStartTime.After(end) {
 			logger.Debugf("Skipping file %s and winding down matcher. File starts after end time (start=%v, end=%v)", fileName, start, end)
 			break
