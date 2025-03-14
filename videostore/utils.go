@@ -55,6 +55,26 @@ type fileWithDate struct {
 	startTime time.Time
 }
 
+// ConcatFileEntry represents an entry in an FFmpeg concat demuxer file
+type concatFileEntry struct {
+	filePath string
+	inpoint  *float64 // Optional start time trim point
+	outpoint *float64 // Optional end time trim point
+}
+
+// String returns the FFmpeg concat demuxer compatible string representation
+func (e concatFileEntry) string() []string {
+	var lines []string
+	lines = append(lines, fmt.Sprintf("file '%s'", e.filePath))
+	if e.inpoint != nil {
+		lines = append(lines, fmt.Sprintf("inpoint %.2f", *e.inpoint))
+	}
+	if e.outpoint != nil {
+		lines = append(lines, fmt.Sprintf("outpoint %.2f", *e.outpoint))
+	}
+	return lines
+}
+
 // fromCVideoInfo converts a C.VideoInfo struct to a Go videoInfo struct
 func fromCVideoInfo(cinfo C.video_store_video_info) videoInfo {
 	return videoInfo{
@@ -265,7 +285,7 @@ func formatDateTimeToString(dateTime time.Time) string {
 // The matcher assumes that the input files list is sorted by start time and the underylying
 // video segments do not overlap.
 func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logging.Logger) []string {
-	var matchedFiles []string
+	var entries []concatFileEntry
 	// Cache of the first matched video file's width, height, and codec
 	// to ensure every video in the matched files set have the same params.
 	var firstSeenVideoInfo videoInfo
@@ -317,34 +337,28 @@ func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logg
 				continue
 			}
 			logger.Debugf("Matched file %s", file.name)
-			// inpoint and outpoint define the start/end trimming offsets for the FFmpeg concat demuxer.
-			var inpoint, outpoint float64
-			inpointSet := false
-			outpointSet := false
+			entry := concatFileEntry{filePath: file.name}
 			// Calculate inpoint if the file starts before the 'start' time and overlaps
 			if file.startTime.Before(start) {
-				inpoint = start.Sub(file.startTime).Seconds()
-				inpointSet = true
+				inpoint := start.Sub(file.startTime).Seconds()
+				entry.inpoint = &inpoint
 			}
 			// Calculate outpoint if the file ends after the 'end' time
 			if fileEndTime.After(end) {
-				outpoint = end.Sub(file.startTime).Seconds()
-				outpointSet = true
+				outpoint := end.Sub(file.startTime).Seconds()
+				entry.outpoint = &outpoint
 			}
-			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", file.name))
-			if inpointSet {
-				logger.Debugf("Trimming file %s to inpoint %.2f", file.name, inpoint)
-				matchedFiles = append(matchedFiles, fmt.Sprintf("inpoint %.2f", inpoint))
-			}
-			// Only include outpoint if it's less than the full duration
-			if outpointSet && outpoint < videoFileInfo.duration.Seconds() {
-				logger.Debugf("Trimming file %s to outpoint %.2f", file.name, outpoint)
-				matchedFiles = append(matchedFiles, fmt.Sprintf("outpoint %.2f", outpoint))
-			}
+			entries = append(entries, entry)
 		}
 	}
 
-	return matchedFiles
+	// Convert entries to concat format strings
+	var concatLines []string
+	for _, entry := range entries {
+		concatLines = append(concatLines, entry.string()...)
+	}
+
+	return concatLines
 }
 
 func cacheFirstVid(first *videoInfo, current videoInfo) {
