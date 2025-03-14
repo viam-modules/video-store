@@ -273,11 +273,17 @@ func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logg
 	// Find the first file to consider for matching. First search for the first file that starts after the query start time.
 	// We then want to consider the previous file as well, since it may overlap with the query start time.
 	var firstFileIndex int
+	firstFileIndexFound := false
 	for i, file := range files {
 		if file.date.After(start) {
 			firstFileIndex = i - 1
+			firstFileIndexFound = true
 			break
 		}
+	}
+	// If no file starts after the query start time, we still want to consider the last file.
+	if !firstFileIndexFound {
+		firstFileIndex = len(files) - 1
 	}
 	if firstFileIndex < 0 {
 		firstFileIndex = 0
