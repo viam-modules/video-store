@@ -30,7 +30,6 @@ func TestFetchDoCommand(t *testing.T) {
 					"sync": "data_manager-1",
 					"storage": {
 						"size_gb": 10,
-						"segment_seconds": 30,
 						"upload_path": "%s",
 						"storage_path": "%s"
 					},

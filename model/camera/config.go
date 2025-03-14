@@ -9,12 +9,11 @@ import (
 	"go.viam.com/utils"
 )
 
-// Storage is the config for storge.
+// Storage is the config for storage.
 type Storage struct {
-	SegmentSeconds int    `json:"segment_seconds,omitempty"`
-	SizeGB         int    `json:"size_gb"`
-	UploadPath     string `json:"upload_path,omitempty"`
-	StoragePath    string `json:"storage_path,omitempty"`
+	SizeGB      int    `json:"size_gb"`
+	UploadPath  string `json:"upload_path,omitempty"`
+	StoragePath string `json:"storage_path,omitempty"`
 }
 
 // Video is the config for storge.
@@ -77,9 +76,6 @@ func applyVideoEncoderDefaults(c Video) videostore.EncoderConfig {
 
 func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, error) {
 	var zero videostore.StorageConfig
-	if c.SegmentSeconds == 0 {
-		c.SegmentSeconds = defaultSegmentSeconds
-	}
 	if c.UploadPath == "" {
 		home, err := getHomeDir()
 		if err != nil {
@@ -95,7 +91,6 @@ func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, err
 		c.StoragePath = filepath.Join(home, defaultStoragePath, name)
 	}
 	return videostore.StorageConfig{
-		SegmentSeconds:       c.SegmentSeconds,
 		SizeGB:               c.SizeGB,
 		OutputFileNamePrefix: name,
 		UploadPath:           c.UploadPath,

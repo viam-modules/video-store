@@ -42,6 +42,51 @@ const (
 	codecH265
 )
 
+// videoInfo in Go, corresponding to the C VideoInfo struct
+type videoInfo struct {
+	duration time.Duration
+	width    int
+	height   int
+	codec    string
+}
+
+type fileWithDate struct {
+	name      string
+	startTime time.Time
+}
+
+// ConcatFileEntry represents an entry in an FFmpeg concat demuxer file
+type concatFileEntry struct {
+	filePath string
+	inpoint  *float64 // Optional start time trim point
+	outpoint *float64 // Optional end time trim point
+}
+
+// String returns the FFmpeg concat demuxer compatible string representation
+func (e concatFileEntry) string() []string {
+	var lines []string
+	lines = append(lines, fmt.Sprintf("file '%s'", e.filePath))
+	if e.inpoint != nil {
+		lines = append(lines, fmt.Sprintf("inpoint %.2f", *e.inpoint))
+	}
+	if e.outpoint != nil {
+		lines = append(lines, fmt.Sprintf("outpoint %.2f", *e.outpoint))
+	}
+	return lines
+}
+
+// fromCVideoInfo converts a C.VideoInfo struct to a Go videoInfo struct
+func fromCVideoInfo(cinfo C.video_store_video_info) videoInfo {
+	return videoInfo{
+		// FFmpeg stores AVFormatContext->duration in AV_TIME_BASE units (1,000,000 ticks per second),
+		// so it effectively represents microseconds.
+		duration: time.Duration(cinfo.duration) * time.Microsecond,
+		width:    int(cinfo.width),
+		height:   int(cinfo.height),
+		codec:    C.GoString(&cinfo.codec[0]),
+	}
+}
+
 func (c codecType) String() string {
 	switch c {
 	case codecH264:
@@ -106,7 +151,7 @@ func ffmpegLogLevel(loglevel C.int) {
 
 // SetFFmpegLogCallback sets the custom log callback for ffmpeg.
 func SetFFmpegLogCallback() {
-	C.set_custom_av_log_callback()
+	C.video_store_set_custom_av_log_callback()
 }
 
 // lookupLogID returns the log ID for the provided log level.
@@ -174,29 +219,37 @@ func getFileSize(path string) (int64, error) {
 }
 
 // getSortedFiles returns a list of files in the provided directory sorted by creation time.
-func getSortedFiles(path string) ([]string, error) {
+func getSortedFiles(path string) ([]fileWithDate, error) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
-	var validFilePaths []string
+	var filePaths []string
 	for _, file := range files {
-		filePath := filepath.Join(path, file.Name())
-		_, err := extractDateTimeFromFilename(filePath)
+		filePaths = append(filePaths, filepath.Join(path, file.Name()))
+	}
+	return createAndSortFileWithDateList(filePaths), nil
+}
+
+// createAndSortFileWithDateList takes a list of file paths, extracts the date from each file name,
+// and returns a sorted list of fileWithDate.
+func createAndSortFileWithDateList(filePaths []string) []fileWithDate {
+	var validFiles []fileWithDate
+	for _, filePath := range filePaths {
+		date, err := extractDateTimeFromFilename(filePath)
 		if err == nil {
-			validFilePaths = append(validFilePaths, filePath)
+			validFiles = append(validFiles, fileWithDate{name: filePath, startTime: date})
 		}
 	}
-	sort.Slice(validFilePaths, func(i, j int) bool {
-		timeI, errI := extractDateTimeFromFilename(validFilePaths[i])
-		timeJ, errJ := extractDateTimeFromFilename(validFilePaths[j])
-		if errI != nil || errJ != nil {
-			return false
-		}
-		return timeI.Before(timeJ)
-	})
+	sortFilesByDate(validFiles)
+	return validFiles
+}
 
-	return validFilePaths, nil
+// sortFilesByDate sorts a slice of fileWithDate by their date field.
+func sortFilesByDate(files []fileWithDate) {
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].startTime.Before(files[j].startTime)
+	})
 }
 
 // extractDateTimeFromFilename extracts the date and time from the filename.
@@ -227,49 +280,91 @@ func formatDateTimeToString(dateTime time.Time) string {
 	return dateTime.Format("2006-01-02_15-04-05")
 }
 
-// matchStorageToRange returns a list of files that fall within the provided time range.
-// Includes trimming video files to the time range if they overlap.
-func matchStorageToRange(files []string, start, end time.Time, logger logging.Logger) []string {
-	var matchedFiles []string
-	for _, file := range files {
-		dateTime, err := extractDateTimeFromFilename(file)
+// matchStorageToRange identifies video files that overlap with the requested time range (start to end)
+// and returns them as FFmpeg concat demuxer entries with appropriate trim points.
+//
+// The function optimizes processing by:
+// 1. Finding the subset of files that could potentially overlap with the time range
+// 2. Checking for actual overlap between each file and the requested time range
+// 3. Calculating inpoint/outpoint trim values when a file partially overlaps
+// 4. Ensuring all matched files have consistent video parameters (width/height/codec)
+//
+// The input files must be sorted by start time, and the function assumes video segments
+// don't overlap in time.
+func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logging.Logger) []concatFileEntry {
+	var entries []concatFileEntry
+	// Cache of the first matched video file's width, height, and codec
+	// to ensure every video in the matched files set have the same params.
+	var firstSeenVideoInfo videoInfo
+	// Find the first and last file that could potentially overlap with the query time range.
+	firstFileIndex := -1
+	lastFileIndex := len(files)
+	for i, file := range files {
+		if file.startTime.After(start) && firstFileIndex == -1 {
+			firstFileIndex = i - 1
+		}
+		if file.startTime.After(end) {
+			lastFileIndex = i
+			break
+		}
+	}
+	logger.Debugf("firstFileIndex: %d, lastFileIndex: %d", firstFileIndex, lastFileIndex)
+	if firstFileIndex == -1 {
+		firstFileIndex = len(files) - 1
+	}
+	for _, file := range files[firstFileIndex:lastFileIndex] {
+		videoFileInfo, err := getVideoInfo(file.name)
 		if err != nil {
-			logger.Debugf("failed to extract datetime from filename: %s, error: %v", file, err)
+			logger.Debugf("failed to get video duration for file: %s, error: %v", file.name, err)
 			continue
 		}
-		duration, err := getVideoDuration(file)
-		if err != nil {
-			logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
-			continue
-		}
-		fileEndTime := dateTime.Add(duration)
-		// Check if the file's time range intersects with [start, end)
-		if dateTime.Before(end) && fileEndTime.After(start) {
-			var inpoint, outpoint float64
-			inpointSet := false
-			outpointSet := false
+		fileEndTime := file.startTime.Add(videoFileInfo.duration)
+		// Check if the segment file's time range intersects
+		// with the match request time range [start, end)
+		if file.startTime.Before(end) && fileEndTime.After(start) {
+			// If the first video file in the matched set, cache the width, height, and codec
+			cacheFirstVid(&firstSeenVideoInfo, videoFileInfo)
+			if firstSeenVideoInfo.width != videoFileInfo.width ||
+				firstSeenVideoInfo.height != videoFileInfo.height ||
+				firstSeenVideoInfo.codec != videoFileInfo.codec {
+				logger.Warnf(
+					"Skipping file %s. Expected (width=%d, height=%d, codec=%s), got (width=%d, height=%d, codec=%s)",
+					file.name,
+					firstSeenVideoInfo.width, firstSeenVideoInfo.height, firstSeenVideoInfo.codec,
+					videoFileInfo.width, videoFileInfo.height, videoFileInfo.codec,
+				)
+				continue
+			}
+			logger.Debugf("Matched file %s", file.name)
+			entry := concatFileEntry{filePath: file.name}
 			// Calculate inpoint if the file starts before the 'start' time and overlaps
-			if dateTime.Before(start) {
-				inpoint = start.Sub(dateTime).Seconds()
-				inpointSet = true
+			if file.startTime.Before(start) {
+				inpoint := start.Sub(file.startTime).Seconds()
+				entry.inpoint = &inpoint
 			}
 			// Calculate outpoint if the file ends after the 'end' time
 			if fileEndTime.After(end) {
-				outpoint = end.Sub(dateTime).Seconds()
-				outpointSet = true
+				outpoint := end.Sub(file.startTime).Seconds()
+				entry.outpoint = &outpoint
 			}
-			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", file))
-			if inpointSet {
-				matchedFiles = append(matchedFiles, fmt.Sprintf("inpoint %.2f", inpoint))
-			}
-			if outpointSet && outpoint < duration.Seconds() {
-				// Only include outpoint if it's less than the full duration
-				matchedFiles = append(matchedFiles, fmt.Sprintf("outpoint %.2f", outpoint))
-			}
+			entries = append(entries, entry)
 		}
 	}
 
-	return matchedFiles
+	return entries
+}
+
+// cacheFirstVid caches the first video file's width, height, and codec.
+func cacheFirstVid(first *videoInfo, current videoInfo) {
+	if first.width == 0 {
+		first.width = current.width
+	}
+	if first.height == 0 {
+		first.height = current.height
+	}
+	if first.codec == "" {
+		first.codec = current.codec
+	}
 }
 
 // generateOutputFilename generates the output filename for the video file.
@@ -287,38 +382,33 @@ func generateOutputFilePath(camName, fromStr, metadata, path string) string {
 // Extracts the start timestamp of the oldest file and the start of the most recent file.
 // Since the most recent segment file is still being written to by the segmenter
 // we do not want to include it in the time range.
-func validateTimeRange(files []string, start, end time.Time) error {
+// func validateTimeRange(files []string, start, end time.Time) error {
+func validateTimeRange(files []fileWithDate, start, end time.Time) error {
 	if len(files) == 0 {
 		return errors.New("no storage files found")
 	}
-	oldestFileStart, err := extractDateTimeFromFilename(files[0])
-	if err != nil {
-		return err
-	}
-	newestFileStart, err := extractDateTimeFromFilename(files[len(files)-1])
-	if err != nil {
-		return err
-	}
+	oldestFileStart := files[0].startTime
+	newestFileStart := files[len(files)-1].startTime
 	if start.Before(oldestFileStart) || end.After(newestFileStart) {
 		return errors.New("time range is outside of storage range")
 	}
 	return nil
 }
 
-// getVideoDuration returns the duration of the video file in seconds.
-func getVideoDuration(filePath string) (time.Duration, error) {
+// getVideoInfo calls the C function get_video_info to retrieve
+// duration, width, height, and codec of a video file.
+func getVideoInfo(filePath string) (videoInfo, error) {
 	cFilePath := C.CString(filePath)
 	defer C.free(unsafe.Pointer(cFilePath))
-
-	var duration C.int64_t
-	ret := C.get_video_duration(&duration, cFilePath)
+	var cinfo C.video_store_video_info
+	ret := C.video_store_get_video_info(&cinfo, cFilePath)
 	switch ret {
-	case C.VIDEO_STORE_DURATION_RESP_OK:
-		// Convert duration from AV_TIME_BASE units to time.Duration
-		return time.Duration(duration) * time.Microsecond, nil
-	case C.VIDEO_STORE_DURATION_RESP_ERROR:
-		return 0, fmt.Errorf("failed to get video duration for file: %s", filePath)
+	case C.VIDEO_STORE_VIDEO_INFO_RESP_OK:
+		return fromCVideoInfo(cinfo), nil
+	case C.VIDEO_STORE_VIDEO_INFO_RESP_ERROR:
+		return videoInfo{}, fmt.Errorf("video_store_get_video_info failed for file: %s", filePath)
 	default:
-		return 0, fmt.Errorf("failed to get video duration for file: %s with error: %s", filePath, ffmpegError(ret))
+		return videoInfo{}, fmt.Errorf("video_store_get_video_info failed for file: %s with error: %s",
+			filePath, ffmpegError(ret))
 	}
 }

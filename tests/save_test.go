@@ -31,7 +31,6 @@ func TestSaveDoCommand(t *testing.T) {
 					"sync": "data_manager-1",
 					"storage": {
 						"size_gb": 10,
-						"segment_seconds": 10,
 						"upload_path": "%s",
 						"storage_path": "%s"
 					},
@@ -217,7 +216,7 @@ func TestSaveDoCommand(t *testing.T) {
 		_, ok := res["filename"].(string)
 		test.That(t, ok, test.ShouldBeTrue)
 		// Wait for async save to complete.
-		time.Sleep(15 * time.Second)
+		time.Sleep(35 * time.Second)
 		filename := fmt.Sprintf("%s_%s_%s.mp4", videoStoreComponentName, fromTimeStr, "test-metadata")
 		concatPath := filepath.Join(testUploadPath, filename)
 		_, err = os.Stat(concatPath)

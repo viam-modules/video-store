@@ -111,7 +111,6 @@ func TestModuleConfiguration(t *testing.T) {
 					"sync": "data_manager-1",
 					"storage": {
 						"size_gb": 10,
-						"segment_seconds": 30,
 						"upload_path": "%s",
 						"storage_path": "%s"
 					},
@@ -172,8 +171,7 @@ func TestModuleConfiguration(t *testing.T) {
                 "attributes": {
 					"sync": "data_manager-1",
                     "storage": {
-                        "size_gb": 10,
-                        "segment_seconds": 30
+                        "size_gb": 10
                     }
                 },
 				"depends_on": [
@@ -275,7 +273,6 @@ func TestModuleConfiguration(t *testing.T) {
 					"camera": "fake-cam-1",
 					"sync": "data_manager-1",
 					"storage": {
-						"segment_seconds": 30,
 						"upload_path": "/tmp/video-upload",
 						"storage_path": "/tmp/video-storage"
 					},
@@ -338,7 +335,6 @@ func TestModuleConfiguration(t *testing.T) {
 					"sync": "data_manager-1",
 					"storage": {
 						"size_gb": 10,
-						"segment_seconds": 30,
 						"upload_path": "/tmp",
 						"storage_path": "/tmp"
 					},
@@ -399,7 +395,6 @@ func TestModuleConfiguration(t *testing.T) {
 					"camera": "fake-cam-1",
 					"storage": {
 						"size_gb": 10,
-						"segment_seconds": 30,
 						"upload_path": "/tmp",
 						"storage_path": "/tmp"
 					},
@@ -448,7 +443,6 @@ func TestModuleConfiguration(t *testing.T) {
 						"sync": "data_manager-1",
 						"storage": {
 							"size_gb": 10,
-							"segment_seconds": 30,
 							"upload_path": "/tmp",
 							"storage_path": "/tmp"
 						},
