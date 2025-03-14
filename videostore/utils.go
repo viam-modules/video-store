@@ -269,11 +269,7 @@ func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logg
 	var matchedFiles []string
 	// Cache of the first matched video file's width, height, and codec
 	// to ensure every video in the matched files set have the same params.
-	firstSeenVideoInfo := videoInfo{
-		width:  0,
-		height: 0,
-		codec:  "",
-	}
+	var firstSeenVideoInfo videoInfo
 	// Find the first file to consider for matching. First search for the first file that starts after the query start time.
 	// We then want to consider the previous file as well, since it may overlap with the query start time.
 	var firstFileIndex int
