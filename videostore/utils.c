@@ -18,7 +18,7 @@ int video_store_get_video_info(video_store_video_info *info, // OUT
     }
 
     if (fmt_ctx->duration == AV_NOPTS_VALUE) {
-        av_log(NULL, AV_LOG_ERROR, "video_store_get_video_info video file has no duration\n");
+        av_log(NULL, AV_LOG_DEBUG, "video_store_get_video_info video file has no duration\n");
         avformat_close_input(&fmt_ctx);
         return VIDEO_STORE_VIDEO_INFO_RESP_ERROR;
     }
@@ -34,7 +34,7 @@ int video_store_get_video_info(video_store_video_info *info, // OUT
 
     // If more than one video stream, return error
     if (videoCount > 1) {
-        av_log(NULL, AV_LOG_ERROR, "video_store_get_video_info video file has more than one video stream\n");
+        av_log(NULL, AV_LOG_DEBUG, "video_store_get_video_info video file has more than one video stream\n");
         avformat_close_input(&fmt_ctx);
         return VIDEO_STORE_VIDEO_INFO_RESP_ERROR;
     }
@@ -57,17 +57,17 @@ int video_store_get_video_info(video_store_video_info *info, // OUT
     }
 
     if (tmpWidth == 0) {
-        av_log(NULL, AV_LOG_ERROR, "video_store_get_video_info could not find width of video stream\n");
+        av_log(NULL, AV_LOG_DEBUG, "video_store_get_video_info could not find width of video stream\n");
         avformat_close_input(&fmt_ctx);
         return VIDEO_STORE_VIDEO_INFO_RESP_ERROR;
     }
     if (tmpHeight == 0) {
-        av_log(NULL, AV_LOG_ERROR, "video_store_get_video_info could not find height of video stream\n");
+        av_log(NULL, AV_LOG_DEBUG, "video_store_get_video_info could not find height of video stream\n");
         avformat_close_input(&fmt_ctx);
         return VIDEO_STORE_VIDEO_INFO_RESP_ERROR;
     }
     if (tmpCodec[0] == '\0') {
-        av_log(NULL, AV_LOG_ERROR, "video_store_get_video_info could not find codec of video stream\n");
+        av_log(NULL, AV_LOG_DEBUG, "video_store_get_video_info could not find codec of video stream\n");
         avformat_close_input(&fmt_ctx);
         return VIDEO_STORE_VIDEO_INFO_RESP_ERROR;
     }
