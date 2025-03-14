@@ -284,7 +284,7 @@ func formatDateTimeToString(dateTime time.Time) string {
 // Includes trimming video files to the time range if they overlap.
 // The matcher assumes that the input files list is sorted by start time and the underylying
 // video segments do not overlap.
-func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logging.Logger) []string {
+func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logging.Logger) []concatFileEntry {
 	var entries []concatFileEntry
 	// Cache of the first matched video file's width, height, and codec
 	// to ensure every video in the matched files set have the same params.
@@ -352,15 +352,10 @@ func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logg
 		}
 	}
 
-	// Convert entries to concat format strings
-	var concatLines []string
-	for _, entry := range entries {
-		concatLines = append(concatLines, entry.string()...)
-	}
-
-	return concatLines
+	return entries
 }
 
+// cacheFirstVid caches the first video file's width, height, and codec.
 func cacheFirstVid(first *videoInfo, current videoInfo) {
 	if first.width == 0 {
 		first.width = current.width

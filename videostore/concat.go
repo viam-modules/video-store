@@ -66,33 +66,23 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 	if err != nil {
 		return err
 	}
-	matchingFiles := matchStorageToRange(storageFiles, from, to, c.logger)
-	if len(matchingFiles) == 0 {
+	concatEntries := matchStorageToRange(storageFiles, from, to, c.logger)
+	if len(concatEntries) == 0 {
 		return errors.New("no matching video data to save")
 	}
 
 	// Create a temporary file to store the list of files to concatenate.
 	concatFilePath := generateConcatFilePath()
-	concatTxtFile, err := os.Create(concatFilePath)
+	err = writeConcatFileEntries(concatEntries, concatFilePath)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err := concatTxtFile.Close(); err != nil {
-			c.logger.Error("failed to close concat file %s, err: %s", concatFilePath, err.Error())
-		}
-
-		// Delete tmp concat txt file
+		// Remove the concat file after the concat operation is complete.
 		if err := os.Remove(concatFilePath); err != nil {
 			c.logger.Error("failed to remove concat file %s, err: %s", concatFilePath, err.Error())
 		}
 	}()
-	for _, file := range matchingFiles {
-		_, err := concatTxtFile.WriteString(file + "\n")
-		if err != nil {
-			return err
-		}
-	}
 
 	concatFilePathCStr := C.CString(concatFilePath)
 	outputPathCStr := C.CString(path)
@@ -110,6 +100,26 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 	default:
 		return fmt.Errorf("failed to concat segment files: error: %s", ffmpegError(ret))
 	}
+}
+
+// writeConcatFileEntries writes the concat file entries to a file.
+func writeConcatFileEntries(entries []concatFileEntry, filePath string) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	for _, entry := range entries {
+		lines := entry.string()
+		for _, line := range lines {
+			_, err := file.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // cleanupConcatTxtFiles cleans up the concat txt files in the tmp directory.

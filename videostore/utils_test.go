@@ -70,15 +70,10 @@ func TestMatchStorageToRange(t *testing.T) {
 		endTime, err := ParseDateTimeString("2025-03-05_16-36-40")
 		test.That(t, err, test.ShouldBeNil)
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
-		expected := []string{
-			"file '../.artifact/data/2025-03-05_16-36-20.mp4'",
-			"inpoint 10.00",
-			"outpoint 20.00",
+		expected := []concatFileEntry{
+			{filePath: artifactStoragePath + "2025-03-05_16-36-20.mp4", inpoint: float64Ptr(10.00), outpoint: float64Ptr(20.00)},
 		}
-		test.That(t, matchedFiles, test.ShouldHaveLength, 3)
-		for i, exp := range expected {
-			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
-		}
+		test.That(t, matchedFiles, test.ShouldResemble, expected)
 	})
 
 	t.Run("Match request spanning multiple segments", func(t *testing.T) {
@@ -92,17 +87,12 @@ func TestMatchStorageToRange(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2024-09-06_15-01-00")
 		test.That(t, err, test.ShouldBeNil)
-		expected := []string{
-			"file '../.artifact/data/2024-09-06_15-00-03.mp4'",
-			"inpoint 7.00",
-			"file '../.artifact/data/2024-09-06_15-00-33.mp4'",
-			"outpoint 27.00",
+		expected := []concatFileEntry{
+			{filePath: artifactStoragePath + "2024-09-06_15-00-03.mp4", inpoint: float64Ptr(7.00)},
+			{filePath: artifactStoragePath + "2024-09-06_15-00-33.mp4", outpoint: float64Ptr(27.00)},
 		}
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
-		test.That(t, matchedFiles, test.ShouldHaveLength, 4)
-		for i, exp := range expected {
-			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
-		}
+		test.That(t, matchedFiles, test.ShouldResemble, expected)
 	})
 
 	t.Run("Match request along segment boundary", func(t *testing.T) {
@@ -117,15 +107,12 @@ func TestMatchStorageToRange(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2024-09-06_15-01-33")
 		test.That(t, err, test.ShouldBeNil)
-		expected := []string{
-			"file '../.artifact/data/2024-09-06_15-00-33.mp4'",
-			"file '../.artifact/data/2024-09-06_15-01-03.mp4'",
+		expected := []concatFileEntry{
+			{filePath: artifactStoragePath + "2024-09-06_15-00-33.mp4"},
+			{filePath: artifactStoragePath + "2024-09-06_15-01-03.mp4"},
 		}
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
-		test.That(t, matchedFiles, test.ShouldHaveLength, 2)
-		for i, exp := range expected {
-			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
-		}
+		test.That(t, matchedFiles, test.ShouldResemble, expected)
 	})
 
 	t.Run("Match request within gap in data", func(t *testing.T) {
@@ -154,17 +141,12 @@ func TestMatchStorageToRange(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-05_16-37-10")
 		test.That(t, err, test.ShouldBeNil)
+		expected := []concatFileEntry{
+			{filePath: artifactStoragePath + "2025-03-05_16-36-20.mp4", inpoint: float64Ptr(20.00)},
+			{filePath: artifactStoragePath + "2025-03-05_16-36-59.mp4", outpoint: float64Ptr(11.00)},
+		}
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
-		expected := []string{
-			"file '../.artifact/data/2025-03-05_16-36-20.mp4'",
-			"inpoint 20.00",
-			"file '../.artifact/data/2025-03-05_16-36-59.mp4'",
-			"outpoint 11.00",
-		}
-		test.That(t, matchedFiles, test.ShouldHaveLength, 4)
-		for i, exp := range expected {
-			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
-		}
+		test.That(t, matchedFiles, test.ShouldResemble, expected)
 	})
 
 	t.Run("Match request start range in data gap", func(t *testing.T) {
@@ -177,15 +159,11 @@ func TestMatchStorageToRange(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-05_16-37-20")
 		test.That(t, err, test.ShouldBeNil)
-		expected := []string{
-			"file '../.artifact/data/2025-03-05_16-36-59.mp4'",
-			"outpoint 21.00",
+		expected := []concatFileEntry{
+			{filePath: artifactStoragePath + "2025-03-05_16-36-59.mp4", outpoint: float64Ptr(21.00)},
 		}
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
-		test.That(t, matchedFiles, test.ShouldHaveLength, 2)
-		for i, exp := range expected {
-			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
-		}
+		test.That(t, matchedFiles, test.ShouldResemble, expected)
 	})
 
 	t.Run("Match request end range in data gap", func(t *testing.T) {
@@ -198,15 +176,11 @@ func TestMatchStorageToRange(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-05_16-36-55")
 		test.That(t, err, test.ShouldBeNil)
-		expected := []string{
-			"file '../.artifact/data/2025-03-05_16-36-20.mp4'",
-			"inpoint 10.00",
+		expected := []concatFileEntry{
+			{filePath: artifactStoragePath + "2025-03-05_16-36-20.mp4", inpoint: float64Ptr(10.00)},
 		}
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
-		test.That(t, matchedFiles, test.ShouldHaveLength, 2)
-		for i, exp := range expected {
-			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
-		}
+		test.That(t, matchedFiles, test.ShouldResemble, expected)
 	})
 
 	t.Run("Match request spanning size change boundary", func(t *testing.T) {
@@ -219,15 +193,11 @@ func TestMatchStorageToRange(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-11_11-50-47")
 		test.That(t, err, test.ShouldBeNil)
-		expected := []string{
-			"file '../.artifact/data/2025-03-11_11-49-37.mp4'",
-			"inpoint 10.00",
+		expected := []concatFileEntry{
+			{filePath: artifactStoragePath + "2025-03-11_11-49-37.mp4", inpoint: float64Ptr(10.00)},
 		}
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
-		test.That(t, matchedFiles, test.ShouldHaveLength, 2)
-		for i, exp := range expected {
-			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
-		}
+		test.That(t, matchedFiles, test.ShouldResemble, expected)
 	})
 
 	t.Run("Match request spanning codec change boundary", func(t *testing.T) {
@@ -240,14 +210,15 @@ func TestMatchStorageToRange(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-11_16-15-30")
 		test.That(t, err, test.ShouldBeNil)
-		expected := []string{
-			"file '../.artifact/data/2025-03-11_16-14-40.mp4'",
-			"inpoint 10.00",
+		expected := []concatFileEntry{
+			{filePath: artifactStoragePath + "2025-03-11_16-14-40.mp4", inpoint: float64Ptr(10.00)},
 		}
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
-		test.That(t, matchedFiles, test.ShouldHaveLength, 2)
-		for i, exp := range expected {
-			test.That(t, matchedFiles[i], test.ShouldEqual, exp)
-		}
+		test.That(t, matchedFiles, test.ShouldResemble, expected)
 	})
+}
+
+// float64Ptr returns a pointer to the given float64 value.
+func float64Ptr(f float64) *float64 {
+	return &f
 }
