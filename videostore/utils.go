@@ -60,6 +60,11 @@ type videoInfo struct {
 	codec    string
 }
 
+type fileWithDate struct {
+	name string
+	date time.Time
+}
+
 // fromCVideoInfo converts a C.VideoInfo struct to a Go videoInfo struct
 func fromCVideoInfo(cinfo C.video_store_video_info) videoInfo {
 	return videoInfo{
@@ -204,29 +209,38 @@ func getFileSize(path string) (int64, error) {
 }
 
 // getSortedFiles returns a list of files in the provided directory sorted by creation time.
-func getSortedFiles(path string) ([]string, error) {
+func getSortedFiles(path string) ([]fileWithDate, error) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
-	var validFilePaths []string
+	var filePaths []string
 	for _, file := range files {
 		filePath := filepath.Join(path, file.Name())
-		_, err := extractDateTimeFromFilename(filePath)
+		filePaths = append(filePaths, filePath)
+	}
+	return createAndSortFileWithDateList(filePaths)
+}
+
+// createAndSortFileWithDateList takes a list of file paths, extracts the date from each file name,
+// and returns a sorted list of fileWithDate.
+func createAndSortFileWithDateList(filePaths []string) ([]fileWithDate, error) {
+	var validFiles []fileWithDate
+	for _, filePath := range filePaths {
+		date, err := extractDateTimeFromFilename(filePath)
 		if err == nil {
-			validFilePaths = append(validFilePaths, filePath)
+			validFiles = append(validFiles, fileWithDate{name: filePath, date: date})
 		}
 	}
-	sort.Slice(validFilePaths, func(i, j int) bool {
-		timeI, errI := extractDateTimeFromFilename(validFilePaths[i])
-		timeJ, errJ := extractDateTimeFromFilename(validFilePaths[j])
-		if errI != nil || errJ != nil {
-			return false
-		}
-		return timeI.Before(timeJ)
-	})
+	sortFilesByDate(validFiles)
+	return validFiles, nil
+}
 
-	return validFilePaths, nil
+// sortFilesByDate sorts a slice of fileWithDate by their date field.
+func sortFilesByDate(files []fileWithDate) {
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].date.Before(files[j].date)
+	})
 }
 
 // extractDateTimeFromFilename extracts the date and time from the filename.
@@ -260,7 +274,8 @@ func formatDateTimeToString(dateTime time.Time) string {
 // matchStorageToRange returns a list of files that fall within the provided time range.
 // The matcher assumes that the input files list is sorted by start time.
 // Includes trimming video files to the time range if they overlap.
-func matchStorageToRange(files []string, start, end time.Time, logger logging.Logger) []string {
+// func matchStorageToRange(files []string, start, end time.Time, logger logging.Logger) []string {
+func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logging.Logger) []string {
 	var matchedFiles []string
 	// Cache of the first matched video file's width, height, and codec
 	// to ensure every video in the matched files set have the same params.
@@ -270,11 +285,7 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 		codec:  "",
 	}
 	for _, file := range files {
-		fileStartTime, err := extractDateTimeFromFilename(file)
-		if err != nil {
-			logger.Debugf("failed to extract datetime from filename: %s, error: %v", file, err)
-			continue
-		}
+		fileStartTime := file.date
 		if fileStartTime.After(end) {
 			logger.Debugf("Skipping file %s and winding down matcher. File starts after end time (start=%v, end=%v)", file, start, end)
 			break
@@ -283,7 +294,7 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 		// Check if the segment file's time range intersects
 		// with the match request time range [start, end)
 		if fileStartTime.Before(end) && estimatedFileEndTime.After(start) {
-			videoFileInfo, err := getVideoInfo(file)
+			videoFileInfo, err := getVideoInfo(file.name)
 			if err != nil {
 				logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
 				continue
@@ -325,7 +336,7 @@ func matchStorageToRange(files []string, start, end time.Time, logger logging.Lo
 				outpoint = end.Sub(fileStartTime).Seconds()
 				outpointSet = true
 			}
-			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", file))
+			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", file.name))
 			if inpointSet {
 				logger.Debugf("Trimming file %s to inpoint %.2f", file, inpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("inpoint %.2f", inpoint))
@@ -368,18 +379,13 @@ func generateOutputFilePath(camName, fromStr, metadata, path string) string {
 // Extracts the start timestamp of the oldest file and the start of the most recent file.
 // Since the most recent segment file is still being written to by the segmenter
 // we do not want to include it in the time range.
-func validateTimeRange(files []string, start, end time.Time) error {
+// func validateTimeRange(files []string, start, end time.Time) error {
+func validateTimeRange(files []fileWithDate, start, end time.Time) error {
 	if len(files) == 0 {
 		return errors.New("no storage files found")
 	}
-	oldestFileStart, err := extractDateTimeFromFilename(files[0])
-	if err != nil {
-		return err
-	}
-	newestFileStart, err := extractDateTimeFromFilename(files[len(files)-1])
-	if err != nil {
-		return err
-	}
+	oldestFileStart := files[0].date
+	newestFileStart := files[len(files)-1].date
 	if start.Before(oldestFileStart) || end.After(newestFileStart) {
 		return errors.New("time range is outside of storage range")
 	}

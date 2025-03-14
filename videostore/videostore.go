@@ -477,7 +477,7 @@ func cleanupStorage(storagePath string, maxStorageSizeGB int, logger logging.Log
 			break
 		}
 		logger.Debugf("deleting file: %s", file)
-		err := os.Remove(file)
+		err := os.Remove(file.name)
 		if err != nil {
 			return err
 		}
