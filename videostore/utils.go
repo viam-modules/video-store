@@ -280,40 +280,39 @@ func formatDateTimeToString(dateTime time.Time) string {
 	return dateTime.Format("2006-01-02_15-04-05")
 }
 
-// matchStorageToRange returns a list of files that fall within the provided time range.
-// Includes trimming video files to the time range if they overlap.
-// The matcher assumes that the input files list is sorted by start time and the underylying
-// video segments do not overlap.
+// matchStorageToRange identifies video files that overlap with the requested time range (start to end)
+// and returns them as FFmpeg concat demuxer entries with appropriate trim points.
+//
+// The function optimizes processing by:
+// 1. Finding the subset of files that could potentially overlap with the time range
+// 2. Checking for actual overlap between each file and the requested time range
+// 3. Calculating inpoint/outpoint trim values when a file partially overlaps
+// 4. Ensuring all matched files have consistent video parameters (width/height/codec)
+//
+// The input files must be sorted by start time, and the function assumes video segments
+// don't overlap in time.
 func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logging.Logger) []concatFileEntry {
 	var entries []concatFileEntry
 	// Cache of the first matched video file's width, height, and codec
 	// to ensure every video in the matched files set have the same params.
 	var firstSeenVideoInfo videoInfo
-	// Find the first file to consider for matching. First search for the first file that starts after the query start time.
-	// We then want to consider the previous file as well, since it may overlap with the query start time.
-	var firstFileIndex int
-	firstFileIndexFound := false
+	// Find the first and last file that could potentially overlap with the query time range.
+	firstFileIndex := -1
+	lastFileIndex := len(files)
 	for i, file := range files {
-		if file.startTime.After(start) {
+		if file.startTime.After(start) && firstFileIndex == -1 {
 			firstFileIndex = i - 1
-			firstFileIndexFound = true
+		}
+		if file.startTime.After(end) {
+			lastFileIndex = i
 			break
 		}
 	}
-	// If no file starts after the query start time, we still want to consider the last file.
-	if !firstFileIndexFound {
+	logger.Debugf("firstFileIndex: %d, lastFileIndex: %d", firstFileIndex, lastFileIndex)
+	if firstFileIndex == -1 {
 		firstFileIndex = len(files) - 1
 	}
-	if firstFileIndex < 0 {
-		firstFileIndex = 0
-	}
-	// Iterate through the files and find the ones that match the time range.
-	for _, file := range files[firstFileIndex:] {
-		// If the file starts after the query end time, we can stop searching.
-		if file.startTime.After(end) {
-			logger.Debugf("Skipping file %s and winding down matcher. File starts after end time (start=%v, end=%v)", file.name, start, end)
-			break
-		}
+	for _, file := range files[firstFileIndex:lastFileIndex] {
 		videoFileInfo, err := getVideoInfo(file.name)
 		if err != nil {
 			logger.Debugf("failed to get video duration for file: %s, error: %v", file.name, err)
