@@ -40,16 +40,6 @@ const (
 	codecH264
 	// CodecH265 represents the H.265 codec type.
 	codecH265
-
-	// maxSegmentLength defines the maximum clip duration in seconds.
-	maxSegmentLength = 30
-
-	// keyFrameIntervalBuffer defines the maximum allowed seconds between keyframes.
-	// Because the viamrtsp videostore path does not always split exactly at 30 seconds,
-	// the segmenter may delay splitting until a keyframe appears, potentially extending
-	// beyond the configured segment time. This const adds a buffer length for the
-	// segment duration estimate during matching.
-	keyFrameIntervalBuffer = 4
 )
 
 // videoInfo in Go, corresponding to the C VideoInfo struct
@@ -272,9 +262,9 @@ func formatDateTimeToString(dateTime time.Time) string {
 }
 
 // matchStorageToRange returns a list of files that fall within the provided time range.
-// The matcher assumes that the input files list is sorted by start time.
 // Includes trimming video files to the time range if they overlap.
-// func matchStorageToRange(files []string, start, end time.Time, logger logging.Logger) []string {
+// The matcher assumes that the input files list is sorted by start time and the underylying
+// video segments do not overlap.
 func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logging.Logger) []string {
 	var matchedFiles []string
 	// Cache of the first matched video file's width, height, and codec
@@ -284,30 +274,36 @@ func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logg
 		height: 0,
 		codec:  "",
 	}
-	for _, file := range files {
-		fileStartTime := file.date
-		if fileStartTime.After(end) {
-			logger.Debugf("Skipping file %s and winding down matcher. File starts after end time (start=%v, end=%v)", file, start, end)
+	// Find the first file to consider for matching. First search for the first file that starts after the query start time.
+	// We then want to consider the previous file as well, since it may overlap with the query start time.
+	var firstFileIndex int
+	for i, file := range files {
+		if file.date.After(start) {
+			firstFileIndex = i - 1
 			break
 		}
-		estimatedFileEndTime := fileStartTime.Add(time.Duration(maxSegmentLength+keyFrameIntervalBuffer) * time.Second)
+	}
+	if firstFileIndex < 0 {
+		firstFileIndex = 0
+	}
+	// Iterate through the files and find the ones that match the time range.
+	for i := firstFileIndex; i < len(files); i++ {
+		fileStartTime := files[i].date
+		fileName := files[i].name
+		// If the file starts after the query end time, we can stop searching.n
+		if fileStartTime.After(end) {
+			logger.Debugf("Skipping file %s and winding down matcher. File starts after end time (start=%v, end=%v)", fileName, start, end)
+			break
+		}
+		videoFileInfo, err := getVideoInfo(fileName)
+		if err != nil {
+			logger.Debugf("failed to get video duration for file: %s, error: %v", fileName, err)
+			continue
+		}
+		actualFileEndTime := fileStartTime.Add(videoFileInfo.duration)
 		// Check if the segment file's time range intersects
 		// with the match request time range [start, end)
-		if fileStartTime.Before(end) && estimatedFileEndTime.After(start) {
-			videoFileInfo, err := getVideoInfo(file.name)
-			if err != nil {
-				logger.Debugf("failed to get video duration for file: %s, error: %v", file, err)
-				continue
-			}
-			actualFileEndTime := fileStartTime.Add(videoFileInfo.duration)
-			// If the real file end time is exclusively before the start time, skip the file
-			if !actualFileEndTime.After(start) {
-				logger.Debugf(
-					"Skipping file %s. File ends before start time (end=%v, start=%v)",
-					file, actualFileEndTime, start,
-				)
-				continue
-			}
+		if fileStartTime.Before(end) && actualFileEndTime.After(start) {
 			// If the first video file in the matched set, cache the width, height, and codec
 			cacheFirstVid(&firstSeenVideoInfo, videoFileInfo)
 			if firstSeenVideoInfo.width != videoFileInfo.width ||
@@ -315,13 +311,13 @@ func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logg
 				firstSeenVideoInfo.codec != videoFileInfo.codec {
 				logger.Warnf(
 					"Skipping file %s. Expected (width=%d, height=%d, codec=%s), got (width=%d, height=%d, codec=%s)",
-					file,
+					fileName,
 					firstSeenVideoInfo.width, firstSeenVideoInfo.height, firstSeenVideoInfo.codec,
 					videoFileInfo.width, videoFileInfo.height, videoFileInfo.codec,
 				)
 				continue
 			}
-			logger.Debugf("Matched file %s", file)
+			logger.Debugf("Matched file %s", fileName)
 			// inpoint and outpoint define the start/end trimming offsets for the FFmpeg concat demuxer.
 			var inpoint, outpoint float64
 			inpointSet := false
@@ -336,14 +332,14 @@ func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logg
 				outpoint = end.Sub(fileStartTime).Seconds()
 				outpointSet = true
 			}
-			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", file.name))
+			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", fileName))
 			if inpointSet {
-				logger.Debugf("Trimming file %s to inpoint %.2f", file, inpoint)
+				logger.Debugf("Trimming file %s to inpoint %.2f", fileName, inpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("inpoint %.2f", inpoint))
 			}
 			// Only include outpoint if it's less than the full duration
 			if outpointSet && outpoint < videoFileInfo.duration.Seconds() {
-				logger.Debugf("Trimming file %s to outpoint %.2f", file, outpoint)
+				logger.Debugf("Trimming file %s to outpoint %.2f", fileName, outpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("outpoint %.2f", outpoint))
 			}
 		}
