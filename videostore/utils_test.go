@@ -64,8 +64,7 @@ func TestMatchStorageToRange(t *testing.T) {
 			artifactStoragePath + "2025-03-05_16-36-59.mp4",
 			artifactStoragePath + "2025-03-05_16-37-38.mp4",
 		}
-		fileWithDateList, err := createAndSortFileWithDateList(fileList)
-		test.That(t, err, test.ShouldBeNil)
+		fileWithDateList := createAndSortFileWithDateList(fileList)
 		startTime, err := ParseDateTimeString("2025-03-05_16-36-30")
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-05_16-36-40")
@@ -88,8 +87,7 @@ func TestMatchStorageToRange(t *testing.T) {
 			artifactStoragePath + "2024-09-06_15-00-33.mp4",
 			artifactStoragePath + "2024-09-06_15-01-03.mp4",
 		}
-		fileWithDateList, err := createAndSortFileWithDateList(fileList)
-		test.That(t, err, test.ShouldBeNil)
+		fileWithDateList := createAndSortFileWithDateList(fileList)
 		startTime, err := ParseDateTimeString("2024-09-06_15-00-10")
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2024-09-06_15-01-00")
@@ -114,8 +112,7 @@ func TestMatchStorageToRange(t *testing.T) {
 			artifactStoragePath + "2024-09-06_15-01-03.mp4",
 			artifactStoragePath + "2024-09-06_15-01-33.mp4",
 		}
-		fileWithDateList, err := createAndSortFileWithDateList(fileList)
-		test.That(t, err, test.ShouldBeNil)
+		fileWithDateList := createAndSortFileWithDateList(fileList)
 		startTime, err := ParseDateTimeString("2024-09-06_15-00-33")
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2024-09-06_15-01-33")
@@ -137,8 +134,7 @@ func TestMatchStorageToRange(t *testing.T) {
 			artifactStoragePath + "2025-03-05_16-36-59.mp4",
 			artifactStoragePath + "2025-03-05_16-37-38.mp4",
 		}
-		fileWithDateList, err := createAndSortFileWithDateList(fileList)
-		test.That(t, err, test.ShouldBeNil)
+		fileWithDateList := createAndSortFileWithDateList(fileList)
 		startTime, err := ParseDateTimeString("2025-03-05_16-36-53")
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-05_16-36-55")
@@ -153,8 +149,7 @@ func TestMatchStorageToRange(t *testing.T) {
 			artifactStoragePath + "2025-03-05_16-36-59.mp4",
 			artifactStoragePath + "2025-03-05_16-37-38.mp4",
 		}
-		fileWithDateList, err := createAndSortFileWithDateList(fileList)
-		test.That(t, err, test.ShouldBeNil)
+		fileWithDateList := createAndSortFileWithDateList(fileList)
 		startTime, err := ParseDateTimeString("2025-03-05_16-36-40")
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-05_16-37-10")
@@ -177,8 +172,7 @@ func TestMatchStorageToRange(t *testing.T) {
 			artifactStoragePath + "2025-03-05_16-36-20.mp4",
 			artifactStoragePath + "2025-03-05_16-36-59.mp4",
 		}
-		fileWithDateList, err := createAndSortFileWithDateList(fileList)
-		test.That(t, err, test.ShouldBeNil)
+		fileWithDateList := createAndSortFileWithDateList(fileList)
 		startTime, err := ParseDateTimeString("2025-03-05_16-36-54")
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-05_16-37-20")
@@ -199,8 +193,7 @@ func TestMatchStorageToRange(t *testing.T) {
 			artifactStoragePath + "2025-03-05_16-36-20.mp4",
 			artifactStoragePath + "2025-03-05_16-36-59.mp4",
 		}
-		fileWithDateList, err := createAndSortFileWithDateList(fileList)
-		test.That(t, err, test.ShouldBeNil)
+		fileWithDateList := createAndSortFileWithDateList(fileList)
 		startTime, err := ParseDateTimeString("2025-03-05_16-36-30")
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-05_16-36-55")
@@ -221,8 +214,7 @@ func TestMatchStorageToRange(t *testing.T) {
 			artifactStoragePath + "2025-03-11_11-49-37.mp4",
 			artifactStoragePath + "2025-03-11_11-49-58.mp4",
 		}
-		fileWithDateList, err := createAndSortFileWithDateList(fileList)
-		test.That(t, err, test.ShouldBeNil)
+		fileWithDateList := createAndSortFileWithDateList(fileList)
 		startTime, err := ParseDateTimeString("2025-03-11_11-49-47")
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-11_11-50-47")
@@ -243,8 +235,7 @@ func TestMatchStorageToRange(t *testing.T) {
 			artifactStoragePath + "2025-03-11_16-14-40.mp4",
 			artifactStoragePath + "2025-03-11_16-15-10.mp4",
 		}
-		fileWithDateList, err := createAndSortFileWithDateList(fileList)
-		test.That(t, err, test.ShouldBeNil)
+		fileWithDateList := createAndSortFileWithDateList(fileList)
 		startTime, err := ParseDateTimeString("2025-03-11_16-14-50")
 		test.That(t, err, test.ShouldBeNil)
 		endTime, err := ParseDateTimeString("2025-03-11_16-15-30")

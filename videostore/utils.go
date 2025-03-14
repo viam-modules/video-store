@@ -51,8 +51,8 @@ type videoInfo struct {
 }
 
 type fileWithDate struct {
-	name string
-	date time.Time
+	name      string
+	startTime time.Time
 }
 
 // fromCVideoInfo converts a C.VideoInfo struct to a Go videoInfo struct
@@ -218,7 +218,7 @@ func createAndSortFileWithDateList(filePaths []string) []fileWithDate {
 	for _, filePath := range filePaths {
 		date, err := extractDateTimeFromFilename(filePath)
 		if err == nil {
-			validFiles = append(validFiles, fileWithDate{name: filePath, date: date})
+			validFiles = append(validFiles, fileWithDate{name: filePath, startTime: date})
 		}
 	}
 	sortFilesByDate(validFiles)
@@ -228,7 +228,7 @@ func createAndSortFileWithDateList(filePaths []string) []fileWithDate {
 // sortFilesByDate sorts a slice of fileWithDate by their date field.
 func sortFilesByDate(files []fileWithDate) {
 	sort.Slice(files, func(i, j int) bool {
-		return files[i].date.Before(files[j].date)
+		return files[i].startTime.Before(files[j].startTime)
 	})
 }
 
@@ -274,7 +274,7 @@ func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logg
 	var firstFileIndex int
 	firstFileIndexFound := false
 	for i, file := range files {
-		if file.date.After(start) {
+		if file.startTime.After(start) {
 			firstFileIndex = i - 1
 			firstFileIndexFound = true
 			break
@@ -288,23 +288,21 @@ func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logg
 		firstFileIndex = 0
 	}
 	// Iterate through the files and find the ones that match the time range.
-	for i := firstFileIndex; i < len(files); i++ {
-		fileStartTime := files[i].date
-		fileName := files[i].name
+	for _, file := range files[firstFileIndex:] {
 		// If the file starts after the query end time, we can stop searching.
-		if fileStartTime.After(end) {
-			logger.Debugf("Skipping file %s and winding down matcher. File starts after end time (start=%v, end=%v)", fileName, start, end)
+		if file.startTime.After(end) {
+			logger.Debugf("Skipping file %s and winding down matcher. File starts after end time (start=%v, end=%v)", file.name, start, end)
 			break
 		}
-		videoFileInfo, err := getVideoInfo(fileName)
+		videoFileInfo, err := getVideoInfo(file.name)
 		if err != nil {
-			logger.Debugf("failed to get video duration for file: %s, error: %v", fileName, err)
+			logger.Debugf("failed to get video duration for file: %s, error: %v", file.name, err)
 			continue
 		}
-		actualFileEndTime := fileStartTime.Add(videoFileInfo.duration)
+		fileEndTime := file.startTime.Add(videoFileInfo.duration)
 		// Check if the segment file's time range intersects
 		// with the match request time range [start, end)
-		if fileStartTime.Before(end) && actualFileEndTime.After(start) {
+		if file.startTime.Before(end) && fileEndTime.After(start) {
 			// If the first video file in the matched set, cache the width, height, and codec
 			cacheFirstVid(&firstSeenVideoInfo, videoFileInfo)
 			if firstSeenVideoInfo.width != videoFileInfo.width ||
@@ -312,35 +310,35 @@ func matchStorageToRange(files []fileWithDate, start, end time.Time, logger logg
 				firstSeenVideoInfo.codec != videoFileInfo.codec {
 				logger.Warnf(
 					"Skipping file %s. Expected (width=%d, height=%d, codec=%s), got (width=%d, height=%d, codec=%s)",
-					fileName,
+					file.name,
 					firstSeenVideoInfo.width, firstSeenVideoInfo.height, firstSeenVideoInfo.codec,
 					videoFileInfo.width, videoFileInfo.height, videoFileInfo.codec,
 				)
 				continue
 			}
-			logger.Debugf("Matched file %s", fileName)
+			logger.Debugf("Matched file %s", file.name)
 			// inpoint and outpoint define the start/end trimming offsets for the FFmpeg concat demuxer.
 			var inpoint, outpoint float64
 			inpointSet := false
 			outpointSet := false
 			// Calculate inpoint if the file starts before the 'start' time and overlaps
-			if fileStartTime.Before(start) {
-				inpoint = start.Sub(fileStartTime).Seconds()
+			if file.startTime.Before(start) {
+				inpoint = start.Sub(file.startTime).Seconds()
 				inpointSet = true
 			}
 			// Calculate outpoint if the file ends after the 'end' time
-			if actualFileEndTime.After(end) {
-				outpoint = end.Sub(fileStartTime).Seconds()
+			if fileEndTime.After(end) {
+				outpoint = end.Sub(file.startTime).Seconds()
 				outpointSet = true
 			}
-			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", fileName))
+			matchedFiles = append(matchedFiles, fmt.Sprintf("file '%s'", file.name))
 			if inpointSet {
-				logger.Debugf("Trimming file %s to inpoint %.2f", fileName, inpoint)
+				logger.Debugf("Trimming file %s to inpoint %.2f", file.name, inpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("inpoint %.2f", inpoint))
 			}
 			// Only include outpoint if it's less than the full duration
 			if outpointSet && outpoint < videoFileInfo.duration.Seconds() {
-				logger.Debugf("Trimming file %s to outpoint %.2f", fileName, outpoint)
+				logger.Debugf("Trimming file %s to outpoint %.2f", file.name, outpoint)
 				matchedFiles = append(matchedFiles, fmt.Sprintf("outpoint %.2f", outpoint))
 			}
 		}
@@ -381,8 +379,8 @@ func validateTimeRange(files []fileWithDate, start, end time.Time) error {
 	if len(files) == 0 {
 		return errors.New("no storage files found")
 	}
-	oldestFileStart := files[0].date
-	newestFileStart := files[len(files)-1].date
+	oldestFileStart := files[0].startTime
+	newestFileStart := files[len(files)-1].startTime
 	if start.Before(oldestFileStart) || end.After(newestFileStart) {
 		return errors.New("time range is outside of storage range")
 	}
