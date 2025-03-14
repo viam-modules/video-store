@@ -74,15 +74,17 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 	// Create a temporary file to store the list of files to concatenate.
 	concatFilePath := generateConcatFilePath()
 	err = writeConcatFileEntries(concatEntries, concatFilePath)
+	defer func() {
+		// Remove the concat file after the concat operation is complete.
+		if _, err := os.Stat(concatFilePath); err == nil {
+			if err := os.Remove(concatFilePath); err != nil {
+				c.logger.Error("failed to remove concat file %s, err: %s", concatFilePath, err.Error())
+			}
+		}
+	}()
 	if err != nil {
 		return err
 	}
-	defer func() {
-		// Remove the concat file after the concat operation is complete.
-		if err := os.Remove(concatFilePath); err != nil {
-			c.logger.Error("failed to remove concat file %s, err: %s", concatFilePath, err.Error())
-		}
-	}()
 
 	concatFilePathCStr := C.CString(concatFilePath)
 	outputPathCStr := C.CString(path)
