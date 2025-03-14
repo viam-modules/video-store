@@ -117,7 +117,7 @@ func TestSaveDoCommand(t *testing.T) {
 	saveCmd5 := map[string]interface{}{
 		"command":  "save",
 		"from":     "2024-09-06_15-00-33",
-		"to":       "2025-09-06_15-00-33",
+		"to":       "3024-09-06_15-00-33",
 		"metadata": "test-metadata",
 		"async":    true,
 	}
