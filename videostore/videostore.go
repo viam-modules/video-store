@@ -88,6 +88,8 @@ const (
 	CodecTypeH264
 	// CodecTypeH265 represents h265 codec
 	CodecTypeH265
+	// CodecTypeMPEG4 represents MPEG4 codec
+	CodecTypeMPEG4
 )
 
 func (t CodecType) String() string {
@@ -98,6 +100,8 @@ func (t CodecType) String() string {
 		return "CodecTypeH264"
 	case CodecTypeH265:
 		return "CodecTypeH265"
+	case CodecTypeMPEG4:
+		return "CodecTypeMPEG4"
 	default:
 		return "CodecTypeUnknown"
 	}

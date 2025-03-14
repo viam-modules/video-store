@@ -27,6 +27,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-libx264 \
                --enable-decoder=hevc \
                --enable-decoder=h264 \
+               --enable-decoder=mpeg4 \
                --enable-gpl \
                --enable-encoder=libx264 \
                --enable-muxer=segment \
@@ -36,6 +37,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-demuxer=mov \
                --enable-demuxer=mp4 \
                --enable-parser=h264 \
+               --enable-parser=mpeg4 \
                --enable-parser=hevc \
                --enable-protocol=file \
                --enable-protocol=concat \
@@ -62,7 +64,7 @@ export PATH := $(PATH):$(shell go env GOPATH)/bin
 
 .PHONY: lint tool-install test clean clean-all clean-ffmpeg module build valgrind
 
-all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
+all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat $(BIN_OUTPUT_PATH)/raw-segmenter-c
 
 $(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go videostore/*.c videostore/*.h $(FFMPEG_BUILD)
 	go mod tidy

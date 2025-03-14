@@ -160,6 +160,38 @@ int video_store_raw_seg_init_h265(struct raw_seg **ppRS,     // OUT
                                   height, codec);
 }
 
+int video_store_raw_seg_init_mpeg4(struct raw_seg **ppRS,     // OUT
+                                   const int segmentSeconds,  // IN
+                                   const char *outputPattern, // IN
+                                   const int width,           // IN
+                                   const int height           // IN
+) {
+  const struct AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_MPEG4);
+  if (codec == NULL) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_raw_seg_init_mpeg4 failed to find codec\n");
+    return VIDEO_STORE_RAW_SEG_RESP_ERROR;
+  }
+  return video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
+                                  height, codec);
+}
+
+int video_store_raw_seg_init_mjpeg(struct raw_seg **ppRS,     // OUT
+                                   const int segmentSeconds,  // IN
+                                   const char *outputPattern, // IN
+                                   const int width,           // IN
+                                   const int height           // IN
+) {
+  const struct AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_MPEG4);
+  if (codec == NULL) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_raw_seg_init_mpeg4 failed to find codec\n");
+    return VIDEO_STORE_RAW_SEG_RESP_ERROR;
+  }
+  return video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
+                                  height, codec);
+}
+
 int video_store_raw_seg_write_packet(struct raw_seg *rs,       // IN
                                      const char *payload,      // IN
                                      const size_t payloadSize, // IN

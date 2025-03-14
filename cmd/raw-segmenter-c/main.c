@@ -6,13 +6,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+enum Codec {
+  CodecUnknown,
+  CodecH264,
+  CodecH265,
+  CodecMPEG4,
+  CodecMJPEG,
+};
+
 int main(int argc, char *argv[]) {
   if (argc != 2) {
     printf("usage: %s <sqlite.db>\n", argv[0]);
     printf("TABLE should have the following schema:\n");
 
-    printf("CREATE TABLE extradata(id INTEGER NOT NULL PRIMARY KEY, isH264 "
-           "BOOLEAN, width INTEGER, height INTEGER);\n");
+    printf("CREATE TABLE extradata(id INTEGER NOT NULL PRIMARY KEY, codec "
+           "INTEGER, width INTEGER, height INTEGER);\n");
     printf("CREATE TABLE packet(id INTEGER NOT NULL PRIMARY KEY, pts "
            "INTEGER,dts INTEGER,isIDR BOOLEAN, data BLOB);\n");
 
@@ -33,9 +41,9 @@ int main(int argc, char *argv[]) {
   sqlite3_stmt *statement;
   /* Compile the SELECT statement into a virtual machine. */
   printf("Performing query...\n");
-  if ((rc = sqlite3_prepare_v2(db,
-                               "SELECT isH264, width, height FROM extradata;",
-                               -1, &statement, 0))) {
+  if ((rc =
+           sqlite3_prepare_v2(db, "SELECT codec, width, height FROM extradata;",
+                              -1, &statement, 0))) {
     printf("sqlite3_prepare failed on extradata: %d\n", rc);
     return rc;
   }
@@ -45,17 +53,24 @@ int main(int argc, char *argv[]) {
     printf("sqlite3_step failed: %d\n", rc);
     return rc;
   }
-  int isH264 = sqlite3_column_int(statement, 0);
+  int codec = sqlite3_column_int(statement, 0);
   int width = sqlite3_column_int(statement, 1);
   int height = sqlite3_column_int(statement, 2);
 
-  if (isH264) {
+  switch (codec) {
+  case CodecH264:
     ret = video_store_raw_seg_init_h264(
         &rs, 30, "./mp4s/h264_%Y-%m-%d_%H-%M-%S.mp4", width, height);
-  } else {
+  case CodecH265:
     ret = video_store_raw_seg_init_h265(
         &rs, 30, "./mp4s/h265_%Y-%m-%d_%H-%M-%S.mp4", width, height);
-  }
+  case CodecMPEG4:
+    ret = video_store_raw_seg_init_mpeg4(
+        &rs, 30, "./mp4s/mpeg4_%Y-%m-%d_%H-%M-%S.mp4", width, height);
+  case CodecMJPEG:
+    ret = video_store_raw_seg_init_mjpeg(
+        &rs, 30, "./mp4s/mjpeg_%Y-%m-%d_%H-%M-%S.mp4", width, height);
+  };
   if (ret != VIDEO_STORE_RAW_SEG_RESP_OK) {
     printf("video_store_raw_seg_init failed: %d\n", ret);
     rc = sqlite3_finalize(statement);
