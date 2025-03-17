@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unsafe"
@@ -254,14 +255,22 @@ func sortFilesByDate(files []fileWithDate) {
 
 // extractDateTimeFromFilename extracts the date and time from the filename.
 func extractDateTimeFromFilename(filePath string) (time.Time, error) {
-	const minParts = 2
 	baseName := filepath.Base(filePath)
-	parts := strings.Split(baseName, "_")
+	nameWithoutExt := strings.TrimSuffix(baseName, filepath.Ext(baseName))
+
+	// Parse as Unix timestamp first
+	if timestamp, err := strconv.ParseInt(nameWithoutExt, 10, 64); err == nil {
+		return time.Unix(timestamp, 0), nil
+	}
+
+	// Fall back to legacy format parsing
+	const minParts = 2
+	parts := strings.Split(nameWithoutExt, "_")
 	if len(parts) < minParts {
 		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
 	}
 	datePart := parts[0]
-	timePart := strings.TrimSuffix(parts[1], filepath.Ext(parts[1]))
+	timePart := parts[1]
 	dateTimeStr := datePart + "_" + timePart
 	return ParseDateTimeString(dateTimeStr)
 }
@@ -276,6 +285,7 @@ func ParseDateTimeString(datetime string) (time.Time, error) {
 	return dateTime, nil
 }
 
+// formatDateTimeToString is only used for legacy format display/comparison
 func formatDateTimeToString(dateTime time.Time) string {
 	return dateTime.Format("2006-01-02_15-04-05")
 }
@@ -370,10 +380,12 @@ func cacheFirstVid(first *videoInfo, current videoInfo) {
 // generateOutputFilename generates the output filename for the video file.
 func generateOutputFilePath(camName, fromStr, metadata, path string) string {
 	var outputFilename string
+	timestamp := time.Now().Unix()
+	
 	if metadata == "" {
-		outputFilename = fmt.Sprintf("%s_%s.%s", camName, fromStr, defaultVideoFormat)
+		outputFilename = fmt.Sprintf("%s_%d.%s", camName, timestamp, defaultVideoFormat)
 	} else {
-		outputFilename = fmt.Sprintf("%s_%s_%s.%s", camName, fromStr, metadata, defaultVideoFormat)
+		outputFilename = fmt.Sprintf("%s_%d_%s.%s", camName, timestamp, metadata, defaultVideoFormat)
 	}
 	return filepath.Join(path, outputFilename)
 }
