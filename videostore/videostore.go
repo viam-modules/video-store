@@ -127,6 +127,9 @@ func (r *SaveRequest) Validate() error {
 	if r.From.After(r.To) {
 		return errors.New("'from' timestamp is after 'to' timestamp")
 	}
+	if r.To.After(time.Now()) {
+		return errors.New("'to' timestamp is in the future")
+	}
 	return nil
 }
 
@@ -330,6 +333,9 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 		return nil, err
 	}
 	vs.logger.Debug("save command received")
+	if err := r.Validate(); err != nil {
+		return nil, err
+	}
 	uploadFilePath := generateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
 		formatDateTimeToString(r.From),
@@ -373,7 +379,7 @@ func (vs *videostore) fetchFrames(ctx context.Context, cam camera.Camera) {
 			}
 			bytes, metadata, err := cam.Image(ctx, mimeTypeReq, nil)
 			if err != nil {
-				vs.logger.Warn("failed to get frame from camera", err)
+				vs.logger.Warn("failed to get frame from camera: ", err)
 				time.Sleep(retryInterval * time.Second)
 				continue
 			}
@@ -387,13 +393,13 @@ func (vs *videostore) fetchFrames(ctx context.Context, cam camera.Camera) {
 				case mimeTypeYUYV:
 					frame, err = mimeHandler.yuyvToYUV420p(bytes)
 					if err != nil {
-						vs.logger.Error("failed to convert yuyv422 to yuv420p", err)
+						vs.logger.Error("failed to convert yuyv422 to yuv420p: ", err)
 						return
 					}
 				case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
 					frame, err = mimeHandler.decodeJPEG(bytes)
 					if err != nil {
-						vs.logger.Error("failed to decode jpeg", err)
+						vs.logger.Error("failed to decode jpeg: ", err)
 						return
 					}
 				default:
