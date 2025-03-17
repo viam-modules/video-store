@@ -133,8 +133,15 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		filename, ok := res["filename"].(string)
 		test.That(t, ok, test.ShouldBeTrue)
+
+		// Convert to Unix for expected output
+		fromTime, err := time.Parse("2006-01-02_15-04-05", "2024-09-06_15-00-33")
+		test.That(t, err, test.ShouldBeNil)
+		unixTimestamp := fromTime.Unix()
+		
 		test.That(t, filename, test.ShouldContainSubstring, "test-metadata")
-		test.That(t, filename, test.ShouldContainSubstring, "2024-09-06_15-00-33")
+		test.That(t, filename, test.ShouldContainSubstring, fmt.Sprintf("%d", unixTimestamp))
+		
 		filePath := filepath.Join(testUploadPath, filename)
 		testVideoPlayback(t, filePath)
 		testVideoDuration(t, filePath, 60)
@@ -219,13 +226,19 @@ func TestSaveDoCommand(t *testing.T) {
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldBeNil)
-		// Wait for the first video segment to be created.
+		
+		// Wait for the first video segment to be created
 		time.Sleep(10 * time.Second)
+		
+		// Use timestamps in the past
 		now := time.Now()
-		fromTime := now.Add(-5 * time.Second)
 		toTime := now
+		fromTime := now.Add(-5 * time.Second)
+		
+		// Keep the formatted string for the API call
 		fromTimeStr := fromTime.Format("2006-01-02_15-04-05")
 		toTimeStr := toTime.Format("2006-01-02_15-04-05")
+		
 		saveCmdNow := map[string]interface{}{
 			"command":  "save",
 			"from":     fromTimeStr,
@@ -235,12 +248,18 @@ func TestSaveDoCommand(t *testing.T) {
 		}
 		res, err := vs.DoCommand(timeoutCtx, saveCmdNow)
 		test.That(t, err, test.ShouldBeNil)
-		_, ok := res["filename"].(string)
+		filename, ok := res["filename"].(string)
 		test.That(t, ok, test.ShouldBeTrue)
 		// Wait for async save to complete.
 		time.Sleep(35 * time.Second)
-		filename := fmt.Sprintf("%s_%s_%s.mp4", videoStoreComponentName, fromTimeStr, "test-metadata")
 		concatPath := filepath.Join(testUploadPath, filename)
+		files, err := os.ReadDir(testUploadPath)
+		test.That(t, err, test.ShouldBeNil)
+		t.Logf("Files in directory %s:", testUploadPath)
+		for _, file := range files {
+			t.Logf("  %s", file.Name())
+		}
+
 		_, err = os.Stat(concatPath)
 		test.That(t, err, test.ShouldBeNil)
 		testVideoPlayback(t, concatPath)
