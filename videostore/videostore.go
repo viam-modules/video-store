@@ -301,7 +301,6 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 	vs.logger.Debug("fetch command received")
 	fetchFilePath := generateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
-		formatDateTimeToString(r.From),
 		"",
 		tempPath)
 
@@ -338,7 +337,6 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	}
 	uploadFilePath := generateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
-		formatDateTimeToString(r.From),
 		r.Metadata,
 		vs.config.Storage.UploadPath,
 	)

@@ -378,10 +378,10 @@ func cacheFirstVid(first *videoInfo, current videoInfo) {
 }
 
 // generateOutputFilename generates the output filename for the video file.
-func generateOutputFilePath(camName, fromStr, metadata, path string) string {
+func generateOutputFilePath(camName, metadata, path string) string {
 	var outputFilename string
 	timestamp := time.Now().Unix()
-	
+
 	if metadata == "" {
 		outputFilename = fmt.Sprintf("%s_%d.%s", camName, timestamp, defaultVideoFormat)
 	} else {
