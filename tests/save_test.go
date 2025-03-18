@@ -13,6 +13,8 @@ import (
 	"go.viam.com/test"
 )
 
+const timeFormat = "2006-01-02_15-04-05"
+
 func TestSaveDoCommand(t *testing.T) {
 	storagePath, err := filepath.Abs(artifactStoragePath)
 	test.That(t, err, test.ShouldBeNil)
@@ -136,7 +138,7 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, ok, test.ShouldBeTrue)
 
 		// Convert to Unix for expected output
-		fromTime, err := time.Parse("2006-01-02_15-04-05", "2024-09-06_15-00-33")
+		fromTime, err := time.Parse(timeFormat, "2024-09-06_15-00-33")
 		test.That(t, err, test.ShouldBeNil)
 		unixTimestamp := fromTime.Unix()
 
@@ -232,11 +234,11 @@ func TestSaveDoCommand(t *testing.T) {
 		time.Sleep(10 * time.Second)
 
 		now := time.Now()
-		toTime := now
 		fromTime := now.Add(-5 * time.Second)
+		toTime := now
 
-		fromTimeStr := fromTime.Format("2006-01-02_15-04-05")
-		toTimeStr := toTime.Format("2006-01-02_15-04-05")
+		fromTimeStr := fromTime.Format(timeFormat)
+		toTimeStr := toTime.Format(timeFormat)
 
 		saveCmdNow := map[string]interface{}{
 			"command":  "save",
