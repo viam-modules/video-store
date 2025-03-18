@@ -233,26 +233,20 @@ func TestExtractDateTimeFromFilename(t *testing.T) {
 	}{
 		{
 			name:         "Unix timestamp format",
-			filename:     "camera_1694019633.mp4",
-			expectedTime: time.Unix(1694019633, 0).UTC(),
+			filename:     "1742334891.mp4",
+			expectedTime: time.Unix(1742334891, 0).UTC(),
 		},
 		{
 			name:     "Legacy format (local time)",
-			filename: "camera_2024-09-06_15-00-33.mp4",
-			// 15:00:33 EDT (UTC-4) is equivalent to 19:00:33 UTC
-			expectedTime: time.Date(2024, 9, 6, 19, 0, 33, 0, time.UTC),
+			filename: "2025-03-18_16-45-47.mp4",
+			// Parse in local time and convert to UTC to match the function's behavior
+			expectedTime: time.Date(2025, 3, 18, 16, 45, 47, 0, time.Local).UTC(),
 		},
 		{
 			name:           "Invalid format",
-			filename:       "camera_invalid.mp4",
+			filename:       "invalid.mp4",
 			expectedTime:   time.Time{},
-			expectedErrMsg: "invalid file name: camera_invalid.mp4",
-		},
-		{
-			name:           "Missing timezone",
-			filename:       "camera_2024-09-06_15-00-33.mp4",
-			expectedTime:   time.Time{},
-			expectedErrMsg: "timezone must be provided for parsing legacy format timestamps",
+			expectedErrMsg: "invalid file name: invalid.mp4",
 		},
 	}
 

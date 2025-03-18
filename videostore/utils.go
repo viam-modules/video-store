@@ -266,21 +266,11 @@ func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 		return time.Unix(timestamp, 0).UTC(), nil
 	}
 
-	// Parse legacy format using system local timezone
-	const minParts = 2
-	parts := strings.Split(nameWithoutExt, "_")
-	if len(parts) < minParts {
-		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
-	}
-	datePart := parts[0]
-	timePart := parts[1]
-	dateTimeStr := datePart + "_" + timePart
-
-	// Parse in local timezone and convert to UTC
-	//nolint:gosmopolitan: this is why we made localtime a legacy format.
-	timeInLocal, err := time.ParseInLocation("2006-01-02_15-04-05", dateTimeStr, time.Local)
+	//nolint:gosmopolitan // Legacy format timestamps must be parsed in local time unfortunately.
+	// Hence why it is the legacy format.
+	timeInLocal, err := time.ParseInLocation("2006-01-02_15-04-05", nameWithoutExt, time.Local)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
 	}
 	return timeInLocal.UTC(), nil
 }
