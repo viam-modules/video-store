@@ -92,6 +92,20 @@ func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 			outputPatternCStr,
 			C.int(width),
 			C.int(height))
+	case CodecTypeMPEG4:
+		ret = C.video_store_raw_seg_init_mpeg4(
+			&cRS,
+			C.int(rs.segmentSeconds),
+			outputPatternCStr,
+			C.int(width),
+			C.int(height))
+	case CodecTypeMJPEG:
+		ret = C.video_store_raw_seg_init_mjpeg(
+			&cRS,
+			C.int(rs.segmentSeconds),
+			outputPatternCStr,
+			C.int(width),
+			C.int(height))
 	default:
 		return fmt.Errorf("rawSegmenter.Init called on invalid codec %s", codec)
 	}
