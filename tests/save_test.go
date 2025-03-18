@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +14,14 @@ import (
 	"go.viam.com/test"
 )
 
-const timeFormat = "2006-01-02_15-04-05"
+const (
+	timeFormat            = "2006-01-02_15-04-05"
+	validFromTimestamp    = "2024-09-06_15-00-33"
+	validToTimestamp      = "2024-09-06_15-01-33"
+	invalidFromTimestamp  = "2024-09-06_14-00-03"
+	invalidToTimestamp    = "3024-09-06_15-00-33"
+	invalidDatetimeFormat = "2024/09/06 15:01:33"
+)
 
 func TestSaveDoCommand(t *testing.T) {
 	storagePath, err := filepath.Abs(artifactStoragePath)
@@ -85,32 +93,32 @@ func TestSaveDoCommand(t *testing.T) {
 	// Valid time range
 	saveCmd1 := map[string]interface{}{
 		"command":  "save",
-		"from":     "2024-09-06_15-00-33",
-		"to":       "2024-09-06_15-01-33",
+		"from":     validFromTimestamp,
+		"to":       validToTimestamp,
 		"metadata": "test-metadata",
 	}
 
 	// Invalid time range
 	saveCmd2 := map[string]interface{}{
 		"command":  "save",
-		"from":     "2024-09-06_14-00-03",
-		"to":       "2024-09-06_15-01-33",
+		"from":     invalidFromTimestamp,
+		"to":       validToTimestamp,
 		"metadata": "test-metadata",
 	}
 
 	// Invalid datetime format
 	saveCmd3 := map[string]interface{}{
 		"command":  "save",
-		"from":     "2024-09-06_15-00-33",
-		"to":       "2024/09/06 15:01:33",
+		"from":     validFromTimestamp,
+		"to":       invalidDatetimeFormat,
 		"metadata": "test-metadata",
 	}
 
 	// Valid async save
 	saveCmd4 := map[string]interface{}{
 		"command":  "save",
-		"from":     "2024-09-06_15-00-33",
-		"to":       "2024-09-06_15-01-33",
+		"from":     validFromTimestamp,
+		"to":       validToTimestamp,
 		"metadata": "test-metadata",
 		"async":    true,
 	}
@@ -118,8 +126,8 @@ func TestSaveDoCommand(t *testing.T) {
 	// Invalid async save with future timestamp
 	saveCmd5 := map[string]interface{}{
 		"command":  "save",
-		"from":     "2024-09-06_15-00-33",
-		"to":       "3024-09-06_15-00-33",
+		"from":     validFromTimestamp,
+		"to":       invalidToTimestamp,
 		"metadata": "test-metadata",
 		"async":    true,
 	}
@@ -137,13 +145,17 @@ func TestSaveDoCommand(t *testing.T) {
 		filename, ok := res["filename"].(string)
 		test.That(t, ok, test.ShouldBeTrue)
 
-		// Convert to Unix for expected output
-		fromTime, err := time.Parse(timeFormat, "2024-09-06_15-00-33")
+		// Calculate expected timestamp from fromTime
+		fromTime, err := time.Parse(timeFormat, validFromTimestamp)
 		test.That(t, err, test.ShouldBeNil)
-		unixTimestamp := fromTime.Unix()
-
+		expectedUnix := fromTime.Unix()
+		// Extract actual timestamp from filename
+		parts := strings.Split(strings.TrimSuffix(filename, ".mp4"), "_")
+		actualUnix, err := strconv.ParseInt(parts[1], 10, 64)
+		test.That(t, err, test.ShouldBeNil)
+		// Assert actual matches expected
+		test.That(t, actualUnix, test.ShouldEqual, expectedUnix)
 		test.That(t, filename, test.ShouldContainSubstring, "test-metadata")
-		test.That(t, filename, test.ShouldContainSubstring, strconv.FormatInt(unixTimestamp, 10))
 
 		filePath := filepath.Join(testUploadPath, filename)
 		testVideoPlayback(t, filePath)
@@ -253,6 +265,13 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, ok, test.ShouldBeTrue)
 		// Wait for async save to complete.
 		time.Sleep(35 * time.Second)
+		
+		expectedFilename := fmt.Sprintf("%s_%d_%s.mp4", 
+			videoStoreComponentName, 
+			fromTime.Unix(), 
+			"test-metadata")
+		test.That(t, filename, test.ShouldEqual, expectedFilename)
+		
 		concatPath := filepath.Join(testUploadPath, filename)
 		_, err = os.Stat(concatPath)
 		test.That(t, err, test.ShouldBeNil)
