@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -138,10 +139,10 @@ func TestSaveDoCommand(t *testing.T) {
 		fromTime, err := time.Parse("2006-01-02_15-04-05", "2024-09-06_15-00-33")
 		test.That(t, err, test.ShouldBeNil)
 		unixTimestamp := fromTime.Unix()
-		
+
 		test.That(t, filename, test.ShouldContainSubstring, "test-metadata")
-		test.That(t, filename, test.ShouldContainSubstring, fmt.Sprintf("%d", unixTimestamp))
-		
+		test.That(t, filename, test.ShouldContainSubstring, strconv.FormatInt(unixTimestamp, 10))
+
 		filePath := filepath.Join(testUploadPath, filename)
 		testVideoPlayback(t, filePath)
 		testVideoDuration(t, filePath, 60)
@@ -226,19 +227,17 @@ func TestSaveDoCommand(t *testing.T) {
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldBeNil)
-		
-		// Wait for the first video segment to be created
+
+		// Wait for the first video segment to be created.
 		time.Sleep(10 * time.Second)
-		
-		// Use timestamps in the past
+
 		now := time.Now()
 		toTime := now
 		fromTime := now.Add(-5 * time.Second)
-		
-		// Keep the formatted string for the API call
+
 		fromTimeStr := fromTime.Format("2006-01-02_15-04-05")
 		toTimeStr := toTime.Format("2006-01-02_15-04-05")
-		
+
 		saveCmdNow := map[string]interface{}{
 			"command":  "save",
 			"from":     fromTimeStr,
@@ -253,13 +252,6 @@ func TestSaveDoCommand(t *testing.T) {
 		// Wait for async save to complete.
 		time.Sleep(35 * time.Second)
 		concatPath := filepath.Join(testUploadPath, filename)
-		files, err := os.ReadDir(testUploadPath)
-		test.That(t, err, test.ShouldBeNil)
-		t.Logf("Files in directory %s:", testUploadPath)
-		for _, file := range files {
-			t.Logf("  %s", file.Name())
-		}
-
 		_, err = os.Stat(concatPath)
 		test.That(t, err, test.ShouldBeNil)
 		testVideoPlayback(t, concatPath)
