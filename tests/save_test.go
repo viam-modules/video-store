@@ -265,13 +265,13 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, ok, test.ShouldBeTrue)
 		// Wait for async save to complete.
 		time.Sleep(35 * time.Second)
-		
-		expectedFilename := fmt.Sprintf("%s_%d_%s.mp4", 
-			videoStoreComponentName, 
-			fromTime.Unix(), 
+
+		expectedFilename := fmt.Sprintf("%s_%d_%s.mp4",
+			videoStoreComponentName,
+			fromTime.Unix(),
 			"test-metadata")
 		test.That(t, filename, test.ShouldEqual, expectedFilename)
-		
+
 		concatPath := filepath.Join(testUploadPath, filename)
 		_, err = os.Stat(concatPath)
 		test.That(t, err, test.ShouldBeNil)

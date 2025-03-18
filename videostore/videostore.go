@@ -295,6 +295,11 @@ func (vs *videostore) Segmenter() *RawSegmenter {
 }
 
 func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse, error) {
+	// Convert incoming local times to UTC for consistent timestamp handling
+	// All internal operations and stored timestamps are in UTC
+	r.From = r.From.UTC()
+	r.To = r.To.UTC()
+
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
@@ -332,10 +337,12 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
+	// Convert incoming local times to UTC for consistent timestamp handling
+	// All internal operations and stored timestamps are in UTC
+	r.From = r.From.UTC()
+	r.To = r.To.UTC()
+
 	vs.logger.Debug("save command received")
-	if err := r.Validate(); err != nil {
-		return nil, err
-	}
 	uploadFilePath := generateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
 		r.From,

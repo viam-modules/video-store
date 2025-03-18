@@ -254,16 +254,19 @@ func sortFilesByDate(files []fileWithDate) {
 }
 
 // extractDateTimeFromFilename extracts the date and time from the filename.
+// For legacy format filenames (YYYY-MM-DD_HH-mm-ss), it interprets the timestamp in the provided timezone
+// and converts to UTC. For Unix timestamp filenames, returns the UTC time directly.
+// The timezone parameter is used only for legacy format filenames.
 func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
 	nameWithoutExt := strings.TrimSuffix(baseName, filepath.Ext(baseName))
 
-	// Parse as Unix timestamp first
+	// Try parsing as Unix timestamp first
 	if timestamp, err := strconv.ParseInt(nameWithoutExt, 10, 64); err == nil {
-		return time.Unix(timestamp, 0), nil
+		return time.Unix(timestamp, 0).UTC(), nil
 	}
 
-	// Fall back to legacy format parsing
+	// Parse legacy format using system local timezone
 	const minParts = 2
 	parts := strings.Split(nameWithoutExt, "_")
 	if len(parts) < minParts {
@@ -272,7 +275,14 @@ func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	datePart := parts[0]
 	timePart := parts[1]
 	dateTimeStr := datePart + "_" + timePart
-	return ParseDateTimeString(dateTimeStr)
+
+	// Parse in local timezone and convert to UTC
+	//nolint:gosmopolitan: this is why we made localtime a legacy format.
+	timeInLocal, err := time.ParseInLocation("2006-01-02_15-04-05", dateTimeStr, time.Local)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return timeInLocal.UTC(), nil
 }
 
 // ParseDateTimeString parses a date and time string in the format "2006-01-02_15-04-05".

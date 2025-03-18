@@ -2,6 +2,7 @@ package videostore
 
 import (
 	"testing"
+	"time"
 
 	"go.viam.com/rdk/logging"
 	"go.viam.com/test"
@@ -221,4 +222,51 @@ func TestMatchStorageToRange(t *testing.T) {
 // float64Ptr returns a pointer to the given float64 value.
 func float64Ptr(f float64) *float64 {
 	return &f
+}
+
+func TestExtractDateTimeFromFilename(t *testing.T) {
+	tests := []struct {
+		name           string
+		filename       string
+		expectedTime   time.Time
+		expectedErrMsg string
+	}{
+		{
+			name:         "Unix timestamp format",
+			filename:     "camera_1694019633.mp4",
+			expectedTime: time.Unix(1694019633, 0).UTC(),
+		},
+		{
+			name:     "Legacy format (local time)",
+			filename: "camera_2024-09-06_15-00-33.mp4",
+			// 15:00:33 EDT (UTC-4) is equivalent to 19:00:33 UTC
+			expectedTime: time.Date(2024, 9, 6, 19, 0, 33, 0, time.UTC),
+		},
+		{
+			name:           "Invalid format",
+			filename:       "camera_invalid.mp4",
+			expectedTime:   time.Time{},
+			expectedErrMsg: "invalid file name: camera_invalid.mp4",
+		},
+		{
+			name:           "Missing timezone",
+			filename:       "camera_2024-09-06_15-00-33.mp4",
+			expectedTime:   time.Time{},
+			expectedErrMsg: "timezone must be provided for parsing legacy format timestamps",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := extractDateTimeFromFilename(tt.filename)
+			if tt.expectedErrMsg != "" {
+				test.That(t, err, test.ShouldNotBeNil)
+				test.That(t, err.Error(), test.ShouldEqual, tt.expectedErrMsg)
+				return
+			}
+			test.That(t, err, test.ShouldBeNil)
+			test.That(t, got.Equal(tt.expectedTime), test.ShouldBeTrue)
+			test.That(t, got.Location(), test.ShouldEqual, time.UTC)
+		})
+	}
 }
