@@ -131,13 +131,13 @@ func TestMatchStorageToRange(t *testing.T) {
 
 	t.Run("Match request within gap in data", func(t *testing.T) {
 		fileList := []string{
-			artifactStoragePath + unixToFilename(segmentUnix1),
-			artifactStoragePath + unixToFilename(segmentUnix2),
-			artifactStoragePath + unixToFilename(segmentUnix3),
+			artifactStoragePath + unixToFilename(segmentUnix1), // ends at +30s
+			artifactStoragePath + unixToFilename(segmentUnix3), // starts at +60s
 		}
 		fileWithDateList := createAndSortFileWithDateList(fileList)
-		startTime := time.Unix(segmentUnix2-10, 0) // 10s before second segment
-		endTime := time.Unix(segmentUnix2-8, 0)    // 8s before second segment
+		// Look for a range entirely within the gap between segmentUnix1 and segmentUnix3
+		startTime := time.Unix(segmentUnix1+35, 0) // 5s after first segment ends
+		endTime := time.Unix(segmentUnix1+40, 0)   // 10s after first segment ends
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
 		test.That(t, matchedFiles, test.ShouldBeEmpty)
 	})
