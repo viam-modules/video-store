@@ -1,6 +1,7 @@
 package videostore
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -8,11 +9,29 @@ import (
 	"go.viam.com/test"
 )
 
-const artifactStoragePath = "../.artifact/data/"
+const (
+	artifactStoragePath = "../.artifact/data/"
+
+	// Sequential segments from actual video files (30 second intervals).
+	segmentUnix1 int64 = 1725634803 // First segment
+	segmentUnix2 int64 = 1725634833 // +30s
+	segmentUnix3 int64 = 1725634863 // +30s
+	segmentUnix4 int64 = 1725634893 // +30s
+	segmentUnix5 int64 = 1725634923 // +30s
+)
+
+// Helper function to create filenames.
+func unixToFilename(unix int64) string {
+	return fmt.Sprintf("%d.mp4", unix)
+}
+
+func unixToLegacyFilename(unix int64) string {
+	return time.Unix(unix, 0).In(time.Local).Format("2006-01-02_15-04-05.mp4")
+}
 
 func TestGetVideoInfo(t *testing.T) {
 	t.Run("Valid video file succeeds", func(t *testing.T) {
-		info, err := getVideoInfo(artifactStoragePath + "2024-09-06_15-00-03.mp4")
+		info, err := getVideoInfo(artifactStoragePath + unixToFilename(segmentUnix1))
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, info.duration.Seconds(), test.ShouldEqual, 30.0)
 		test.That(t, info.width, test.ShouldEqual, 640)
@@ -61,36 +80,32 @@ func TestMatchStorageToRange(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 	t.Run("Match request within one segment", func(t *testing.T) {
 		fileList := []string{
-			artifactStoragePath + "2025-03-05_16-36-20.mp4",
-			artifactStoragePath + "2025-03-05_16-36-59.mp4",
-			artifactStoragePath + "2025-03-05_16-37-38.mp4",
+			artifactStoragePath + unixToFilename(segmentUnix1),
+			artifactStoragePath + unixToFilename(segmentUnix2),
+			artifactStoragePath + unixToFilename(segmentUnix3),
 		}
 		fileWithDateList := createAndSortFileWithDateList(fileList)
-		startTime, err := ParseDateTimeString("2025-03-05_16-36-30")
-		test.That(t, err, test.ShouldBeNil)
-		endTime, err := ParseDateTimeString("2025-03-05_16-36-40")
-		test.That(t, err, test.ShouldBeNil)
+		startTime := time.Unix(segmentUnix1+10, 0) // +10 seconds from first file
+		endTime := time.Unix(segmentUnix1+20, 0)   // +20 seconds from first file
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
 		expected := []concatFileEntry{
-			{filePath: artifactStoragePath + "2025-03-05_16-36-20.mp4", inpoint: float64Ptr(10.00), outpoint: float64Ptr(20.00)},
+			{filePath: artifactStoragePath + unixToFilename(segmentUnix1), inpoint: float64Ptr(10.00), outpoint: float64Ptr(20.00)},
 		}
 		test.That(t, matchedFiles, test.ShouldResemble, expected)
 	})
 
 	t.Run("Match request spanning multiple segments", func(t *testing.T) {
 		fileList := []string{
-			artifactStoragePath + "2024-09-06_15-00-03.mp4",
-			artifactStoragePath + "2024-09-06_15-00-33.mp4",
-			artifactStoragePath + "2024-09-06_15-01-03.mp4",
+			artifactStoragePath + unixToFilename(segmentUnix1),
+			artifactStoragePath + unixToFilename(segmentUnix2),
+			artifactStoragePath + unixToFilename(segmentUnix3),
 		}
 		fileWithDateList := createAndSortFileWithDateList(fileList)
-		startTime, err := ParseDateTimeString("2024-09-06_15-00-10")
-		test.That(t, err, test.ShouldBeNil)
-		endTime, err := ParseDateTimeString("2024-09-06_15-01-00")
-		test.That(t, err, test.ShouldBeNil)
+		startTime := time.Unix(segmentUnix1+7, 0) // +7 seconds from first file
+		endTime := time.Unix(segmentUnix2+27, 0)  // +27 seconds from second file
 		expected := []concatFileEntry{
-			{filePath: artifactStoragePath + "2024-09-06_15-00-03.mp4", inpoint: float64Ptr(7.00)},
-			{filePath: artifactStoragePath + "2024-09-06_15-00-33.mp4", outpoint: float64Ptr(27.00)},
+			{filePath: artifactStoragePath + unixToFilename(segmentUnix1), inpoint: float64Ptr(7.00)},
+			{filePath: artifactStoragePath + unixToFilename(segmentUnix2), outpoint: float64Ptr(27.00)},
 		}
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
 		test.That(t, matchedFiles, test.ShouldResemble, expected)
@@ -98,19 +113,17 @@ func TestMatchStorageToRange(t *testing.T) {
 
 	t.Run("Match request along segment boundary", func(t *testing.T) {
 		fileList := []string{
-			artifactStoragePath + "2024-09-06_15-00-03.mp4",
-			artifactStoragePath + "2024-09-06_15-00-33.mp4",
-			artifactStoragePath + "2024-09-06_15-01-03.mp4",
-			artifactStoragePath + "2024-09-06_15-01-33.mp4",
+			artifactStoragePath + unixToFilename(segmentUnix1),
+			artifactStoragePath + unixToFilename(segmentUnix2),
+			artifactStoragePath + unixToFilename(segmentUnix3),
+			artifactStoragePath + unixToFilename(segmentUnix4),
 		}
 		fileWithDateList := createAndSortFileWithDateList(fileList)
-		startTime, err := ParseDateTimeString("2024-09-06_15-00-33")
-		test.That(t, err, test.ShouldBeNil)
-		endTime, err := ParseDateTimeString("2024-09-06_15-01-33")
-		test.That(t, err, test.ShouldBeNil)
+		startTime := time.Unix(segmentUnix2, 0) // Start at second segment
+		endTime := time.Unix(segmentUnix4, 0)   // End at fourth segment
 		expected := []concatFileEntry{
-			{filePath: artifactStoragePath + "2024-09-06_15-00-33.mp4"},
-			{filePath: artifactStoragePath + "2024-09-06_15-01-03.mp4"},
+			{filePath: artifactStoragePath + unixToFilename(segmentUnix2)},
+			{filePath: artifactStoragePath + unixToFilename(segmentUnix3)},
 		}
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
 		test.That(t, matchedFiles, test.ShouldResemble, expected)
@@ -118,15 +131,13 @@ func TestMatchStorageToRange(t *testing.T) {
 
 	t.Run("Match request within gap in data", func(t *testing.T) {
 		fileList := []string{
-			artifactStoragePath + "2025-03-05_16-36-20.mp4",
-			artifactStoragePath + "2025-03-05_16-36-59.mp4",
-			artifactStoragePath + "2025-03-05_16-37-38.mp4",
+			artifactStoragePath + unixToFilename(segmentUnix1),
+			artifactStoragePath + unixToFilename(segmentUnix2),
+			artifactStoragePath + unixToFilename(segmentUnix3),
 		}
 		fileWithDateList := createAndSortFileWithDateList(fileList)
-		startTime, err := ParseDateTimeString("2025-03-05_16-36-53")
-		test.That(t, err, test.ShouldBeNil)
-		endTime, err := ParseDateTimeString("2025-03-05_16-36-55")
-		test.That(t, err, test.ShouldBeNil)
+		startTime := time.Unix(segmentUnix2-10, 0) // 10s before second segment
+		endTime := time.Unix(segmentUnix2-8, 0)    // 8s before second segment
 		matchedFiles := matchStorageToRange(fileWithDateList, startTime, endTime, logger)
 		test.That(t, matchedFiles, test.ShouldBeEmpty)
 	})
@@ -233,14 +244,13 @@ func TestExtractDateTimeFromFilename(t *testing.T) {
 	}{
 		{
 			name:         "Unix timestamp format",
-			filename:     "1742334891.mp4",
-			expectedTime: time.Unix(1742334891, 0).UTC(),
+			filename:     unixToFilename(segmentUnix1),
+			expectedTime: time.Unix(segmentUnix1, 0).UTC(),
 		},
 		{
-			name:     "Legacy format (local time)",
-			filename: "2025-03-18_16-45-47.mp4",
-			// Parse in local time and convert to UTC to match the function's behavior
-			expectedTime: time.Date(2025, 3, 18, 16, 45, 47, 0, time.Local).UTC(),
+			name:         "Legacy format (local time)",
+			filename:     unixToLegacyFilename(segmentUnix1),
+			expectedTime: time.Unix(segmentUnix1, 0).UTC(),
 		},
 		{
 			name:           "Invalid format",
