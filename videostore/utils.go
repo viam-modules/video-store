@@ -254,9 +254,9 @@ func sortFilesByDate(files []fileWithDate) {
 }
 
 // extractDateTimeFromFilename extracts the date and time from the filename.
-// For legacy format filenames (YYYY-MM-DD_HH-mm-ss), it interprets the timestamp in the provided timezone
+// For datetime format filenames (YYYY-MM-DD_HH-mm-ss), it interprets the timestamp in the provided timezone
 // and converts to UTC. For Unix timestamp filenames, returns the UTC time directly.
-// The timezone parameter is used only for legacy format filenames.
+// The timezone parameter is used only for datetime format filenames.
 func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
 	nameWithoutExt := strings.TrimSuffix(baseName, filepath.Ext(baseName))
@@ -266,8 +266,8 @@ func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 		return time.Unix(timestamp, 0).UTC(), nil
 	}
 
-	//nolint:gosmopolitan // Legacy format timestamps must be parsed in local time unfortunately.
-	// Hence why it is the legacy format.
+	//nolint:gosmopolitan // datetime format timestamps must be parsed in local time unfortunately.
+	// Hence why it is the legacy format for storing our source of truth segments.
 	timeInLocal, err := time.ParseInLocation("2006-01-02_15-04-05", nameWithoutExt, time.Local)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
@@ -283,11 +283,6 @@ func ParseDateTimeString(datetime string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return dateTime, nil
-}
-
-// formatDateTimeToString is only used for legacy format display/comparison
-func formatDateTimeToString(dateTime time.Time) string {
-	return dateTime.Format("2006-01-02_15-04-05")
 }
 
 // matchStorageToRange identifies video files that overlap with the requested time range (start to end)
@@ -377,17 +372,22 @@ func cacheFirstVid(first *videoInfo, current videoInfo) {
 	}
 }
 
-// generateOutputFilename generates the output filename for the video file.
-func generateOutputFilePath(camName string, timestamp time.Time, metadata, path string) string {
-	var outputFilename string
-	unixTime := timestamp.Unix()
+// generateOutputFilePath generates the output filename for the video file.
+func generateOutputFilePath(prefix string, timestamp time.Time, metadata, dir string) string {
+	// Format timestamp in local time for user-friendly filenames
+	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time for outputs.
+	// We do not rely on localtime strftime for actual segments. They are stored in Unix UTC time.
+	localTime := timestamp.In(time.Local)
+	filename := localTime.Format("2006-01-02_15-04-05")
 
-	if metadata == "" {
-		outputFilename = fmt.Sprintf("%s_%d.%s", camName, unixTime, defaultVideoFormat)
-	} else {
-		outputFilename = fmt.Sprintf("%s_%d_%s.%s", camName, unixTime, metadata, defaultVideoFormat)
+	if prefix != "" {
+		filename = fmt.Sprintf("%s_%s", prefix, filename)
 	}
-	return filepath.Join(path, outputFilename)
+	if metadata != "" {
+		filename = fmt.Sprintf("%s_%s", filename, metadata)
+	}
+
+	return filepath.Join(dir, filename+".mp4")
 }
 
 // validateTimeRange validates the start and end time range against storage files.

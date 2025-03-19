@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -148,13 +146,11 @@ func TestSaveDoCommand(t *testing.T) {
 		// Calculate expected timestamp from fromTime
 		fromTime, err := time.Parse(timeFormat, validFromTimestamp)
 		test.That(t, err, test.ShouldBeNil)
-		expectedUnix := fromTime.Unix()
-		// Extract actual timestamp from filename
-		parts := strings.Split(strings.TrimSuffix(filename, ".mp4"), "_")
-		actualUnix, err := strconv.ParseInt(parts[1], 10, 64)
-		test.That(t, err, test.ShouldBeNil)
-		// Assert actual matches expected
-		test.That(t, actualUnix, test.ShouldEqual, expectedUnix)
+		expectedFilename := fmt.Sprintf("%s_%s_%s.mp4",
+			videoStoreComponentName,
+			fromTime.Format(timeFormat),
+			"test-metadata")
+		test.That(t, filename, test.ShouldEqual, expectedFilename)
 		test.That(t, filename, test.ShouldContainSubstring, "test-metadata")
 
 		filePath := filepath.Join(testUploadPath, filename)
@@ -266,9 +262,9 @@ func TestSaveDoCommand(t *testing.T) {
 		// Wait for async save to complete.
 		time.Sleep(35 * time.Second)
 
-		expectedFilename := fmt.Sprintf("%s_%d_%s.mp4",
+		expectedFilename := fmt.Sprintf("%s_%s_%s.mp4",
 			videoStoreComponentName,
-			fromTime.Unix(),
+			fromTime.Format(timeFormat),
 			"test-metadata")
 		test.That(t, filename, test.ShouldEqual, expectedFilename)
 

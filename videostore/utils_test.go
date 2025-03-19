@@ -25,7 +25,7 @@ func unixToFilename(unix int64) string {
 	return fmt.Sprintf("%d.mp4", unix)
 }
 
-func unixToLegacyFilename(unix int64) string {
+func unixToDatetimeFilename(unix int64) string {
 	return time.Unix(unix, 0).In(time.Local).Format("2006-01-02_15-04-05.mp4")
 }
 
@@ -248,8 +248,8 @@ func TestExtractDateTimeFromFilename(t *testing.T) {
 			expectedTime: time.Unix(segmentUnix1, 0).UTC(),
 		},
 		{
-			name:         "Legacy format (local time)",
-			filename:     unixToLegacyFilename(segmentUnix1),
+			name:         "Legacy datetime format (local time)",
+			filename:     unixToDatetimeFilename(segmentUnix1),
 			expectedTime: time.Unix(segmentUnix1, 0).UTC(),
 		},
 		{

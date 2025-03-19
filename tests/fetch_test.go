@@ -14,7 +14,7 @@ import (
 
 // pathForFetchCmd constructs the .mp4 path based on the "from" field in the command.
 func pathForFetchCmd(fromTimestamp string) string {
-	// Parse the legacy format timestamp
+	// Parse the datetime format timestamp
 	t, err := time.Parse("2006-01-02_15-04-05", fromTimestamp)
 	if err != nil {
 		return "/tmp/" + videoStoreComponentName + "_" + fromTimestamp + ".mp4"
