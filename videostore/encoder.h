@@ -14,18 +14,20 @@ typedef struct video_store_h264_encoder {
 
   AVFrame *encoderFrame;
   AVCodecContext *encoderCtx;
-} viam_encoder;
+} video_store_h264_encoder;
 
 int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
                                   const int segmentSeconds,              // IN
                                   const char *outputPattern,             // IN
                                   const int width,                       // IN
                                   const int height,                      // IN
-                                  const int64_t bitrate, const int frameRate,
-                                  const char *preset);
+                                  const int64_t bitrate,                 // IN
+                                  const int frameRate,                   // IN
+                                  const char *preset                     // IN
+);
 
-int video_store_h264_encoder_frame(struct video_store_h264_encoder *rs, // IN
-                                   uint8_t *payload,                    // IN
+int video_store_h264_encoder_frame(struct video_store_h264_encoder *pE, // IN
+                                   char *payload,                       // IN
                                    int payloadSize                      // IN
 );
 

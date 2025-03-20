@@ -2,6 +2,7 @@
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
 #include "libavutil/log.h"
+#include <stdint.h>
 int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
                                   const int segmentSeconds,              // IN
                                   const char *outputPattern,             // IN
@@ -293,13 +294,13 @@ cleanup:
 }
 
 int video_store_h264_encoder_frame(struct video_store_h264_encoder *pE, // IN
-                                   uint8_t *payload,                    // IN
+                                   char *payload,                       // IN
                                    int payloadSize                      // IN
 ) {
   // fill a jpeg pkt with the frame bytes
   int ret = VIDEO_STORE_ENCODER_RESP_ERROR;
   AVPacket decoderPkt = {0};
-  decoderPkt.data = payload;
+  decoderPkt.data = (uint8_t *)payload;
   decoderPkt.size = payloadSize;
   AVPacket *encoderPkt = NULL;
   // The mjpeg decoder can figure out width and height from the frame bytes.
