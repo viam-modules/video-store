@@ -79,12 +79,13 @@ func (e *encoder) initialize(width, height int) error {
 	presetCStr := C.CString(e.preset)
 	defer C.free(unsafe.Pointer(presetCStr))
 
+	e.logger.Infof("video_store_h264_encoder_init: e.segmentSeconds: %d, path: %s, width: %d, height: %d, bitrate: %d, framerate: %d, preset: %s", e.segmentSeconds, e.storagePath+"/"+outputPattern, e.width, e.height, e.bitrate, e.framerate, e.preset)
 	ret := C.video_store_h264_encoder_init(
 		&cEncoder,
 		C.int(e.segmentSeconds),
 		outputPatternCStr,
-		C.int(e.width),
-		C.int(e.height),
+		C.int(width),
+		C.int(height),
 		C.int64_t(e.bitrate),
 		C.int(e.framerate),
 		presetCStr,
@@ -96,6 +97,8 @@ func (e *encoder) initialize(width, height int) error {
 		return err
 	}
 	e.cEncoder = cEncoder
+	e.width = width
+	e.height = height
 	return nil
 }
 

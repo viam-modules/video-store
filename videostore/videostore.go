@@ -391,6 +391,7 @@ func fetchAndProcessFrames(
 					logger.Warnf("encoder init failed: %s", err.Error())
 					continue
 				}
+				initialized = true
 			}
 			encoder.encode(data, time.Now())
 		}
