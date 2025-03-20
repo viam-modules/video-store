@@ -49,7 +49,7 @@ type component struct {
 }
 
 func newComponent(
-	ctx context.Context,
+	_ context.Context,
 	deps resource.Dependencies,
 	conf resource.Config,
 	logger logging.Logger,
@@ -76,10 +76,17 @@ func newComponent(
 	if err != nil {
 		return nil, err
 	}
-
-	vs, err := videostore.NewFramePollingVideoStore(ctx, vsConfig, logger)
-	if err != nil {
-		return nil, err
+	var vs videostore.VideoStore
+	if vsConfig.FramePoller.Camera != nil {
+		vs, err = videostore.NewFramePollingVideoStore(vsConfig, logger)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		vs, err = videostore.NewReadOnlyVideoStore(vsConfig, logger)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &component{

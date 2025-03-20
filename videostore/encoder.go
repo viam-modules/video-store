@@ -14,6 +14,7 @@ import (
 	"unsafe"
 
 	"go.viam.com/rdk/logging"
+	rutils "go.viam.com/rdk/utils"
 )
 
 const (
@@ -48,6 +49,10 @@ func newEncoder(
 	// Initialize without codec context and source frame. We will spin up
 	// the codec context and source frame when we get the first frame or when
 	// a resize is needed.
+	mimeHandler := newMimeHandler(logger)
+	defer mimeHandler.close()
+	defaultSegmentSeconds
+	defaultVideoFormat
 	enc := &encoder{
 		logger:     logger,
 		codecCtx:   nil,
@@ -137,12 +142,52 @@ func (e *encoder) initialize(width, height int) (err error) {
 	return nil
 }
 
+type encoderFrameMimeType int
+
+const (
+	encoderFrameMimeTypeUnknown encoderFrameMimeType = iota
+	encoderFrameMimeTypeJPEG
+	encoderFrameMimeTypeYUYV
+)
+
+var toEncoderFrameMimeType = map[string]encoderFrameMimeType{
+	rutils.MimeTypeJPEG: encoderFrameMimeTypeJPEG,
+	mimeTypeYUYV:        encoderFrameMimeTypeYUYV,
+}
+
 // encode encodes the given frame and returns the encoded data
 // in bytes along with the PTS and DTS timestamps.
 // PTS is calculated based on the frame count and source framerate.
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
-func (e *encoder) encode(frame *C.AVFrame) (encodeResult, error) {
+func (e *encoder) encode(mt encoderFrameMimeType, data []byte) {
+	// TODO: move this into the struct
+	var (
+		frame *C.AVFrame
+		err   error
+	)
+	switch mt {
+	case encoderFrameMimeTypeJPEG:
+		frame, err = mimeHandler.decodeJPEG(data)
+		if err != nil {
+			e.logger.Error("failed to decode jpeg: ", err)
+			return
+		}
+	case encoderFrameMimeTypeYUYV:
+		frame, err = mimeHandler.yuyvToYUV420p(data)
+		if err != nil {
+			e.logger.Error("failed to convert yuyv422 to yuv420p: ", err)
+			return
+		}
+	default:
+		e.logger.Warn("unsupported image format", metadata.MimeType)
+		return
+	}
+	// Only reached on success.
+	if frame == nil {
+		e.logger.Debug("latest frame is not available yet")
+		return
+	}
 	result := encodeResult{
 		encodedData:      nil,
 		pts:              0,
@@ -198,8 +243,22 @@ func (e *encoder) encode(frame *C.AVFrame) (encodeResult, error) {
 	result.dts = int64(pkt.dts)
 	e.frameCount++
 
-	// return encoded data
-	return result, nil
+	if result.frameDimsChanged {
+		e.logger.Info("reinitializing segmenter due to encoder refresh")
+		err := segmenter.initialize(encoder.codecCtx)
+		if err != nil {
+			logger.Debug("failed to reinitialize segmenter", err)
+			// Hack that flags the encoder to reinitialize if segmenter fails to
+			// ensure that encoder and segmenter inits are in sync.
+			encoder.codecCtx = nil
+			continue
+		}
+	}
+	err = segmenter.writeEncodedFrame(result.encodedData, result.pts, result.dts)
+	if err != nil {
+		logger.Debug("failed to segment frame", err)
+		continue
+	}
 }
 
 func (e *encoder) close() {

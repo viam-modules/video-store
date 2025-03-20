@@ -65,7 +65,7 @@ func newSegmenter(
 }
 
 // initialize takes in a codec ctx and initializes the segmenter with the codec parameters.
-func (s *segmenter) initialize(codecCtx *C.AVCodecContext) error {
+func (s *segmenter) initialize(encoderCtx *C.AVCodecContext) error {
 	s.outCtxMu.Lock()
 	defer s.outCtxMu.Unlock()
 	if s.outCtx != nil {
@@ -93,13 +93,13 @@ func (s *segmenter) initialize(codecCtx *C.AVCodecContext) error {
 		return errors.New("failed to allocate stream")
 	}
 	stream.id = C.int(fmtCtx.nb_streams) - 1
-	stream.time_base = codecCtx.time_base
+	stream.time_base = encoderCtx.time_base
 
 	// Copy codec parameters from encoder to segment stream. This is equivalent to
 	// -c:v copy in ffmpeg cli
 	codecpar := C.avcodec_parameters_alloc()
 	defer C.avcodec_parameters_free(&codecpar)
-	if ret := C.avcodec_parameters_from_context(codecpar, codecCtx); ret < 0 {
+	if ret := C.avcodec_parameters_from_context(codecpar, encoderCtx); ret < 0 {
 		return fmt.Errorf("failed to copy codec parameters: %s", ffmpegError(ret))
 	}
 	ret = C.avcodec_parameters_copy(stream.codecpar, codecpar)
@@ -154,7 +154,7 @@ func (s *segmenter) initialize(codecCtx *C.AVCodecContext) error {
 
 	// Writing header overwrites the time_base, so we need to reset it.
 	// TODO(seanp): Figure out why this is necessary.
-	stream.time_base = codecCtx.time_base
+	stream.time_base = encoderCtx.time_base
 	stream.id = C.int(fmtCtx.nb_streams) - 1
 	s.stream = stream
 	s.outCtx = fmtCtx
