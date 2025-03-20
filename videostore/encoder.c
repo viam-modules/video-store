@@ -80,7 +80,7 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
   encoderCtx->bit_rate = bitrate;
   encoderCtx->pix_fmt = AV_PIX_FMT_YUV420P;
   encoderCtx->time_base.num = 1;
-  encoderCtx->time_base.num = frameRate;
+  encoderCtx->time_base.den = frameRate;
   encoderCtx->width = width;
   encoderCtx->height = height;
   // TODO(seanp): Do we want b frames? This could make it more complicated to
