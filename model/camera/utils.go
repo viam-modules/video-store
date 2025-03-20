@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/logging"
@@ -19,21 +20,34 @@ func getHomeDir() (string, error) {
 	return home, nil
 }
 
-// ToSaveCommand converts a do command to a *videostore.SaveRequest.
-func ToSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, error) {
+// parseTimeRange parses the from/to timestamps from a command.
+func parseTimeRange(command map[string]interface{}) (from, to time.Time, err error) {
 	fromStr, ok := command["from"].(string)
 	if !ok {
-		return nil, errors.New("from timestamp not found")
+		return time.Time{}, time.Time{}, errors.New("from timestamp not found")
 	}
-	from, err := videostore.ParseDateTimeString(fromStr)
+	from, err = videostore.ParseDateTimeString(fromStr)
 	if err != nil {
-		return nil, err
+		return time.Time{}, time.Time{}, err
 	}
 	toStr, ok := command["to"].(string)
 	if !ok {
-		return nil, errors.New("to timestamp not found")
+		return time.Time{}, time.Time{}, errors.New("to timestamp not found")
 	}
-	to, err := videostore.ParseDateTimeString(toStr)
+	to, err = videostore.ParseDateTimeString(toStr)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	// Convert incoming local times to UTC for consistent timestamp handling
+	// All internal operations and stored timestamps are in UTC
+	from = from.UTC()
+	to = to.UTC()
+	return from, to, nil
+}
+
+// ToSaveCommand converts a do command to a *videostore.SaveRequest.
+func ToSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, error) {
+	from, to, err := parseTimeRange(command)
 	if err != nil {
 		return nil, err
 	}
@@ -55,19 +69,7 @@ func ToSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, err
 
 // ToFetchCommand converts a do command to a *videostore.FetchRequest.
 func ToFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, error) {
-	fromStr, ok := command["from"].(string)
-	if !ok {
-		return nil, errors.New("from timestamp not found")
-	}
-	from, err := videostore.ParseDateTimeString(fromStr)
-	if err != nil {
-		return nil, err
-	}
-	toStr, ok := command["to"].(string)
-	if !ok {
-		return nil, errors.New("to timestamp not found")
-	}
-	to, err := videostore.ParseDateTimeString(toStr)
+	from, to, err := parseTimeRange(command)
 	if err != nil {
 		return nil, err
 	}

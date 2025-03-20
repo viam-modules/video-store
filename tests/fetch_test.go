@@ -16,7 +16,7 @@ import (
 func pathForFetchCmd(fromTimestamp string) string {
 	// Parse the datetime format timestamp
 	t, err := time.Parse("2006-01-02_15-04-05", fromTimestamp)
-	if err != nil {
+	if err == nil {
 		return "/tmp/" + videoStoreComponentName + "_" + fromTimestamp + ".mp4"
 	}
 	// Convert to Unix timestamp
