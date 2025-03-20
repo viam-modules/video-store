@@ -298,10 +298,10 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
-	vs.logger.Debug("fetch command received")
+	vs.logger.Debug("fetch command received and validated")
 	fetchFilePath := generateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
-		formatDateTimeToString(r.From),
+		r.From,
 		"",
 		tempPath)
 
@@ -332,13 +332,10 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
-	vs.logger.Debug("save command received")
-	if err := r.Validate(); err != nil {
-		return nil, err
-	}
+	vs.logger.Debug("save command received and validated")
 	uploadFilePath := generateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
-		formatDateTimeToString(r.From),
+		r.From,
 		r.Metadata,
 		vs.config.Storage.UploadPath,
 	)
