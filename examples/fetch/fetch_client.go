@@ -1,15 +1,15 @@
 /*
-This example demonstrates calling async save command on video-store resource. To setup:
+This example demonstrates calling async fetch command on video-store resource. To setup:
 - You need to have a robot running with video-store component.
 - Ensure you have a .env file with the necessary credentials and secrets.
-- Run example script `go run save_client.go`
+- Run example script `go run fetch_client.go <camera_name> <start_time> <end_time>`
 */
-
 package main
 
 import (
 	"context"
-	"math/rand"
+	"encoding/base64"
+	"fmt"
 	"os"
 	"time"
 
@@ -21,8 +21,7 @@ import (
 )
 
 func main() {
-	logger := logging.NewDebugLogger("client")
-
+	logger := logging.NewDebugLogger("video-store-fetch-client")
 	err := godotenv.Load()
 	if err != nil {
 		logger.Fatal("Please make sure you add a .env file with the necessary credentials and secrets.")
@@ -48,43 +47,36 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-	defer machine.Close(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	defer machine.Close(ctx)
 	logger.Info("Resources:")
 	logger.Info(machine.ResourceNames())
-
-	videoStore, err := camera.FromRobot(machine, "video-store")
+	c, err := camera.FromRobot(machine, os.Args[1])
 	if err != nil {
 		logger.Error(err)
 		return
 	}
-	videoStoreReturnValue, err := videoStore.Properties(context.Background())
+	resp, err := c.DoCommand(ctx, map[string]interface{}{
+		"command": "fetch",
+		"from":    os.Args[2],
+		"to":      os.Args[3],
+	})
 	if err != nil {
 		logger.Error(err)
 		return
 	}
-	logger.Infof("video-store Properties return value: %+v", videoStoreReturnValue)
 
-	// Save clip of random duration every 30 seconds
-	for {
-		now := time.Now()
-		randomSeconds := rand.Intn(56) + 5 // 5 to 60 seconds
-		from := now.Add(-time.Duration(randomSeconds) * time.Second)
-		nowStr := now.Format("2006-01-02_15-04-05")
-		fromStr := from.Format("2006-01-02_15-04-05")
-		_, err = videoStore.DoCommand(context.Background(),
-			map[string]interface{}{
-				"command":  "save",
-				"from":     fromStr,
-				"to":       nowStr,
-				"metadata": "metadata",
-				"async":    true,
-			},
-		)
-		if err != nil {
-			logger.Error(err)
-			return
-		}
-		time.Sleep(30 * time.Second)
+	b, err := base64.StdEncoding.DecodeString(resp["video"].(string))
+	if err != nil {
+		logger.Error(err)
+		return
 	}
 
+	mp4FileName := fmt.Sprintf("%s_%s-%s.mp4", os.Args[1], os.Args[2], os.Args[3])
+	if err := os.WriteFile(mp4FileName, b, 0o600); err != nil {
+		logger.Error(err)
+		return
+	}
 }

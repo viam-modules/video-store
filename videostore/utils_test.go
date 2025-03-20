@@ -237,10 +237,10 @@ func float64Ptr(f float64) *float64 {
 
 func TestExtractDateTimeFromFilename(t *testing.T) {
 	tests := []struct {
-		name           string
-		filename       string
-		expectedTime   time.Time
-		expectedErrMsg string
+		name         string
+		filename     string
+		expectedTime time.Time
+		expectedErr  error
 	}{
 		{
 			name:         "Unix timestamp format",
@@ -253,19 +253,18 @@ func TestExtractDateTimeFromFilename(t *testing.T) {
 			expectedTime: time.Unix(segmentUnix1, 0).UTC(),
 		},
 		{
-			name:           "Invalid format",
-			filename:       "invalid.mp4",
-			expectedTime:   time.Time{},
-			expectedErrMsg: "invalid file name: invalid.mp4",
+			name:        "Invalid format",
+			filename:    "invalid.mp4",
+			expectedErr: ErrInvalidDatetimeFormat,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := extractDateTimeFromFilename(tt.filename)
-			if tt.expectedErrMsg != "" {
+			if tt.expectedErr != nil {
 				test.That(t, err, test.ShouldNotBeNil)
-				test.That(t, err.Error(), test.ShouldEqual, tt.expectedErrMsg)
+				test.That(t, err, test.ShouldWrap, tt.expectedErr)
 				return
 			}
 			test.That(t, err, test.ShouldBeNil)

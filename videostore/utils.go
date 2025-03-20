@@ -24,6 +24,9 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
+// ErrInvalidDatetimeFormat is an error returned when a datetime string is not in the correct format.
+var ErrInvalidDatetimeFormat = errors.New("invalid datetime format")
+
 // SetLibAVLogLevel sets the libav log level.
 // this is global for the entire OS process.
 // valid inputs are "info", "warn", "error", "debug"
@@ -254,35 +257,31 @@ func sortFilesByDate(files []fileWithDate) {
 }
 
 // extractDateTimeFromFilename extracts the date and time from the filename.
-// For datetime format filenames (YYYY-MM-DD_HH-mm-ss), it interprets the timestamp in the provided timezone
-// and converts to UTC. For Unix timestamp filenames, returns the UTC time directly.
-// The timezone parameter is used only for datetime format filenames.
+// Returns UTC time regardless of filename format:
+// - Unix timestamp filenames: directly converts to UTC time
+// - Datetime format filenames (YYYY-MM-DD_HH-mm-ss): parses as local time, converts to UTC
 func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
 	nameWithoutExt := strings.TrimSuffix(baseName, filepath.Ext(baseName))
 
-	// Try parsing as Unix timestamp first
+	// Unix timestamp case
 	if timestamp, err := strconv.ParseInt(nameWithoutExt, 10, 64); err == nil {
 		return time.Unix(timestamp, 0).UTC(), nil
 	}
 
-	//nolint:gosmopolitan // datetime format timestamps must be parsed in local time unfortunately.
-	// Hence why it is the legacy format for storing our source of truth segments.
-	timeInLocal, err := time.ParseInLocation("2006-01-02_15-04-05", nameWithoutExt, time.Local)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
-	}
-	return timeInLocal.UTC(), nil
+	// Datetime format case
+	return ParseDateTimeString(nameWithoutExt)
 }
 
-// ParseDateTimeString parses a date and time string in the format "2006-01-02_15-04-05".
-// Returns a time.Time object and an error if the string is not in the correct format.
+// ParseDateTimeString parses a datetime string in our format "2006-01-02_15-04-05" from localtime,
+// converting it to UTC for internal processing.
 func ParseDateTimeString(datetime string) (time.Time, error) {
-	dateTime, err := time.Parse("2006-01-02_15-04-05", datetime)
+	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time before UTC conversion.
+	t, err := time.ParseInLocation("2006-01-02_15-04-05", datetime, time.Local)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, fmt.Errorf("%w: %w", ErrInvalidDatetimeFormat, err)
 	}
-	return dateTime, nil
+	return t.UTC(), nil
 }
 
 // matchStorageToRange identifies video files that overlap with the requested time range (start to end)
