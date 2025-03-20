@@ -13,12 +13,14 @@ import (
 )
 
 const (
-	timeFormat            = "2006-01-02_15-04-05"
-	validFromTimestamp    = "2024-09-06_15-00-33"
-	validToTimestamp      = "2024-09-06_15-01-33"
-	invalidFromTimestamp  = "2024-09-06_14-00-03"
-	invalidToTimestamp    = "3024-09-06_15-00-33"
-	invalidDatetimeFormat = "2024/09/06 15:01:33"
+	timeFormat                 = "2006-01-02_15-04-05"
+	validFromTimestamp         = "2024-09-06_15-00-33"
+	validToTimestamp           = "2024-09-06_15-01-33"
+	validFromTimestampStrftime = "2024-09-06_15-00-02"
+	validToTimestampUnixInt    = "2024-09-06_15-00-04"
+	invalidFromTimestamp       = "2024-09-06_14-00-03"
+	invalidToTimestamp         = "3024-09-06_15-00-33"
+	invalidDatetimeFormat      = "2024/09/06 15:01:33"
 )
 
 func TestSaveDoCommand(t *testing.T) {
@@ -265,6 +267,39 @@ func TestSaveDoCommand(t *testing.T) {
 		expectedFilename := fmt.Sprintf("%s_%s_%s.mp4",
 			videoStoreComponentName,
 			fromTime.Format(timeFormat),
+			"test-metadata")
+		test.That(t, filename, test.ShouldEqual, expectedFilename)
+
+		concatPath := filepath.Join(testUploadPath, filename)
+		_, err = os.Stat(concatPath)
+		test.That(t, err, test.ShouldBeNil)
+		testVideoPlayback(t, concatPath)
+	})
+
+	t.Run("Test Save DoCommand across strftime and unix int segments", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config1)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		vs, err := camera.FromRobot(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
+
+		saveCmd := map[string]interface{}{
+			"command":  "save",
+			"from":     validFromTimestampStrftime,
+			"to":       validToTimestampUnixInt,
+			"metadata": "test-metadata",
+		}
+
+		res, err := vs.DoCommand(timeoutCtx, saveCmd)
+		test.That(t, err, test.ShouldBeNil)
+		filename, ok := res["filename"].(string)
+		test.That(t, ok, test.ShouldBeTrue)
+
+		expectedFilename := fmt.Sprintf("%s_%s_%s.mp4",
+			videoStoreComponentName,
+			validFromTimestampStrftime,
 			"test-metadata")
 		test.That(t, filename, test.ShouldEqual, expectedFilename)
 
