@@ -1,6 +1,7 @@
 package videostore
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -237,39 +238,41 @@ func float64Ptr(f float64) *float64 {
 
 func TestExtractDateTimeFromFilename(t *testing.T) {
 	tests := []struct {
-		name         string
-		filename     string
-		expectedTime time.Time
-		expectedErr  error
+		name             string
+		filename         string
+		expectedDateTime time.Time
+		shouldErrOnParse bool
 	}{
 		{
-			name:         "Unix timestamp format",
-			filename:     unixToFilename(segmentUnix1),
-			expectedTime: time.Unix(segmentUnix1, 0).UTC(),
+			name:             "Unix timestamp format",
+			filename:         unixToFilename(segmentUnix1),
+			expectedDateTime: time.Unix(segmentUnix1, 0).UTC(),
 		},
 		{
-			name:         "Legacy datetime format (local time)",
-			filename:     unixToDatetimeFilename(segmentUnix1),
-			expectedTime: time.Unix(segmentUnix1, 0).UTC(),
+			name:             "Legacy datetime format (local time)",
+			filename:         unixToDatetimeFilename(segmentUnix1),
+			expectedDateTime: time.Unix(segmentUnix1, 0).UTC(),
 		},
 		{
-			name:        "Invalid format",
-			filename:    "invalid.mp4",
-			expectedErr: ErrInvalidDatetimeFormat,
+			name:             "Invalid format",
+			filename:         "invalid.mp4",
+			shouldErrOnParse: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := extractDateTimeFromFilename(tt.filename)
-			if tt.expectedErr != nil {
+			dateTime, err := extractDateTimeFromFilename(tt.filename)
+			if tt.shouldErrOnParse {
 				test.That(t, err, test.ShouldNotBeNil)
-				test.That(t, err, test.ShouldWrap, tt.expectedErr)
+				var parseErr *time.ParseError
+				isParseErr := errors.As(err, &parseErr)
+				test.That(t, isParseErr, test.ShouldBeTrue)
 				return
 			}
 			test.That(t, err, test.ShouldBeNil)
-			test.That(t, got.Equal(tt.expectedTime), test.ShouldBeTrue)
-			test.That(t, got.Location(), test.ShouldEqual, time.UTC)
+			test.That(t, dateTime.Equal(tt.expectedDateTime), test.ShouldBeTrue)
+			test.That(t, dateTime.Location(), test.ShouldEqual, time.UTC)
 		})
 	}
 }

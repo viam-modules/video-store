@@ -24,9 +24,6 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-// ErrInvalidDatetimeFormat is an error returned when a datetime string is not in the correct format.
-var ErrInvalidDatetimeFormat = errors.New("invalid datetime format")
-
 // SetLibAVLogLevel sets the libav log level.
 // this is global for the entire OS process.
 // valid inputs are "info", "warn", "error", "debug"
@@ -279,7 +276,7 @@ func ParseDateTimeString(datetime string) (time.Time, error) {
 	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time before UTC conversion.
 	t, err := time.ParseInLocation("2006-01-02_15-04-05", datetime, time.Local)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: %w", ErrInvalidDatetimeFormat, err)
+		return time.Time{}, err
 	}
 	return t.UTC(), nil
 }
