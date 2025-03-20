@@ -1,8 +1,8 @@
 /*
-This example demonstrates calling async save command on video-store resource. To setup:
-- You need to have a robot running with video-store component.
+This example demonstrates calling the async save command on a video-store resource. To setup:
+- You need to have a machine running with the video-store component.
 - Ensure you have a .env file with the necessary credentials and secrets.
-- Run example script `go run save_client.go`
+- Run example script `go run save_client.go <camera_name>`
 */
 
 package main
@@ -21,7 +21,7 @@ import (
 )
 
 func main() {
-	logger := logging.NewDebugLogger("client")
+	logger := logging.NewDebugLogger("video-store-save-client")
 
 	err := godotenv.Load()
 	if err != nil {
@@ -52,7 +52,11 @@ func main() {
 	logger.Info("Resources:")
 	logger.Info(machine.ResourceNames())
 
-	videoStore, err := camera.FromRobot(machine, "video-store-1")
+	if len(os.Args) < 2 {
+		logger.Fatal("Insufficient arguments. Please provide camera_name.")
+	}
+	cameraName := os.Args[1]
+	videoStore, err := camera.FromRobot(machine, cameraName)
 	if err != nil {
 		logger.Error(err)
 		return

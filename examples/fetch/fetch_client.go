@@ -1,6 +1,6 @@
 /*
-This example demonstrates calling async fetch command on video-store resource. To setup:
-- You need to have a robot running with video-store component.
+This example demonstrates calling the fetch command on a video-store resource. To setup:
+- You need to have a machine running with the video-store component.
 - Ensure you have a .env file with the necessary credentials and secrets.
 - Run example script `go run fetch_client.go <camera_name> <start_time> <end_time>`
 */
@@ -53,15 +53,23 @@ func main() {
 	defer machine.Close(ctx)
 	logger.Info("Resources:")
 	logger.Info(machine.ResourceNames())
-	c, err := camera.FromRobot(machine, os.Args[1])
+
+	if len(os.Args) < 4 {
+		logger.Fatal("Insufficient arguments. Please provide camera_name, start_time, and end_time.")
+	}
+	cameraName := os.Args[1]
+	startTime := os.Args[2]
+	endTime := os.Args[3]
+
+	c, err := camera.FromRobot(machine, cameraName)
 	if err != nil {
 		logger.Error(err)
 		return
 	}
 	resp, err := c.DoCommand(ctx, map[string]interface{}{
 		"command": "fetch",
-		"from":    os.Args[2],
-		"to":      os.Args[3],
+		"from":    startTime,
+		"to":      endTime,
 	})
 	if err != nil {
 		logger.Error(err)
@@ -74,7 +82,7 @@ func main() {
 		return
 	}
 
-	mp4FileName := fmt.Sprintf("%s_%s-%s.mp4", os.Args[1], os.Args[2], os.Args[3])
+	mp4FileName := fmt.Sprintf("%s_%s-%s.mp4", cameraName, startTime, endTime)
 	if err := os.WriteFile(mp4FileName, b, 0o600); err != nil {
 		logger.Error(err)
 		return
