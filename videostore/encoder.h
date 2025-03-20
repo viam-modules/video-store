@@ -8,9 +8,11 @@ typedef struct video_store_h264_encoder {
   AVFormatContext *segmenterCtx;
   AVStream *segmenterStream;
 
-  AVFrame *decoderFrame;
-  AVFrame *encoderFrame;
   AVCodecContext *decoderCtx;
+  AVFrame *decoderFrame;
+  int frameCount;
+
+  AVFrame *encoderFrame;
   AVCodecContext *encoderCtx;
 } viam_encoder;
 

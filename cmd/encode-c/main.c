@@ -1,5 +1,4 @@
 #include "../../videostore/encoder.h"
-/* #include "libavutil/log.h" */
 #include <sqlite3.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -16,12 +15,12 @@ int main(int argc, char *argv[]) {
   }
 
   // init
-  int width = 720;
-  int height = 420;
+  int width = 2560;
+  int height = 1440;
   int bitrate = 100000;
   int fps = 20;
   char preset[] = "medium";
-  struct video_store_h264_encoder *e;
+  struct video_store_h264_encoder *e = NULL;
   int ret =
       video_store_h264_encoder_init(&e, 30, "./mp4s/h264_%Y-%m-%d_%H-%M-%S.mp4",
                                     width, height, bitrate, fps, preset);
@@ -42,7 +41,7 @@ int main(int argc, char *argv[]) {
 
   sqlite3_stmt *statement;
   printf("Performing query...\n");
-  if ((rc = sqlite3_prepare_v2(db, "SELECT data FROM images;", -1, &statement,
+  if ((rc = sqlite3_prepare_v2(db, "SELECT (data) FROM images;", -1, &statement,
                                0))) {
     printf("sqlite3_prepare failed on extradata: %d\n", rc);
     return rc;
@@ -66,6 +65,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  // close
   ret = video_store_h264_encoder_close(&e);
   if (ret != VIDEO_STORE_ENCODER_RESP_OK) {
     printf("Failed to close encoder: %d\n", ret);
