@@ -10,9 +10,12 @@ typedef struct video_store_h264_encoder {
 
   AVCodecContext *decoderCtx;
   AVFrame *decoderFrame;
-  int frameCount;
+  int firstPTSMicroSet;
+  int64_t firstPTSMicro;
+  int64_t prevPTSMicro;
+  int64_t prevIframePTSMicro;
 
-  AVFrame *encoderFrame;
+  /* AVFrame *encoderFrame; */
   AVCodecContext *encoderCtx;
 } video_store_h264_encoder;
 
@@ -27,8 +30,9 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
 );
 
 int video_store_h264_encoder_frame(struct video_store_h264_encoder *pE, // IN
-                                   char *payload,                       // IN
-                                   int payloadSize                      // IN
+                                   int64_t unixMicro,                   // IN
+                                   void *payload,                       // IN
+                                   size_t payloadSize                   // IN
 );
 
 int video_store_h264_encoder_close(struct video_store_h264_encoder **ppE // OUT

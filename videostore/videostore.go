@@ -356,7 +356,7 @@ func fetchAndProcessFrames(
 	logger logging.Logger) {
 	defer encoder.close()
 	frameInterval := time.Second / time.Duration(framePoller.Framerate)
-	ticker := time.NewTicker(frameInterval)
+	ticker := time.NewTicker(frameInterval * 4)
 	defer ticker.Stop()
 	var (
 		data        []byte
@@ -369,6 +369,7 @@ func fetchAndProcessFrames(
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			// logger.Info("call")
 			data, metadata, err = framePoller.Camera.Image(ctx, rutils.MimeTypeJPEG, nil)
 			if err != nil {
 				logger.Warn("failed to get frame from camera: ", err)

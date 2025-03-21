@@ -108,7 +108,8 @@ func (e *encoder) initialize(width, height int) error {
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
 // TODO: propagate error
-func (e *encoder) encode(frame []byte, _now time.Time) {
+func (e *encoder) encode(frame []byte, now time.Time) {
+	unixMicro := now.UnixMicro()
 	payloadC := C.CBytes(frame)
 	defer C.free(payloadC)
 
@@ -120,8 +121,9 @@ func (e *encoder) encode(frame []byte, _now time.Time) {
 	}
 	ret := C.video_store_h264_encoder_frame(
 		e.cEncoder,
-		(*C.char)(payloadC),
-		C.int(len(frame)),
+		C.int64_t(unixMicro),
+		payloadC,
+		C.size_t(len(frame)),
 	)
 	if ret != C.VIDEO_STORE_ENCODER_RESP_OK {
 		err := errors.New("failed to write packet to encoder")

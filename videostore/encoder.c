@@ -1,19 +1,26 @@
 #include "encoder.h"
 #include "libavcodec/avcodec.h"
+#include "libavcodec/packet.h"
 #include "libavformat/avformat.h"
+#include "libavutil/frame.h"
 #include "libavutil/log.h"
+#include "libavutil/rational.h"
 #include <stdint.h>
+// TODO: have a normal time base
 int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
                                   const int segmentSeconds,              // IN
                                   const char *outputPattern,             // IN
                                   const int width,                       // IN
                                   const int height,                      // IN
-                                  const int64_t bitrate, const int frameRate,
-                                  const char *preset) {
+                                  const int64_t bitrate,                 // IN
+                                  const int targetFrameRate,             // IN
+                                  const char *preset                     // IN
+
+) {
   struct video_store_h264_encoder *e = NULL;
-  AVFrame *destFrame = NULL;
-  AVFrame *srcFrame = NULL;
-  AVCodecContext *jpegCodecCtx = NULL;
+  AVFrame *decoderFrame = NULL;
+  /* AVFrame *encoderFrame = NULL; */
+  AVCodecContext *decoderCtx = NULL;
   AVCodecContext *encoderCtx = NULL;
   AVFormatContext *segmenterCtx = NULL;
   AVCodecParameters *codecParams = NULL;
@@ -26,7 +33,8 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
       1, sizeof(struct video_store_h264_encoder));
   if (e == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_h264_encoder_init failed allocate a raw_seg_h264\n");
+           "video_store_h264_encoder_init failed allocate a "
+           "video_store_h264_encoder\n");
     goto cleanup;
   }
 
@@ -38,15 +46,22 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
     goto cleanup;
   }
 
-  jpegCodecCtx = avcodec_alloc_context3(frameCodec);
-  if (jpegCodecCtx == NULL) {
+  decoderCtx = avcodec_alloc_context3(frameCodec);
+  if (decoderCtx == NULL) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_h264_encoder_init failed to allocate JPEG context\n");
     goto cleanup;
   }
 
-  jpegCodecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
-  ret = avcodec_open2(jpegCodecCtx, frameCodec, NULL);
+  decoderCtx->pix_fmt = AV_PIX_FMT_YUV420P;
+  /* decoderCtx->time_base.num = 1; */
+  // decoder interprests pts in microseconds
+  /* decoderCtx->time_base.den = 1000000; */
+  av_log(NULL, AV_LOG_FATAL,
+         " decoderCtx->time_base.num: %d,  "
+         "decoderCtx->time_base.den: %d\n",
+         decoderCtx->time_base.num, decoderCtx->time_base.den);
+  ret = avcodec_open2(decoderCtx, frameCodec, NULL);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_h264_encoder_init failed to open the JPEG codec "
@@ -55,13 +70,15 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
     goto cleanup;
   };
 
-  destFrame = av_frame_alloc();
-  if (destFrame == NULL) {
+  decoderFrame = av_frame_alloc();
+  if (decoderFrame == NULL) {
     av_log(
         NULL, AV_LOG_ERROR,
         "video_store_h264_encoder_init failed to allocate destination frame\n");
     goto cleanup;
   }
+  /* decoderFrame->time_base.num = 1; */
+  /* decoderFrame->time_base.den = 1000000; */
   // END frame decoder
 
   // BEGIN video encoder
@@ -71,6 +88,7 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
            "video_store_h264_encoder_init failed to find H264 encoder\n");
     goto cleanup;
   }
+
   encoderCtx = avcodec_alloc_context3(encoderCodec);
   if (encoderCtx == NULL) {
     av_log(NULL, AV_LOG_ERROR,
@@ -79,13 +97,16 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
   }
   encoderCtx->bit_rate = bitrate;
   encoderCtx->pix_fmt = AV_PIX_FMT_YUV420P;
-  encoderCtx->time_base.num = 1;
-  encoderCtx->time_base.den = frameRate;
+  // microsecond
   encoderCtx->width = width;
   encoderCtx->height = height;
   // TODO(seanp): Do we want b frames? This could make it more complicated to
   // split clips.
   encoderCtx->max_b_frames = 0;
+  encoderCtx->time_base.num = 1;
+  encoderCtx->time_base.den = 1000000;
+  encoderCtx->framerate.num = 1;
+  encoderCtx->framerate.den = targetFrameRate;
 
   ret = av_dict_set(&encoderOpts, "preset", preset, 0);
   if (ret < 0) {
@@ -103,6 +124,10 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
     goto cleanup;
   }
 
+  av_log(NULL, AV_LOG_FATAL,
+         "BEFORE encoderCtx->time_base: %d/%d, encoderCtx->framerate: %d/%d\n",
+         encoderCtx->time_base.num, encoderCtx->time_base.den,
+         encoderCtx->framerate.num, encoderCtx->framerate.den);
   ret = avcodec_open2(encoderCtx, encoderCodec, &encoderOpts);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
@@ -111,17 +136,22 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
            av_err2str(ret));
     goto cleanup;
   }
+  av_log(NULL, AV_LOG_FATAL,
+         "AFTER encoderCtx->time_base: %d/%d, encoderCtx->framerate: %d/%d\n",
+         encoderCtx->time_base.num, encoderCtx->time_base.den,
+         encoderCtx->framerate.num, encoderCtx->framerate.den);
 
-  srcFrame = av_frame_alloc();
-  if (srcFrame == NULL) {
-    av_log(NULL, AV_LOG_ERROR,
-           "video_store_h264_encoder_init failed to allocate source frame\n");
-    ret = VIDEO_STORE_ENCODER_RESP_ERROR;
-    goto cleanup;
-  }
-  srcFrame->width = encoderCtx->width;
-  srcFrame->height = encoderCtx->height;
-  srcFrame->format = encoderCtx->pix_fmt;
+  /* encoderFrame = av_frame_alloc(); */
+  /* if (encoderFrame == NULL) { */
+  /*   av_log(NULL, AV_LOG_ERROR, */
+  /*          "video_store_h264_encoder_init failed to allocate source
+   * frame\n"); */
+  /*   ret = VIDEO_STORE_ENCODER_RESP_ERROR; */
+  /*   goto cleanup; */
+  /* } */
+  /* encoderFrame->width = encoderCtx->width; */
+  /* encoderFrame->height = encoderCtx->height; */
+  /* encoderFrame->format = encoderCtx->pix_fmt; */
 
   // END video encoder
   // BEGIN Segmenter
@@ -141,11 +171,8 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
            "video_store_h264_encoder_init failed to create new stream\n");
     goto cleanup;
   }
-  /* // NOTE: (NICK): Why do we need to do this? Isn't this always */
-  /* going to be */
-  // negative 1?
-  segmenterStream->id = (int)(segmenterCtx->nb_streams) - 1;
-  segmenterStream->time_base = encoderCtx->time_base;
+  /* segmenterStream->time_base = encoderCtx->time_base; */
+  /* segmenterStream->time_base = encoderCtx->time_base; */
   codecParams = avcodec_parameters_alloc();
 
   ret = avcodec_parameters_from_context(codecParams, encoderCtx);
@@ -217,6 +244,8 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
     goto cleanup;
   }
 
+  av_log(NULL, AV_LOG_FATAL, "BEFORE segmenterStream->time_base: %d/%d\n",
+         segmenterStream->time_base.num, segmenterStream->time_base.den);
   ret = avformat_write_header(segmenterCtx, &segmenterOpts);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
@@ -224,25 +253,30 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
            av_err2str(ret));
     goto cleanup;
   }
+  av_log(NULL, AV_LOG_FATAL, "AFTER segmenterStream->time_base: %d/%d\n",
+         segmenterStream->time_base.num, segmenterStream->time_base.den);
 
   // Writing header overwrites the time_base, so we need to reset it.
   // TODO(seanp): Figure out why this is necessary.
-  segmenterStream->time_base = encoderCtx->time_base;
-  segmenterStream->id = (int)(segmenterCtx->nb_streams) - 1;
+  // TODO: Nick see if you need this
+  /* segmenterStream->id = (int)(segmenterCtx->nb_streams) - 1; */
+  /* segmenterStream->time_base = encoderCtx->time_base; */
   // END Segmenter
 
   // BEGIN Success
   // decoder
-  e->decoderCtx = jpegCodecCtx;
-  e->decoderFrame = destFrame;
+  e->decoderCtx = decoderCtx;
+  e->decoderFrame = decoderFrame;
 
   // encoder
   e->encoderCtx = encoderCtx;
-  e->encoderFrame = srcFrame;
+  /* e->encoderFrame = encoderFrame; */
 
   // segmenter
   e->segmenterCtx = segmenterCtx;
   e->segmenterStream = segmenterStream;
+  av_log(NULL, AV_LOG_ERROR, "e->segmenterStream->id %d\n",
+         e->segmenterStream->id);
 
   *ppE = e;
   ret = VIDEO_STORE_ENCODER_RESP_OK;
@@ -254,16 +288,16 @@ cleanup:
     if (e != NULL) {
       free(e);
     }
-    if (jpegCodecCtx != NULL) {
-      avcodec_free_context(&jpegCodecCtx);
+    if (decoderCtx != NULL) {
+      avcodec_free_context(&decoderCtx);
     }
-    if (destFrame != NULL) {
-      av_frame_free(&destFrame);
+    if (decoderFrame != NULL) {
+      av_frame_free(&decoderFrame);
     }
 
-    if (srcFrame != NULL) {
-      av_frame_free(&srcFrame);
-    }
+    /* if (encoderFrame != NULL) { */
+    /*   av_frame_free(&encoderFrame); */
+    /* } */
 
     if (segmenterCtx != NULL) {
       avformat_free_context(segmenterCtx);
@@ -293,21 +327,65 @@ cleanup:
   return ret;
 }
 
+// TODO: take in time now and set pts based on time now
+// TODO: support changing image size
 int video_store_h264_encoder_frame(struct video_store_h264_encoder *pE, // IN
-                                   char *payload,                       // IN
-                                   int payloadSize                      // IN
+                                   int64_t unixMicro,                   // IN
+                                   void *payload,                       // IN
+                                   size_t payloadSize                   // IN
 ) {
+  if (!pE->firstPTSMicroSet) {
+    pE->firstPTSMicro = unixMicro;
+    pE->firstPTSMicroSet = 1;
+  } else {
+    if (unixMicro - pE->firstPTSMicro <= pE->prevPTSMicro) {
+      av_log(NULL, AV_LOG_ERROR,
+             "video_store_h264_encoder_frame received non monotonically "
+             "increasing pts");
+      return VIDEO_STORE_ENCODER_RESP_ERROR;
+    }
+  }
+  int64_t pts = unixMicro - pE->firstPTSMicro;
+  pE->prevPTSMicro = pts;
   // fill a jpeg pkt with the frame bytes
   int ret = VIDEO_STORE_ENCODER_RESP_ERROR;
-  AVPacket decoderPkt = {0};
-  decoderPkt.data = (uint8_t *)payload;
-  decoderPkt.size = payloadSize;
+  AVPacket *decoderPkt = NULL;
   AVPacket *encoderPkt = NULL;
+
+  decoderPkt = av_packet_alloc();
+  if (decoderPkt == NULL) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_h264_encoder_frame failed to allocate AVPacket\n");
+    ret = VIDEO_STORE_ENCODER_RESP_ERROR;
+    goto cleanup;
+  }
+  uint8_t *data = av_malloc(payloadSize);
+  if (data == NULL) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_h264_encoder_frame failed to av_malloc\n");
+    ret = VIDEO_STORE_ENCODER_RESP_ERROR;
+    goto cleanup;
+  }
+  memcpy(data, payload, payloadSize);
+  ret = av_packet_from_data(decoderPkt, data, (int)payloadSize);
+  if (ret != 0) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_h264_encoder_frame failed to create new "
+           "AVPacket from data\n");
+    // if av_packet_from_data returned an error then data is not owned by the
+    // packet and we need to free it outselves
+    av_free(data);
+    goto cleanup;
+  }
+  decoderPkt->size = (int)payloadSize;
+  /* decoderPkt->time_base.num = 1; */
+  /* decoderPkt->time_base.den = 1000000; */
+  /* decoderPkt->data = (uint8_t *)payload; */
   // The mjpeg decoder can figure out width and height from the frame bytes.
 
   // We don't need to pass width and height to initJPEGDecoder and it can
   // recover from a change in resolution.
-  ret = avcodec_send_packet(pE->decoderCtx, &decoderPkt);
+  ret = avcodec_send_packet(pE->decoderCtx, decoderPkt);
   if (ret != 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_h264_encoder_frame failed to avcodec_send_packet %s\n",
@@ -316,6 +394,7 @@ int video_store_h264_encoder_frame(struct video_store_h264_encoder *pE, // IN
   }
   // Receive frame will allocate the frame buffer so we do not need to
   // manually call av_frame_get_buffer.
+  av_frame_unref(pE->decoderFrame);
   ret = avcodec_receive_frame(pE->decoderCtx, pE->decoderFrame);
   if (ret != 0) {
     av_log(
@@ -324,33 +403,59 @@ int video_store_h264_encoder_frame(struct video_store_h264_encoder *pE, // IN
         av_err2str(ret));
     goto cleanup;
   }
+  // rescale nanoseconds to the clock time of h264
+  // TODO: Test concating files with different frame rates
+  pE->decoderFrame->pts = av_rescale(pts, 90000, 1000000);
+  pE->decoderFrame->pkt_dts = pE->decoderFrame->pts;
+  /* packet->pts = */
+  /*      */
+  /* packet->dts = */
+  /*     av_rescale_q_rnd(packet->dts, inStream->time_base,
+   * outStream->time_base, */
+  /*                      AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX); */
+  /* packet->duration = av_rescale_q_rnd( */
+  /*     packet->duration, inStream->time_base, outStream->time_base, */
+  /*     AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX); */
+  /* packet->pos = -1; */
+  av_log(NULL, AV_LOG_FATAL,
+         "pE->decoderFrame->pts: %lld, pE->decoderFrame->pkt_pts: %lld, "
+         "time_base: %d/%d, dims: %dx%d \n",
+         pE->decoderFrame->pts, pE->decoderFrame->pkt_dts,
+         pE->decoderFrame->time_base.num, pE->decoderFrame->time_base.den,
+         pE->decoderFrame->width, pE->decoderFrame->height);
 
   // TODO Handle frame size changing
 
-  // Both PTS and DTS times are equal frameCount multiplied by the time_base.
-  // This assumes that the processFrame routine is running at the source
-  // framerate.
+  // Both PTS and DTS times are equal frameCount multiplied by the
+  // time_base. This assumes that the processFrame routine is running at the
+  // source framerate.
   // TODO(seanp): What happens to playback if frame is dropped?
   //
   // TODO: Nick: This is a bad assumption, make it so that the PTS is just
   // determined by wall clock time
-  pE->decoderFrame->pts = pE->frameCount;
-  pE->decoderFrame->pkt_dts = pE->frameCount;
+  /* pE->decoderFrame->pts = pts; */
+  /* pE->decoderFrame->pkt_dts = pts; */
 
-  /* // Manually force keyframes every second, removing the need to rely on */
-  /* // gop_size or other encoder settings. This is necessary for the segmenter
+  /* // Manually force keyframes every second, removing the need to rely on
+   */
+  /* // gop_size or other encoder settings. This is necessary for the
+   * segmenter
    */
   /* // to split the video files at keyframe boundaries. */
-  if (pE->frameCount % pE->encoderCtx->time_base.den == 0) {
+  // if it has been a second or more, add an iframe
+  if (pE->decoderFrame->pts - pE->prevIframePTSMicro >= 1000000) {
+    av_log(NULL, AV_LOG_FATAL, "keyframe!!!\n");
+    pE->prevIframePTSMicro = pE->decoderFrame->pts;
     // TODO: Look into key_frame being deprecated
-    pE->decoderFrame->key_frame = 1;
+    /* pE->decoderFrame->key_frame = 1; */
     // TODO: Nick try this
-    /* pE->decoderFrame->flags |= AV_FRAME_FLAG_KEY; */
-    pE->decoderFrame->pict_type = AV_PICTURE_TYPE_I;
-  } else {
-    pE->decoderFrame->key_frame = 0;
-    pE->decoderFrame->pict_type = AV_PICTURE_TYPE_NONE;
+    pE->decoderFrame->flags |= AV_FRAME_FLAG_KEY;
+    /* pE->decoderFrame->pict_type = AV_PICTURE_TYPE_I; */
   }
+  /* } else { */
+  /*   /1* pE->decoderFrame->key_frame = 0; *1/ */
+  /*   /1* pE->decoderFrame->pict_type = AV_PICTURE_TYPE_NONE; *1/ */
+  /* } */
 
   ret = avcodec_send_frame(pE->encoderCtx, pE->decoderFrame);
   if (ret < 0) {
@@ -376,7 +481,11 @@ int video_store_h264_encoder_frame(struct video_store_h264_encoder *pE, // IN
     ret = VIDEO_STORE_ENCODER_RESP_ERROR;
     goto cleanup;
   }
-  pE->frameCount++;
+  av_log(NULL, AV_LOG_FATAL,
+         "encoderPkt->pts: %lld, encoderPkt->dts: %lld, "
+         "time_base: %d/%d \n",
+         encoderPkt->pts, encoderPkt->dts, encoderPkt->time_base.num,
+         encoderPkt->time_base.den);
 
   ret = av_interleaved_write_frame(pE->segmenterCtx, encoderPkt);
   if (ret < 0) {
@@ -389,6 +498,9 @@ int video_store_h264_encoder_frame(struct video_store_h264_encoder *pE, // IN
   }
 
 cleanup:
+  av_packet_unref(decoderPkt);
+  av_packet_free(&decoderPkt);
+  av_packet_unref(encoderPkt);
   av_packet_free(&encoderPkt);
   return ret;
 }
@@ -426,7 +538,7 @@ int video_store_h264_encoder_close(struct video_store_h264_encoder **ppE // OUT
            "video_store_h264_encoder_close failed to close codec H264: %s\n",
            av_err2str(ret));
   }
-  av_frame_free(&(*ppE)->encoderFrame);
+  /* av_frame_free(&(*ppE)->encoderFrame); */
   avcodec_free_context(&(*ppE)->encoderCtx);
 
   // decoder
