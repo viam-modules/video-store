@@ -60,7 +60,7 @@ endif
 CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
 export PATH := $(PATH):$(shell go env GOPATH)/bin
 
-.PHONY: lint tool-install test clean clean-all clean-ffmpeg module build valgrind
+.PHONY: lint tool-install test clean clean-all clean-ffmpeg module build valgrind valgrind-run
 
 all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
 
@@ -81,6 +81,14 @@ $(BIN_OUTPUT_PATH)/concat-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | 
 	rm -f $(BIN_OUTPUT_PATH)/concat-c
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(OBJS) ./cmd/concat-c/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  -g -o $(BIN_OUTPUT_PATH)/concat-c
+
+encoder-c: $(BIN_OUTPUT_PATH)/encoder-c
+$(BIN_OUTPUT_PATH)/encoder-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
+	rm -f $(BIN_OUTPUT_PATH)/encoder-c
+	mkdir -p $(BUILD_DIR)
+	$(CC) $(OBJS) ./cmd/encode-c/main.c $(CGO_LDFLAGS) $(shell pkg-config --cflags sqlite3) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  $(shell pkg-config --libs sqlite3) -g -o $(BIN_OUTPUT_PATH)/encoder-c
+
 
 $(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"

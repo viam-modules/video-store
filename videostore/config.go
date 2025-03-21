@@ -144,5 +144,9 @@ func (c FramePollerConfig) Validate() error {
 		return errors.New("framerate can't be less than or equal to 0")
 	}
 
+	if c.Camera == nil {
+		return errors.New("camera must be provided")
+	}
+
 	return nil
 }

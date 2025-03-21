@@ -1,5 +1,6 @@
 #include "rawsegmenter.h"
 #include "libavcodec/packet.h"
+#include "libavformat/avformat.h"
 #include "libavutil/dict.h"
 #include "libavutil/log.h"
 #include "libavutil/mem.h"
@@ -196,6 +197,12 @@ int video_store_raw_seg_write_packet(struct raw_seg *rs,       // IN
   }
 
   uint8_t *data = av_malloc(payloadSize);
+  if (data == NULL) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_raw_seg_write_packet failed to av_malloc\n");
+    ret = VIDEO_STORE_RAW_SEG_RESP_ERROR;
+    goto cleanup;
+  }
   memcpy(data, payload, payloadSize);
   ret = av_packet_from_data(pkt, data, (int)payloadSize);
   if (ret != 0) {

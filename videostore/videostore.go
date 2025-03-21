@@ -7,12 +7,13 @@ package videostore
 import "C"
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"image/jpeg"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"go.viam.com/rdk/components/camera"
@@ -62,12 +63,9 @@ type videostore struct {
 	config Config
 	logger logging.Logger
 
-	latestFrame   *C.AVFrame
-	latestFrameMu sync.Mutex
-	workers       *utils.StoppableWorkers
+	workers *utils.StoppableWorkers
 
 	rawSegmenter *RawSegmenter
-	segmenter    *segmenter
 	concater     *concater
 }
 
@@ -153,7 +151,7 @@ func (r *FetchRequest) Validate() error {
 }
 
 // NewFramePollingVideoStore returns a VideoStore that stores video it encoded from polling frames from a camera.Camera
-func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.Logger) (VideoStore, error) {
+func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore, error) {
 	if config.Type != SourceTypeFrame {
 		return nil, fmt.Errorf("config type must be %s", SourceTypeFrame)
 	}
@@ -182,34 +180,27 @@ func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.
 		return nil, err
 	}
 
-	// Only initialize mime handler, encoder, segmenter, and frame processing routines
-	// if the source camera is available.
-	cameraAvailable := config.FramePoller.Camera != nil
-	if cameraAvailable {
-		encoder, err := newEncoder(
-			logger,
-			vs.config.Encoder.Bitrate,
-			vs.config.Encoder.Preset,
-			vs.config.FramePoller.Framerate,
-		)
-		if err != nil {
-			return nil, err
-		}
-		vs.segmenter, err = newSegmenter(
-			logger,
-			vs.config.Storage.SizeGB,
-			defaultSegmentSeconds,
-			vs.config.Storage.StoragePath,
-			defaultVideoFormat,
-		)
-		if err != nil {
-			return nil, err
-		}
-		// Start workers to process frames and clean up storage.
-		vs.workers.Add(func(ctx context.Context) { vs.fetchFrames(ctx, config.FramePoller.Camera) })
-		vs.workers.Add(func(ctx context.Context) { vs.processFrames(ctx, encoder) })
-		vs.workers.Add(vs.deleter)
+	encoder, err := newEncoder(
+		vs.config.Encoder,
+		vs.config.FramePoller.Framerate,
+		vs.config.Storage.SizeGB,
+		vs.config.Storage.StoragePath,
+		logger,
+	)
+	if err != nil {
+		return nil, err
 	}
+	// Start workers to process frames and clean up storage.
+	// vs.workers.Add(func(ctx context.Context) { vs.fetchFrames(ctx, config.FramePoller.Camera) })
+	// vs.workers.Add(func(ctx context.Context) { vs.processFrames(ctx, encoder) })
+	vs.workers.Add(func(ctx context.Context) {
+		fetchAndProcessFrames(
+			ctx,
+			config.FramePoller,
+			encoder,
+			vs.logger)
+	})
+	vs.workers.Add(vs.deleter)
 
 	return vs, nil
 }
@@ -358,101 +349,52 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	return &SaveResponse{Filename: uploadFileName}, nil
 }
 
-// fetchFrames reads frames from the camera at the framerate interval
-// and stores the decoded image in the latestFrame atomic pointer.
-func (vs *videostore) fetchFrames(ctx context.Context, cam camera.Camera) {
-	mimeHandler := newMimeHandler(vs.logger)
-	defer mimeHandler.close()
-	frameInterval := time.Second / time.Duration(vs.config.FramePoller.Framerate)
-	ticker := time.NewTicker(frameInterval)
+func fetchAndProcessFrames(
+	ctx context.Context,
+	framePoller FramePollerConfig,
+	encoder *encoder,
+	logger logging.Logger) {
+	defer encoder.close()
+	frameInterval := time.Second / time.Duration(framePoller.Framerate)
+	ticker := time.NewTicker(frameInterval * 4)
 	defer ticker.Stop()
+	var (
+		data        []byte
+		metadata    camera.ImageMetadata
+		err         error
+		initialized bool
+	)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			var mimeTypeReq string
-			if vs.config.FramePoller.YUYV {
-				mimeTypeReq = mimeTypeYUYV
-			} else {
-				mimeTypeReq = rutils.MimeTypeJPEG
-			}
-			bytes, metadata, err := cam.Image(ctx, mimeTypeReq, nil)
+			// logger.Info("call")
+			data, metadata, err = framePoller.Camera.Image(ctx, rutils.MimeTypeJPEG, nil)
 			if err != nil {
-				vs.logger.Warn("failed to get frame from camera: ", err)
+				logger.Warn("failed to get frame from camera: ", err)
 				time.Sleep(retryInterval * time.Second)
 				continue
 			}
 			// Transform image bytes to yuv420p based on the mimetype.
-			func() {
-				vs.latestFrameMu.Lock()
-				defer vs.latestFrameMu.Unlock()
-				var frame *C.AVFrame
-				mimetype, _ := rutils.CheckLazyMIMEType(metadata.MimeType)
-				switch mimetype {
-				case mimeTypeYUYV:
-					frame, err = mimeHandler.yuyvToYUV420p(bytes)
-					if err != nil {
-						vs.logger.Error("failed to convert yuyv422 to yuv420p: ", err)
-						return
-					}
-				case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
-					frame, err = mimeHandler.decodeJPEG(bytes)
-					if err != nil {
-						vs.logger.Error("failed to decode jpeg: ", err)
-						return
-					}
-				default:
-					vs.logger.Warn("unsupported image format", metadata.MimeType)
-					return
-				}
-				// Only reached on success.
-				vs.latestFrame = frame
-			}()
-		}
-	}
-}
 
-// processFrames grabs the latest frame, encodes, and writes to the segmenter
-// which chunks video stream into clip files inside the storage directory.
-func (vs *videostore) processFrames(ctx context.Context, encoder *encoder) {
-	defer encoder.close()
-	frameInterval := time.Second / time.Duration(vs.config.FramePoller.Framerate)
-	ticker := time.NewTicker(frameInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			vs.latestFrameMu.Lock()
-			if vs.latestFrame == nil {
-				vs.logger.Debug("latest frame is not available yet")
-				vs.latestFrameMu.Unlock()
+			if actualMimeType, _ := rutils.CheckLazyMIMEType(metadata.MimeType); actualMimeType != rutils.MimeTypeJPEG {
+				logger.Warnf("expected image in mime type %s got %s: ", rutils.MimeTypeJPEG, actualMimeType)
 				continue
 			}
-			result, err := encoder.encode(vs.latestFrame)
-			vs.latestFrameMu.Unlock()
-			if err != nil {
-				vs.logger.Debug("failed to encode frame", err)
-				continue
-			}
-			if result.frameDimsChanged {
-				vs.logger.Info("reinitializing segmenter due to encoder refresh")
-				err = vs.segmenter.initialize(encoder.codecCtx)
+			if !initialized {
+				img, err := jpeg.Decode(bytes.NewReader(data))
 				if err != nil {
-					vs.logger.Debug("failed to reinitialize segmenter", err)
-					// Hack that flags the encoder to reinitialize if segmenter fails to
-					// ensure that encoder and segmenter inits are in sync.
-					encoder.codecCtx = nil
+					logger.Warnf("first image was unable to be decoded")
 					continue
 				}
+				if err := encoder.initialize(img.Bounds().Dx(), img.Bounds().Dy()); err != nil {
+					logger.Warnf("encoder init failed: %s", err.Error())
+					continue
+				}
+				initialized = true
 			}
-			err = vs.segmenter.writeEncodedFrame(result.encodedData, result.pts, result.dts)
-			if err != nil {
-				vs.logger.Debug("failed to segment frame", err)
-				continue
-			}
+			encoder.encode(data, time.Now())
 		}
 	}
 }
@@ -538,9 +480,6 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 func (vs *videostore) Close() {
 	if vs.workers != nil {
 		vs.workers.Stop()
-	}
-	if vs.segmenter != nil {
-		vs.segmenter.close()
 	}
 	if vs.rawSegmenter != nil {
 		vs.rawSegmenter.Close()
