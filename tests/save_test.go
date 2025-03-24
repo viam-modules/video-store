@@ -14,6 +14,7 @@ import (
 	"github.com/viam-modules/video-store/videostore"
 )
 
+// TODO(RSDK-10317): tests only pass on machines with UTC timezone
 const (
 	validFromTimestamp         = "2024-09-06_15-00-33"
 	validToTimestamp           = "2024-09-06_15-01-33"
