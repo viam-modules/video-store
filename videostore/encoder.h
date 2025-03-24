@@ -17,8 +17,6 @@ typedef struct video_store_h264_encoder {
   // encoder
   AVCodecContext *encoderCtx;
   AVPacket *encoderPkt;
-  int encoderWidth;
-  int encoderHeight;
   int64_t encoderFirstUnixMicroSec;
   int64_t encoderPrevUnixMicroSec;
   int64_t encoderPrevIframeUnixMicroSec;

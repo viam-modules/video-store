@@ -169,8 +169,6 @@ int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
   }
   // encoder
   e->encoderCtx = encoderCtx;
-  e->encoderWidth = width;
-  e->encoderHeight = height;
   e->encoderFirstUnixMicroSec = unixMicro;
   e->encoderPrevUnixMicroSec = INT64_MIN;
 
@@ -222,8 +220,6 @@ void close_encoder_segmenter(struct video_store_h264_encoder *e) {
   if (e->encoderCtx != NULL) {
     avcodec_free_context(&e->encoderCtx);
     e->encoderCtx = NULL;
-    e->encoderWidth = 0;
-    e->encoderHeight = 0;
     e->encoderFirstUnixMicroSec = 0;
     e->encoderPrevUnixMicroSec = 0;
   }
@@ -445,8 +441,9 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
 
   // if the width & height have changed, close the encoder and segmenter
   // and set them to null
-  if (e->decoderFrame->width != e->encoderWidth ||
-      e->decoderFrame->height != e->encoderHeight) {
+  if (e->encoderCtx != NULL &&
+      (e->decoderFrame->width != e->encoderCtx->width ||
+       e->decoderFrame->height != e->encoderCtx->height)) {
     close_encoder_segmenter(e);
   }
 
@@ -486,6 +483,7 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
   if (unixMicro - e->encoderPrevIframeUnixMicroSec >= MICROSECONDS_IN_SECOND) {
     e->encoderPrevIframeUnixMicroSec = unixMicro;
     e->decoderFrame->flags |= AV_FRAME_FLAG_KEY;
+    e->decoderFrame->pict_type = AV_PICTURE_TYPE_I;
   }
 
   ret = avcodec_send_frame(e->encoderCtx, e->decoderFrame);
