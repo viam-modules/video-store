@@ -246,12 +246,12 @@ func TestExtractDateTimeFromFilename(t *testing.T) {
 		{
 			name:             "Unix timestamp format",
 			filename:         unixToFilename(segmentUnix1),
-			expectedDateTime: time.Unix(segmentUnix1, 0).UTC(),
+			expectedDateTime: time.Unix(segmentUnix1, 0),
 		},
 		{
 			name:             "Legacy datetime format (local time)",
 			filename:         unixToDatetimeFilename(segmentUnix1),
-			expectedDateTime: time.Unix(segmentUnix1, 0).UTC(),
+			expectedDateTime: time.Unix(segmentUnix1, 0),
 		},
 		{
 			name:             "Invalid format",
