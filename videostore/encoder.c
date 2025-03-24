@@ -63,10 +63,6 @@ int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
     goto cleanup;
   }
 
-  av_log(NULL, AV_LOG_FATAL,
-         "BEFORE encoderCtx->time_base: %d/%d, encoderCtx->framerate: %d/%d\n",
-         encoderCtx->time_base.num, encoderCtx->time_base.den,
-         encoderCtx->framerate.num, encoderCtx->framerate.den);
   ret = avcodec_open2(encoderCtx, e->encoderCodec, &encoderOpts);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
@@ -75,10 +71,6 @@ int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
            av_err2str(ret));
     goto cleanup;
   }
-  av_log(NULL, AV_LOG_FATAL,
-         "AFTER encoderCtx->time_base: %d/%d, encoderCtx->framerate: %d/%d\n",
-         encoderCtx->time_base.num, encoderCtx->time_base.den,
-         encoderCtx->framerate.num, encoderCtx->framerate.den);
 
   // END video encoder
   // BEGIN Segmenter
@@ -168,8 +160,6 @@ int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
     goto cleanup;
   }
 
-  /* av_log(NULL, AV_LOG_FATAL, "BEFORE segmenterStream->time_base: %d/%d\n", */
-  /*        segmenterStream->time_base.num, segmenterStream->time_base.den); */
   ret = avformat_write_header(segmenterCtx, &segmenterOpts);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
@@ -177,9 +167,6 @@ int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
            av_err2str(ret));
     goto cleanup;
   }
-  /* av_log(NULL, AV_LOG_FATAL, "AFTER segmenterStream->time_base: %d/%d\n", */
-  /*        segmenterStream->time_base.num, segmenterStream->time_base.den); */
-
   // encoder
   e->encoderCtx = encoderCtx;
   e->encoderWidth = width;
@@ -200,12 +187,6 @@ cleanup:
     }
 
     if (encoderCtx != NULL) {
-      int tmpRet = avcodec_close(encoderCtx);
-      if (tmpRet < 0) {
-        av_log(NULL, AV_LOG_ERROR,
-               "setup_encoder_segmenter failed to close codec H264: %s\n",
-               av_err2str(tmpRet));
-      }
       avcodec_free_context(&encoderCtx);
     }
   }
@@ -227,7 +208,6 @@ void close_encoder_segmenter(struct video_store_h264_encoder *e) {
   // segmenter
   int ret = 0;
   if (e->segmenterCtx != NULL) {
-    av_log(NULL, AV_LOG_FATAL, "writin trailer\n");
     ret = av_write_trailer(e->segmenterCtx);
     if (ret < 0) {
       av_log(NULL, AV_LOG_ERROR,
@@ -239,16 +219,7 @@ void close_encoder_segmenter(struct video_store_h264_encoder *e) {
   }
 
   // encoder
-  // TODO: apparently this function shouldn't be needed?
   if (e->encoderCtx != NULL) {
-    av_log(NULL, AV_LOG_FATAL, "closing encoder\n");
-    ret = avcodec_close(e->encoderCtx);
-    if (ret < 0) {
-      av_log(NULL, AV_LOG_ERROR,
-             "close_encoder_segmenter failed to close codec H264: %s\n",
-             av_err2str(ret));
-    }
-    /* av_frame_free(&(*ppE)->encoderFrame); */
     avcodec_free_context(&e->encoderCtx);
     e->encoderCtx = NULL;
     e->encoderWidth = 0;
@@ -269,6 +240,9 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
   struct video_store_h264_encoder *e = NULL;
   AVFrame *decoderFrame = NULL;
   AVCodecContext *decoderCtx = NULL;
+  AVPacket *decoderPkt = NULL;
+  AVPacket *encoderPkt = NULL;
+
   int ret = VIDEO_STORE_ENCODER_RESP_ERROR;
 
   // calloc so that the memory is zeroed which is a safer default
@@ -297,10 +271,6 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
   }
 
   decoderCtx->pix_fmt = AV_PIX_FMT_YUV420P;
-  av_log(NULL, AV_LOG_FATAL,
-         " decoderCtx->time_base.num: %d,  "
-         "decoderCtx->time_base.den: %d\n",
-         decoderCtx->time_base.num, decoderCtx->time_base.den);
   ret = avcodec_open2(decoderCtx, frameCodec, NULL);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
@@ -321,6 +291,23 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
   // END frame decoder
 
   // BEGIN video encoder
+
+  // TODO: move this to struct
+  decoderPkt = av_packet_alloc();
+  if (decoderPkt == NULL) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_h264_encoder_write failed to allocate AVPacket\n");
+    ret = VIDEO_STORE_ENCODER_RESP_ERROR;
+    goto cleanup;
+  }
+  // TODO: make it so that only one packet gets allocated
+  encoderPkt = av_packet_alloc();
+  if (encoderPkt == NULL) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_h264_encoder_write failed to av_packet_alloc\n");
+    ret = VIDEO_STORE_ENCODER_RESP_ERROR;
+    goto cleanup;
+  }
   const AVCodec *encoderCodec = avcodec_find_encoder(AV_CODEC_ID_H264);
   if (encoderCodec == NULL) {
     av_log(NULL, AV_LOG_ERROR,
@@ -358,6 +345,8 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
   e->targetFrameRate = targetFrameRate;
   e->preset = presetStr;
   e->outputPattern = outputPatternStr;
+  e->encoderPkt = encoderPkt;
+  e->decoderPkt = decoderPkt;
 
   *ppE = e;
   ret = VIDEO_STORE_ENCODER_RESP_OK;
@@ -370,13 +359,6 @@ cleanup:
       free(e);
     }
     if (decoderCtx != NULL) {
-      int tmpRet = avcodec_close(decoderCtx);
-      if (tmpRet < 0) {
-        av_log(
-            NULL, AV_LOG_ERROR,
-            "video_store_h264_encoder_init failed to close codec MJPEG: %s\n",
-            av_err2str(tmpRet));
-      }
       avcodec_free_context(&decoderCtx);
     }
     if (decoderFrame != NULL) {
@@ -415,19 +397,10 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
            "payload pointer");
     return VIDEO_STORE_ENCODER_RESP_ERROR;
   }
-  // fill a jpeg pkt with the frame bytes
+  av_packet_unref(e->decoderPkt);
+  av_packet_unref(e->encoderPkt);
   int ret = VIDEO_STORE_ENCODER_RESP_ERROR;
-  AVPacket *decoderPkt = NULL;
-  AVPacket *encoderPkt = NULL;
-
-  // TODO: move this to struct
-  decoderPkt = av_packet_alloc();
-  if (decoderPkt == NULL) {
-    av_log(NULL, AV_LOG_ERROR,
-           "video_store_h264_encoder_write failed to allocate AVPacket\n");
-    ret = VIDEO_STORE_ENCODER_RESP_ERROR;
-    goto cleanup;
-  }
+  // fill a jpeg pkt with the frame bytes
   uint8_t *data = av_malloc(payloadSize);
   if (data == NULL) {
     av_log(NULL, AV_LOG_ERROR,
@@ -436,7 +409,7 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
     goto cleanup;
   }
   memcpy(data, payload, payloadSize);
-  ret = av_packet_from_data(decoderPkt, data, (int)payloadSize);
+  ret = av_packet_from_data(e->decoderPkt, data, (int)payloadSize);
   if (ret != 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_h264_encoder_write failed to create new "
@@ -446,12 +419,12 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
     av_free(data);
     goto cleanup;
   }
-  decoderPkt->size = (int)payloadSize;
+  e->decoderPkt->size = (int)payloadSize;
   // The mjpeg decoder can figure out width and height from the frame bytes.
 
   // We don't need to pass width and height to initJPEGDecoder and it can
   // recover from a change in resolution.
-  ret = avcodec_send_packet(e->decoderCtx, decoderPkt);
+  ret = avcodec_send_packet(e->decoderCtx, e->decoderPkt);
   if (ret != 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_h264_encoder_write failed to avcodec_send_packet %s\n",
@@ -474,7 +447,6 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
   // and set them to null
   if (e->decoderFrame->width != e->encoderWidth ||
       e->decoderFrame->height != e->encoderHeight) {
-    av_log(NULL, AV_LOG_FATAL, "dimentions changed");
     close_encoder_segmenter(e);
   }
 
@@ -512,7 +484,6 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
   // to split the video files at keyframe boundaries.
   // if it has been a second or more, add an iframe
   if (unixMicro - e->encoderPrevIframeUnixMicroSec >= MICROSECONDS_IN_SECOND) {
-    av_log(NULL, AV_LOG_FATAL, "keyframe!!!\n");
     e->encoderPrevIframeUnixMicroSec = unixMicro;
     e->decoderFrame->flags |= AV_FRAME_FLAG_KEY;
   }
@@ -524,15 +495,8 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
            av_err2str(ret));
     goto cleanup;
   }
-  // TODO: make it so that only one packet gets allocated
-  encoderPkt = av_packet_alloc();
-  if (encoderPkt == NULL) {
-    av_log(NULL, AV_LOG_ERROR,
-           "video_store_h264_encoder_write failed to av_packet_alloc\n");
-    ret = VIDEO_STORE_ENCODER_RESP_ERROR;
-    goto cleanup;
-  }
-  ret = avcodec_receive_packet(e->encoderCtx, encoderPkt);
+
+  ret = avcodec_receive_packet(e->encoderCtx, e->encoderPkt);
   if (ret < 0) {
     av_log(
         NULL, AV_LOG_ERROR,
@@ -541,13 +505,8 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
     ret = VIDEO_STORE_ENCODER_RESP_ERROR;
     goto cleanup;
   }
-  /* av_log(NULL, AV_LOG_FATAL, */
-  /*        "encoderPkt->pts: %lld, encoderPkt->dts: %lld, " */
-  /*        "time_base: %d/%d \n", */
-  /*        encoderPkt->pts, encoderPkt->dts, encoderPkt->time_base.num, */
-  /*        encoderPkt->time_base.den); */
 
-  ret = av_interleaved_write_frame(e->segmenterCtx, encoderPkt);
+  ret = av_interleaved_write_frame(e->segmenterCtx, e->encoderPkt);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_h264_encoder_write failed to "
@@ -558,10 +517,8 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
   }
 
 cleanup:
-  av_packet_unref(decoderPkt);
-  av_packet_free(&decoderPkt);
-  av_packet_unref(encoderPkt);
-  av_packet_free(&encoderPkt);
+  av_packet_unref(e->decoderPkt);
+  av_packet_unref(e->encoderPkt);
   return ret;
 }
 
@@ -583,9 +540,11 @@ int video_store_h264_encoder_close(struct video_store_h264_encoder **ppE // OUT
     return VIDEO_STORE_ENCODER_RESP_ERROR;
   }
   close_encoder_segmenter(*ppE);
+  av_packet_free(&(*ppE)->encoderPkt);
 
   // decoder
   av_frame_free(&(*ppE)->decoderFrame);
+  av_packet_free(&(*ppE)->decoderPkt);
   avcodec_free_context(&(*ppE)->decoderCtx);
   free((void *)(*ppE)->outputPattern);
   free((void *)(*ppE)->preset);
