@@ -297,6 +297,10 @@ func (vs *videostore) Segmenter() *RawSegmenter {
 }
 
 func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse, error) {
+	// Convert incoming local times to UTC for consistent timestamp handling
+	// All internal operations and segmenter timestamps are in UTC
+	r.From = r.From.UTC()
+	r.To = r.To.UTC()
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
@@ -331,6 +335,10 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 }
 
 func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, error) {
+	// Convert incoming local times to UTC for consistent timestamp handling
+	// All internal operations and segmenter timestamps are in UTC
+	r.From = r.From.UTC()
+	r.To = r.To.UTC()
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}

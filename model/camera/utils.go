@@ -38,10 +38,6 @@ func parseTimeRange(command map[string]interface{}) (from, to time.Time, err err
 	if err != nil {
 		return time.Time{}, time.Time{}, err
 	}
-	// Convert incoming local times to UTC for consistent timestamp handling
-	// All internal operations and stored timestamps are in UTC
-	from = from.UTC()
-	to = to.UTC()
 	return from, to, nil
 }
 
