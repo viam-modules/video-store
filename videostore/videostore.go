@@ -7,11 +7,9 @@ package videostore
 import "C"
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"image/jpeg"
 	"os"
 	"path/filepath"
 	"time"
@@ -377,12 +375,7 @@ func fetchAndProcessFrames(
 				continue
 			}
 			if !initialized {
-				img, err := jpeg.Decode(bytes.NewReader(data))
-				if err != nil {
-					logger.Warnf("first image was unable to be decoded")
-					continue
-				}
-				if err := encoder.initialize(img.Bounds().Dx(), img.Bounds().Dy()); err != nil {
+				if err := encoder.initialize(); err != nil {
 					logger.Warnf("encoder init failed: %s", err.Error())
 					continue
 				}

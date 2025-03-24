@@ -9,21 +9,32 @@ int main(int argc, char *argv[]) {
   if (argc != 2) {
     printf("usage: %s <sqlite.db>\n", argv[0]);
     printf("TABLE should have the following schema:\n");
-    printf(
-        "CREATE TABLE images(id INTEGER NOT NULL PRIMARY KEY, data BLOB);\n");
+    printf("CREATE TABLE images(id INTEGER NOT NULL PRIMARY KEY, data BLOB, "
+           "unixMicro INTEGER);\n");
     return 1;
   }
 
   // init
-  int width = 2560;
-  int height = 1440;
   int bitrate = 100000;
   int fps = 20;
   char preset[] = "medium";
   struct video_store_h264_encoder *e = NULL;
-  int ret =
-      video_store_h264_encoder_init(&e, 30, "./mp4s/h264_%Y-%m-%d_%H-%M-%S.mp4",
-                                    width, height, bitrate, fps, preset);
+  // confirm init followed by close is valid
+  int ret = video_store_h264_encoder_init(
+      &e, 30, "./mp4s/h264_%Y-%m-%d_%H-%M-%S.mp4", bitrate, fps, preset);
+  if (ret != VIDEO_STORE_ENCODER_RESP_OK) {
+    printf("Failed to init encoder: %d\n", ret);
+    return 1;
+  }
+  ret = video_store_h264_encoder_close(&e);
+  if (ret != VIDEO_STORE_ENCODER_RESP_OK) {
+    printf("Failed to close encoder: %d\n", ret);
+    return 1;
+  }
+
+  e = NULL;
+  ret = video_store_h264_encoder_init(
+      &e, 30, "./mp4s/h264_%Y-%m-%d_%H-%M-%S.mp4", bitrate, fps, preset);
   if (ret != VIDEO_STORE_ENCODER_RESP_OK) {
     printf("Failed to init encoder: %d\n", ret);
     return 1;
@@ -41,9 +52,9 @@ int main(int argc, char *argv[]) {
 
   sqlite3_stmt *statement;
   printf("Performing query...\n");
-  if ((rc = sqlite3_prepare_v2(db, "SELECT (data) FROM images;", -1, &statement,
-                               0))) {
-    printf("sqlite3_prepare failed on extradata: %d\n", rc);
+  if ((rc = sqlite3_prepare_v2(db, "SELECT data, unixMicro FROM images;", -1,
+                               &statement, 0))) {
+    printf("sqlite3_prepare failed on images: %d\n", rc);
     return rc;
   }
 
@@ -55,9 +66,10 @@ int main(int argc, char *argv[]) {
     }
 
     printf("calling video_store_h264_encoder_frame");
-    ret = video_store_h264_encoder_frame(
-        e, (uint8_t *)sqlite3_column_blob(statement, 0),
-        sqlite3_column_bytes(statement, 0));
+    ret = video_store_h264_encoder_write(
+        e, sqlite3_column_int64(statement, 1),
+        (uint8_t *)sqlite3_column_blob(statement, 0),
+        (size_t)sqlite3_column_bytes(statement, 0));
     if (ret != VIDEO_STORE_ENCODER_RESP_OK) {
       printf("Failed to write frame: %d\n", ret);
       failed = 1;

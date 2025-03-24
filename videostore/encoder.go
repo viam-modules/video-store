@@ -22,8 +22,6 @@ const (
 type encoder struct {
 	logger         logging.Logger
 	framerate      int
-	width          int
-	height         int
 	bitrate        int
 	preset         string
 	sizeGB         int
@@ -62,10 +60,7 @@ func newEncoder(
 	return enc, nil
 }
 
-func (e *encoder) initialize(width, height int) error {
-	if width <= 0 || height <= 0 {
-		return errors.New("both width and height must be greater than zero")
-	}
+func (e *encoder) initialize() error {
 	var cEncoder *C.video_store_h264_encoder
 	e.cEncoderMu.Lock()
 	defer e.cEncoderMu.Unlock()
@@ -79,13 +74,11 @@ func (e *encoder) initialize(width, height int) error {
 	presetCStr := C.CString(e.preset)
 	defer C.free(unsafe.Pointer(presetCStr))
 
-	e.logger.Infof("video_store_h264_encoder_init: e.segmentSeconds: %d, path: %s, width: %d, height: %d, bitrate: %d, framerate: %d, preset: %s", e.segmentSeconds, e.storagePath+"/"+outputPattern, e.width, e.height, e.bitrate, e.framerate, e.preset)
+	e.logger.Infof("video_store_h264_encoder_init: e.segmentSeconds: %d, path: %s, bitrate: %d, framerate: %d, preset: %s", e.segmentSeconds, e.storagePath+"/"+outputPattern, e.bitrate, e.framerate, e.preset)
 	ret := C.video_store_h264_encoder_init(
 		&cEncoder,
 		C.int(e.segmentSeconds),
 		outputPatternCStr,
-		C.int(width),
-		C.int(height),
 		C.int64_t(e.bitrate),
 		C.int(e.framerate),
 		presetCStr,
@@ -97,8 +90,6 @@ func (e *encoder) initialize(width, height int) error {
 		return err
 	}
 	e.cEncoder = cEncoder
-	e.width = width
-	e.height = height
 	return nil
 }
 
@@ -119,7 +110,7 @@ func (e *encoder) encode(frame []byte, now time.Time) {
 		e.logger.Errorf("encode called before init")
 		return
 	}
-	ret := C.video_store_h264_encoder_frame(
+	ret := C.video_store_h264_encoder_write(
 		e.cEncoder,
 		C.int64_t(unixMicro),
 		payloadC,
