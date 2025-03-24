@@ -482,7 +482,7 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
   // if it has been a second or more, add an iframe
   if (unixMicro - e->encoderPrevIframeUnixMicroSec >= MICROSECONDS_IN_SECOND) {
     e->encoderPrevIframeUnixMicroSec = unixMicro;
-    e->decoderFrame->flags |= AV_FRAME_FLAG_KEY;
+    e->decoderFrame->key_frame = 1;
     e->decoderFrame->pict_type = AV_PICTURE_TYPE_I;
   }
 
