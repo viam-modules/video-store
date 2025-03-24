@@ -10,10 +10,11 @@ import (
 
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/test"
+
+	"github.com/viam-modules/video-store/videostore"
 )
 
 const (
-	timeFormat                 = "2006-01-02_15-04-05"
 	validFromTimestamp         = "2024-09-06_15-00-33"
 	validToTimestamp           = "2024-09-06_15-01-33"
 	validFromTimestampStrftime = "2024-09-06_15-00-02"
@@ -146,11 +147,11 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, ok, test.ShouldBeTrue)
 
 		// Calculate expected timestamp from fromTime
-		fromTime, err := time.Parse(timeFormat, validFromTimestamp)
+		fromTime, err := time.Parse(videostore.TimeFormat, validFromTimestamp)
 		test.That(t, err, test.ShouldBeNil)
 		expectedFilename := fmt.Sprintf("%s_%s_%s.mp4",
 			videoStoreComponentName,
-			fromTime.Format(timeFormat),
+			fromTime.Format(videostore.TimeFormat),
 			"test-metadata")
 		test.That(t, filename, test.ShouldEqual, expectedFilename)
 		test.That(t, filename, test.ShouldContainSubstring, "test-metadata")
@@ -247,8 +248,8 @@ func TestSaveDoCommand(t *testing.T) {
 		fromTime := now.Add(-5 * time.Second)
 		toTime := now
 
-		fromTimeStr := fromTime.Format(timeFormat)
-		toTimeStr := toTime.Format(timeFormat)
+		fromTimeStr := fromTime.Format(videostore.TimeFormat)
+		toTimeStr := toTime.Format(videostore.TimeFormat)
 
 		saveCmdNow := map[string]interface{}{
 			"command":  "save",
@@ -266,7 +267,7 @@ func TestSaveDoCommand(t *testing.T) {
 
 		expectedFilename := fmt.Sprintf("%s_%s_%s.mp4",
 			videoStoreComponentName,
-			fromTime.Format(timeFormat),
+			fromTime.Format(videostore.TimeFormat),
 			"test-metadata")
 		test.That(t, filename, test.ShouldEqual, expectedFilename)
 

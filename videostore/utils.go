@@ -270,11 +270,11 @@ func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	return ParseDateTimeString(nameWithoutExt)
 }
 
-// ParseDateTimeString parses a datetime string in our format "2006-01-02_15-04-05" from localtime,
+// ParseDateTimeString parses a datetime string in our format (2006-01-02_15-04-05) from localtime,
 // converting it to UTC for internal processing.
 func ParseDateTimeString(datetime string) (time.Time, error) {
 	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time before UTC conversion.
-	t, err := time.ParseInLocation("2006-01-02_15-04-05", datetime, time.Local)
+	t, err := time.ParseInLocation(TimeFormat, datetime, time.Local)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -374,7 +374,7 @@ func generateOutputFilePath(prefix string, timestamp time.Time, metadata, dir st
 	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time for outputs.
 	// We do not rely on localtime strftime for actual segments. They are stored in Unix UTC time.
 	localTime := timestamp.In(time.Local)
-	filename := localTime.Format("2006-01-02_15-04-05")
+	filename := localTime.Format(TimeFormat)
 
 	if prefix != "" {
 		filename = fmt.Sprintf("%s_%s", prefix, filename)

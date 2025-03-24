@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/robot/client"
@@ -73,8 +74,8 @@ func main() {
 		now := time.Now()
 		randomSeconds := rand.Intn(56) + 5 // 5 to 60 seconds
 		from := now.Add(-time.Duration(randomSeconds) * time.Second)
-		nowStr := now.Format("2006-01-02_15-04-05")
-		fromStr := from.Format("2006-01-02_15-04-05")
+		nowStr := now.Format(videostore.TimeFormat)
+		fromStr := from.Format(videostore.TimeFormat)
 		_, err = videoStore.DoCommand(context.Background(),
 			map[string]interface{}{
 				"command":  "save",
