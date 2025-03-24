@@ -348,7 +348,8 @@ func fetchAndProcessFrames(
 	ctx context.Context,
 	framePoller FramePollerConfig,
 	encoder *encoder,
-	logger logging.Logger) {
+	logger logging.Logger,
+) {
 	defer encoder.close()
 	frameInterval := time.Second / time.Duration(framePoller.Framerate)
 	ticker := time.NewTicker(frameInterval)

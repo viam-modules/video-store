@@ -74,7 +74,8 @@ func (e *encoder) initialize() error {
 	presetCStr := C.CString(e.preset)
 	defer C.free(unsafe.Pointer(presetCStr))
 
-	e.logger.Infof("video_store_h264_encoder_init: e.segmentSeconds: %d, path: %s, bitrate: %d, framerate: %d, preset: %s", e.segmentSeconds, e.storagePath+"/"+outputPattern, e.bitrate, e.framerate, e.preset)
+	e.logger.Infof("video_store_h264_encoder_init: e.segmentSeconds: %d, path: %s, bitrate: %d, framerate: %d, preset: %s",
+		e.segmentSeconds, e.storagePath+"/"+outputPattern, e.bitrate, e.framerate, e.preset)
 	ret := C.video_store_h264_encoder_init(
 		&cEncoder,
 		C.int(e.segmentSeconds),
