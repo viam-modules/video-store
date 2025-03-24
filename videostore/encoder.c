@@ -417,12 +417,12 @@ int video_store_h264_encoder_frame(struct video_store_h264_encoder *pE, // IN
   /*     packet->duration, inStream->time_base, outStream->time_base, */
   /*     AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX); */
   /* packet->pos = -1; */
-  av_log(NULL, AV_LOG_FATAL,
-         "pE->decoderFrame->pts: %lld, pE->decoderFrame->pkt_pts: %lld, "
-         "time_base: %d/%d, dims: %dx%d \n",
-         pE->decoderFrame->pts, pE->decoderFrame->pkt_dts,
-         pE->decoderFrame->time_base.num, pE->decoderFrame->time_base.den,
-         pE->decoderFrame->width, pE->decoderFrame->height);
+  /* av_log(NULL, AV_LOG_FATAL, */
+  /*        "pE->decoderFrame->pts: %lld, pE->decoderFrame->pkt_pts: %lld, " */
+  /*        "time_base: %d/%d, dims: %dx%d \n", */
+  /*        pE->decoderFrame->pts, pE->decoderFrame->pkt_dts, */
+  /*        pE->decoderFrame->time_base.num, pE->decoderFrame->time_base.den, */
+  /*        pE->decoderFrame->width, pE->decoderFrame->height); */
 
   // TODO Handle frame size changing
 
@@ -481,11 +481,11 @@ int video_store_h264_encoder_frame(struct video_store_h264_encoder *pE, // IN
     ret = VIDEO_STORE_ENCODER_RESP_ERROR;
     goto cleanup;
   }
-  av_log(NULL, AV_LOG_FATAL,
-         "encoderPkt->pts: %lld, encoderPkt->dts: %lld, "
-         "time_base: %d/%d \n",
-         encoderPkt->pts, encoderPkt->dts, encoderPkt->time_base.num,
-         encoderPkt->time_base.den);
+  /* av_log(NULL, AV_LOG_FATAL, */
+  /*        "encoderPkt->pts: %lld, encoderPkt->dts: %lld, " */
+  /*        "time_base: %d/%d \n", */
+  /*        encoderPkt->pts, encoderPkt->dts, encoderPkt->time_base.num, */
+  /*        encoderPkt->time_base.den); */
 
   ret = av_interleaved_write_frame(pE->segmenterCtx, encoderPkt);
   if (ret < 0) {
