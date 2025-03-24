@@ -272,7 +272,7 @@ func TestExtractDateTimeFromFilename(t *testing.T) {
 			}
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, dateTime.Equal(tt.expectedDateTime), test.ShouldBeTrue)
-			test.That(t, dateTime.Location(), test.ShouldEqual, time.UTC)
+			test.That(t, dateTime.Location(), test.ShouldEqual, time.Local)
 		})
 	}
 }

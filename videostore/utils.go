@@ -239,7 +239,8 @@ func createAndSortFileWithDateList(filePaths []string) []fileWithDate {
 	for _, filePath := range filePaths {
 		date, err := extractDateTimeFromFilename(filePath)
 		if err == nil {
-			validFiles = append(validFiles, fileWithDate{name: filePath, startTime: date})
+			dateUTC := date.UTC()
+			validFiles = append(validFiles, fileWithDate{name: filePath, startTime: dateUTC})
 		}
 	}
 	sortFilesByDate(validFiles)
@@ -254,31 +255,25 @@ func sortFilesByDate(files []fileWithDate) {
 }
 
 // extractDateTimeFromFilename extracts the date and time from the filename.
-// Returns UTC time regardless of filename format:
-// - Unix timestamp filenames: directly converts to UTC time
-// - Datetime format filenames (YYYY-MM-DD_HH-mm-ss): parses as local time, converts to UTC
+// Returns time in the inputted timezone.
 func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 	baseName := filepath.Base(filePath)
 	nameWithoutExt := strings.TrimSuffix(baseName, filepath.Ext(baseName))
 
-	// Unix timestamp case
+	// Unix timestamp case - keep in UTC
 	if timestamp, err := strconv.ParseInt(nameWithoutExt, 10, 64); err == nil {
-		return time.Unix(timestamp, 0).UTC(), nil
+		return time.Unix(timestamp, 0), nil
 	}
 
-	// Datetime format case
+	// Datetime format case - keep in local time
 	return ParseDateTimeString(nameWithoutExt)
 }
 
-// ParseDateTimeString parses a datetime string in our format (2006-01-02_15-04-05) from localtime,
-// converting it to UTC for internal processing.
+// ParseDateTimeString parses a datetime string in our format (2006-01-02_15-04-05)
+// and returns it in local time.
 func ParseDateTimeString(datetime string) (time.Time, error) {
-	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time before UTC conversion.
-	t, err := time.ParseInLocation(TimeFormat, datetime, time.Local)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return t.UTC(), nil
+	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time
+	return time.ParseInLocation(TimeFormat, datetime, time.Local)
 }
 
 // matchStorageToRange identifies video files that overlap with the requested time range (start to end)
@@ -369,6 +364,7 @@ func cacheFirstVid(first *videoInfo, current videoInfo) {
 }
 
 // generateOutputFilePath generates the output filename for the video file.
+// The filename timestamp is formatted in local time.
 func generateOutputFilePath(prefix string, timestamp time.Time, metadata, dir string) string {
 	// Format timestamp in local time for user-friendly filenames
 	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time for outputs.
