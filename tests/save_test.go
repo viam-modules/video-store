@@ -8,8 +8,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/test"
+)
+
+// TODO(RSDK-10317): tests only pass on machines with UTC timezone.
+const (
+	validFromTimestamp         = "2024-09-06_15-00-33"
+	validToTimestamp           = "2024-09-06_15-01-33"
+	validFromTimestampStrftime = "2024-09-06_15-00-02"
+	validToTimestampUnixInt    = "2024-09-06_15-00-04"
+	invalidFromTimestamp       = "2024-09-06_14-00-03"
+	invalidToTimestamp         = "3024-09-06_15-00-33"
+	invalidDatetimeFormat      = "2024/09/06 15:01:33"
 )
 
 func TestSaveDoCommand(t *testing.T) {
@@ -82,32 +94,32 @@ func TestSaveDoCommand(t *testing.T) {
 	// Valid time range
 	saveCmd1 := map[string]interface{}{
 		"command":  "save",
-		"from":     "2024-09-06_15-00-33",
-		"to":       "2024-09-06_15-01-33",
+		"from":     validFromTimestamp,
+		"to":       validToTimestamp,
 		"metadata": "test-metadata",
 	}
 
 	// Invalid time range
 	saveCmd2 := map[string]interface{}{
 		"command":  "save",
-		"from":     "2024-09-06_14-00-03",
-		"to":       "2024-09-06_15-01-33",
+		"from":     invalidFromTimestamp,
+		"to":       validToTimestamp,
 		"metadata": "test-metadata",
 	}
 
 	// Invalid datetime format
 	saveCmd3 := map[string]interface{}{
 		"command":  "save",
-		"from":     "2024-09-06_15-00-33",
-		"to":       "2024/09/06 15:01:33",
+		"from":     validFromTimestamp,
+		"to":       invalidDatetimeFormat,
 		"metadata": "test-metadata",
 	}
 
 	// Valid async save
 	saveCmd4 := map[string]interface{}{
 		"command":  "save",
-		"from":     "2024-09-06_15-00-33",
-		"to":       "2024-09-06_15-01-33",
+		"from":     validFromTimestamp,
+		"to":       validToTimestamp,
 		"metadata": "test-metadata",
 		"async":    true,
 	}
@@ -115,8 +127,8 @@ func TestSaveDoCommand(t *testing.T) {
 	// Invalid async save with future timestamp
 	saveCmd5 := map[string]interface{}{
 		"command":  "save",
-		"from":     "2024-09-06_15-00-33",
-		"to":       "3024-09-06_15-00-33",
+		"from":     validFromTimestamp,
+		"to":       invalidToTimestamp,
 		"metadata": "test-metadata",
 		"async":    true,
 	}
@@ -133,8 +145,17 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		filename, ok := res["filename"].(string)
 		test.That(t, ok, test.ShouldBeTrue)
+
+		// Calculate expected timestamp from fromTime
+		fromTime, err := time.Parse(videostore.TimeFormat, validFromTimestamp)
+		test.That(t, err, test.ShouldBeNil)
+		expectedFilename := fmt.Sprintf("%s_%s_%s.mp4",
+			videoStoreComponentName,
+			fromTime.Format(videostore.TimeFormat),
+			"test-metadata")
+		test.That(t, filename, test.ShouldEqual, expectedFilename)
 		test.That(t, filename, test.ShouldContainSubstring, "test-metadata")
-		test.That(t, filename, test.ShouldContainSubstring, "2024-09-06_15-00-33")
+
 		filePath := filepath.Join(testUploadPath, filename)
 		testVideoPlayback(t, filePath)
 		testVideoDuration(t, filePath, 60)
@@ -219,13 +240,17 @@ func TestSaveDoCommand(t *testing.T) {
 		defer r.Close(timeoutCtx)
 		vs, err := camera.FromRobot(r, videoStoreComponentName)
 		test.That(t, err, test.ShouldBeNil)
+
 		// Wait for the first video segment to be created.
 		time.Sleep(10 * time.Second)
+
 		now := time.Now()
 		fromTime := now.Add(-5 * time.Second)
 		toTime := now
-		fromTimeStr := fromTime.Format("2006-01-02_15-04-05")
-		toTimeStr := toTime.Format("2006-01-02_15-04-05")
+
+		fromTimeStr := fromTime.Format(videostore.TimeFormat)
+		toTimeStr := toTime.Format(videostore.TimeFormat)
+
 		saveCmdNow := map[string]interface{}{
 			"command":  "save",
 			"from":     fromTimeStr,
@@ -235,11 +260,50 @@ func TestSaveDoCommand(t *testing.T) {
 		}
 		res, err := vs.DoCommand(timeoutCtx, saveCmdNow)
 		test.That(t, err, test.ShouldBeNil)
-		_, ok := res["filename"].(string)
+		filename, ok := res["filename"].(string)
 		test.That(t, ok, test.ShouldBeTrue)
 		// Wait for async save to complete.
 		time.Sleep(35 * time.Second)
-		filename := fmt.Sprintf("%s_%s_%s.mp4", videoStoreComponentName, fromTimeStr, "test-metadata")
+
+		expectedFilename := fmt.Sprintf("%s_%s_%s.mp4",
+			videoStoreComponentName,
+			fromTime.Format(videostore.TimeFormat),
+			"test-metadata")
+		test.That(t, filename, test.ShouldEqual, expectedFilename)
+
+		concatPath := filepath.Join(testUploadPath, filename)
+		_, err = os.Stat(concatPath)
+		test.That(t, err, test.ShouldBeNil)
+		testVideoPlayback(t, concatPath)
+	})
+
+	t.Run("Test Save DoCommand across strftime and unix int segments", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config1)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		vs, err := camera.FromRobot(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
+
+		saveCmd := map[string]interface{}{
+			"command":  "save",
+			"from":     validFromTimestampStrftime,
+			"to":       validToTimestampUnixInt,
+			"metadata": "test-metadata",
+		}
+
+		res, err := vs.DoCommand(timeoutCtx, saveCmd)
+		test.That(t, err, test.ShouldBeNil)
+		filename, ok := res["filename"].(string)
+		test.That(t, ok, test.ShouldBeTrue)
+
+		expectedFilename := fmt.Sprintf("%s_%s_%s.mp4",
+			videoStoreComponentName,
+			validFromTimestampStrftime,
+			"test-metadata")
+		test.That(t, filename, test.ShouldEqual, expectedFilename)
+
 		concatPath := filepath.Join(testUploadPath, filename)
 		_, err = os.Stat(concatPath)
 		test.That(t, err, test.ShouldBeNil)
