@@ -44,7 +44,7 @@ const (
 
 	mimeTypeYUYV = "image/yuyv422"
 	// TimeFormat is how we format the timestamp in output filenames and do commands.
-	TimeFormat   = "2006-01-02_15-04-05"
+	TimeFormat = "2006-01-02_15-04-05"
 )
 
 var presets = map[string]struct{}{
