@@ -9,10 +9,11 @@
 #define H264_CLOCK_TIME 90000
 #define MICROSECONDS_IN_SECOND 1000000
 typedef struct video_store_h264_encoder {
+  int count;
   // decoder
   AVCodecContext *decoderCtx;
   AVFrame *decoderFrame;
-  AVPacket *decoderPkt;
+  /* AVPacket *decoderPkt; */
 
   // encoder
   AVCodecContext *encoderCtx;

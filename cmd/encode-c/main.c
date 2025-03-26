@@ -6,14 +6,16 @@
 #include <string.h>
 
 int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    printf("usage: %s <sqlite.db>\n", argv[0]);
+  if (argc != 2 && argc != 3) {
+    printf("usage: %s <sqlite.db> [short]\n", argv[0]);
     printf("TABLE should have the following schema:\n");
     printf("CREATE TABLE images(id INTEGER NOT NULL PRIMARY KEY, data BLOB, "
            "unixMicro INTEGER);\n");
     return 1;
   }
 
+  // write
+  av_log_set_level(AV_LOG_DEBUG);
   // init
   int bitrate = 100000;
   int fps = 20;
@@ -40,8 +42,6 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // write
-  av_log_set_level(AV_LOG_DEBUG);
   sqlite3 *db = NULL;
   int rc = 0;
 
@@ -52,10 +52,19 @@ int main(int argc, char *argv[]) {
 
   sqlite3_stmt *statement;
   printf("Performing query...\n");
-  if ((rc = sqlite3_prepare_v2(db, "SELECT data, unixMicro FROM images;", -1,
-                               &statement, 0))) {
-    printf("sqlite3_prepare failed on images: %d\n", rc);
-    return rc;
+  if (argc == 3) {
+    if ((rc = sqlite3_prepare_v2(db,
+                                 "SELECT data, unixMicro FROM images limit 60;",
+                                 -1, &statement, 0))) {
+      printf("sqlite3_prepare failed on images: %d\n", rc);
+      return rc;
+    }
+  } else {
+    if ((rc = sqlite3_prepare_v2(db, "SELECT data, unixMicro FROM images;", -1,
+                                 &statement, 0))) {
+      printf("sqlite3_prepare failed on images: %d\n", rc);
+      return rc;
+    }
   }
 
   int failed = 0;
