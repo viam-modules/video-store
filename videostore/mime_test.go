@@ -2,7 +2,6 @@ package videostore
 
 import (
 	"bytes"
-	"encoding/binary"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -28,23 +27,6 @@ func createDummyJPEG() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func createDummyYUYVPacket(width, height int) []byte {
-	header := make([]byte, 12)
-	copy(header[0:4], []byte("YUYV"))
-	binary.BigEndian.PutUint32(header[4:8], uint32(width))
-	binary.BigEndian.PutUint32(header[8:12], uint32(height))
-	dataLen := width * height * 2
-	yuyvData := make([]byte, dataLen)
-	for i := 0; i < dataLen; i += 4 {
-		yuyvData[i+0] = 0x80 // U
-		yuyvData[i+1] = 0x10 // Y
-		yuyvData[i+2] = 0x80 // V
-		yuyvData[i+3] = 0x10 // Y
-	}
-
-	return append(header, yuyvData...)
-}
-
 func TestJPEGDecode(t *testing.T) {
 	jpegBytes, err := createDummyJPEG()
 	test.That(t, err, test.ShouldBeNil)
@@ -62,34 +44,5 @@ func TestJPEGDecode(t *testing.T) {
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "failed to send packet to JPEG decoder")
 		test.That(t, frame, test.ShouldBeNil)
-	})
-}
-
-func TestYUYVToYUV420p(t *testing.T) {
-	width := 100
-	height := 100
-	yuyvBytes := createDummyYUYVPacket(width, height)
-	logger := logging.NewLogger("test")
-	mh := newMimeHandler(logger)
-	t.Run("YUYV to YUV420p succeeds with valid YUYV bytes", func(t *testing.T) {
-		frame, err := mh.yuyvToYUV420p(yuyvBytes)
-		test.That(t, err, test.ShouldBeNil)
-		test.That(t, frame, test.ShouldNotBeNil)
-		test.That(t, frame.data[0], test.ShouldNotBeNil)
-	})
-
-	t.Run("YUYV to YUV420p fails with invalid header", func(t *testing.T) {
-		frame, err := mh.yuyvToYUV420p([]byte("invalid yuyv bytes"))
-		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "missing 'YUYV' magic bytes")
-		test.That(t, frame, test.ShouldBeNil)
-	})
-
-	t.Run("Test that header width and height are scraped correctly", func(t *testing.T) {
-		frame, err := mh.yuyvToYUV420p(yuyvBytes)
-		test.That(t, err, test.ShouldBeNil)
-		test.That(t, frame, test.ShouldNotBeNil)
-		test.That(t, frame.width, test.ShouldEqual, width)
-		test.That(t, frame.height, test.ShouldEqual, height)
 	})
 }

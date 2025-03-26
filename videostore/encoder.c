@@ -241,7 +241,7 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
       1, sizeof(struct video_store_h264_encoder));
   if (e == NULL) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_h264_encoder_init failed allocate a "
+           "video_store_h264_encoder_init failed to allocate a "
            "video_store_h264_encoder\n");
     goto cleanup;
   }

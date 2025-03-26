@@ -200,16 +200,13 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	vs.workers.Add(func(ctx context.Context) {
 		vs.fetchFrames(
 			ctx,
-			config.FramePoller,
-			encoder,
-			vs.logger)
+			config.FramePoller)
 	})
 	vs.workers.Add(func(ctx context.Context) {
 		vs.processFrames(
 			ctx,
-			config.FramePoller,
-			encoder,
-			vs.logger)
+			config.FramePoller.Framerate,
+			encoder)
 	})
 	vs.workers.Add(vs.deleter)
 
@@ -360,11 +357,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	return &SaveResponse{Filename: uploadFileName}, nil
 }
 
-func (vs *videostore) fetchFrames(
-	ctx context.Context,
-	framePoller FramePollerConfig,
-	encoder *encoder,
-	logger logging.Logger,
+func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerConfig,
 ) {
 	frameInterval := time.Second / time.Duration(framePoller.Framerate)
 	ticker := time.NewTicker(frameInterval)
@@ -381,12 +374,12 @@ func (vs *videostore) fetchFrames(
 		case <-ticker.C:
 			data, metadata, err = framePoller.Camera.Image(ctx, rutils.MimeTypeJPEG, nil)
 			if err != nil {
-				logger.Warn("failed to get frame from camera: ", err)
+				vs.logger.Warn("failed to get frame from camera: ", err)
 				time.Sleep(retryInterval * time.Second)
 				continue
 			}
 			if actualMimeType, _ := rutils.CheckLazyMIMEType(metadata.MimeType); actualMimeType != rutils.MimeTypeJPEG {
-				logger.Warnf("expected image in mime type %s got %s: ", rutils.MimeTypeJPEG, actualMimeType)
+				vs.logger.Warnf("expected image in mime type %s got %s: ", rutils.MimeTypeJPEG, actualMimeType)
 				continue
 			}
 			vs.latestFrame.Store(data)
@@ -396,12 +389,11 @@ func (vs *videostore) fetchFrames(
 
 func (vs *videostore) processFrames(
 	ctx context.Context,
-	framePoller FramePollerConfig,
+	framerate int,
 	encoder *encoder,
-	logger logging.Logger,
 ) {
 	defer encoder.close()
-	frameInterval := time.Second / time.Duration(framePoller.Framerate)
+	frameInterval := time.Second / time.Duration(framerate)
 	ticker := time.NewTicker(frameInterval)
 	defer ticker.Stop()
 	for {
