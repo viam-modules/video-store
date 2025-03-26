@@ -74,10 +74,10 @@ int main(int argc, char *argv[]) {
       break;
     }
 
+    sqlite3_sleep(50);
     printf("calling video_store_h264_encoder_frame");
     ret = video_store_h264_encoder_write(
-        e, sqlite3_column_int64(statement, 1),
-        (uint8_t *)sqlite3_column_blob(statement, 0),
+        e, (uint8_t *)sqlite3_column_blob(statement, 0),
         (size_t)sqlite3_column_bytes(statement, 0));
     if (ret != VIDEO_STORE_ENCODER_RESP_OK) {
       printf("Failed to write frame: %d\n", ret);

@@ -9,7 +9,6 @@ import "C"
 import (
 	"errors"
 	"sync"
-	"time"
 	"unsafe"
 
 	"go.viam.com/rdk/logging"
@@ -100,8 +99,7 @@ func (e *encoder) initialize() error {
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
 // TODO: propagate error
-func (e *encoder) encode(frame []byte, now time.Time) {
-	unixMicro := now.UnixMicro()
+func (e *encoder) encode(frame []byte) {
 	payloadC := C.CBytes(frame)
 	defer C.free(payloadC)
 
@@ -113,7 +111,6 @@ func (e *encoder) encode(frame []byte, now time.Time) {
 	}
 	ret := C.video_store_h264_encoder_write(
 		e.cEncoder,
-		C.int64_t(unixMicro),
 		payloadC,
 		C.size_t(len(frame)),
 	)

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"go.viam.com/rdk/components/camera"
@@ -57,9 +58,10 @@ var presets = map[string]struct{}{
 }
 
 type videostore struct {
-	typ    SourceType
-	config Config
-	logger logging.Logger
+	latestFrame *atomic.Value
+	typ         SourceType
+	config      Config
+	logger      logging.Logger
 
 	workers *utils.StoppableWorkers
 
@@ -158,10 +160,11 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	}
 
 	vs := &videostore{
-		typ:     config.Type,
-		logger:  logger,
-		config:  config,
-		workers: utils.NewBackgroundStoppableWorkers(),
+		latestFrame: &atomic.Value{},
+		typ:         config.Type,
+		logger:      logger,
+		config:      config,
+		workers:     utils.NewBackgroundStoppableWorkers(),
 	}
 	// Create concater to handle concatenation of video clips when requested.
 	err := createDir(vs.config.Storage.UploadPath)
@@ -188,8 +191,21 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	if err != nil {
 		return nil, err
 	}
+
+	if err := encoder.initialize(); err != nil {
+		logger.Warnf("encoder init failed: %s", err.Error())
+		return nil, err
+	}
+
 	vs.workers.Add(func(ctx context.Context) {
-		fetchAndProcessFrames(
+		vs.fetchFrames(
+			ctx,
+			config.FramePoller,
+			encoder,
+			vs.logger)
+	})
+	vs.workers.Add(func(ctx context.Context) {
+		vs.processFrames(
 			ctx,
 			config.FramePoller,
 			encoder,
@@ -344,21 +360,19 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	return &SaveResponse{Filename: uploadFileName}, nil
 }
 
-func fetchAndProcessFrames(
+func (vs *videostore) fetchFrames(
 	ctx context.Context,
 	framePoller FramePollerConfig,
 	encoder *encoder,
 	logger logging.Logger,
 ) {
-	defer encoder.close()
 	frameInterval := time.Second / time.Duration(framePoller.Framerate)
 	ticker := time.NewTicker(frameInterval)
 	defer ticker.Stop()
 	var (
-		data        []byte
-		metadata    camera.ImageMetadata
-		err         error
-		initialized bool
+		data     []byte
+		metadata camera.ImageMetadata
+		err      error
 	)
 	for {
 		select {
@@ -375,14 +389,30 @@ func fetchAndProcessFrames(
 				logger.Warnf("expected image in mime type %s got %s: ", rutils.MimeTypeJPEG, actualMimeType)
 				continue
 			}
-			if !initialized {
-				if err := encoder.initialize(); err != nil {
-					logger.Warnf("encoder init failed: %s", err.Error())
-					continue
-				}
-				initialized = true
+			vs.latestFrame.Store(data)
+		}
+	}
+}
+
+func (vs *videostore) processFrames(
+	ctx context.Context,
+	framePoller FramePollerConfig,
+	encoder *encoder,
+	logger logging.Logger,
+) {
+	defer encoder.close()
+	frameInterval := time.Second / time.Duration(framePoller.Framerate)
+	ticker := time.NewTicker(frameInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			frame, ok := vs.latestFrame.Load().([]byte)
+			if ok && frame != nil {
+				encoder.encode(frame)
 			}
-			encoder.encode(data, time.Now())
 		}
 	}
 }
