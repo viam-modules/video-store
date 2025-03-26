@@ -493,7 +493,7 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
   // to split the video files at keyframe boundaries.
   // if it has been a second or more, add an iframe
   if (e->count % e->encoderCtx->time_base.den == 0) {
-    av_log(NULL, AV_LOG_INFO, "keyframe!!!");
+    av_log(NULL, AV_LOG_INFO, "keyframe!!!: %lld", e->decoderFrame->pts);
     e->encoderPrevIframeUnixMicroSec = unixMicro;
     e->decoderFrame->flags |= AV_FRAME_FLAG_KEY;
     e->decoderFrame->pict_type = AV_PICTURE_TYPE_I;
