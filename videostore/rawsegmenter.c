@@ -1,6 +1,5 @@
 #include "rawsegmenter.h"
 #include "libavcodec/packet.h"
-#include "libavformat/avformat.h"
 #include "libavutil/dict.h"
 #include "libavutil/log.h"
 #include "libavutil/mem.h"
