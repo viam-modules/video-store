@@ -4,10 +4,7 @@
 #include <libavformat/avformat.h>
 #include <libavutil/frame.h>
 #include <libswscale/swscale.h>
-#define MAX_PRESET_SIZE 30
-#define MAX_OUTPUT_PATTERN_SIZE 1024
-#define H264_CLOCK_TIME 90000
-#define MICROSECONDS_IN_SECOND 1000000
+
 typedef struct video_store_h264_encoder {
   // decoder
   AVCodecContext *decoderCtx;
@@ -21,7 +18,7 @@ typedef struct video_store_h264_encoder {
   // segmenter
   AVFormatContext *segmenterCtx;
 
-  // satic config
+  // static config
   const AVCodec *encoderCodec;
   int segmentSeconds;
   const char *outputPattern;
@@ -50,6 +47,12 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *pE, // IN
 // video_store_h264_encoder_close stops and frees the encoder resources
 int video_store_h264_encoder_close(struct video_store_h264_encoder **ppE // OUT
 );
+
+// errors
 #define VIDEO_STORE_ENCODER_RESP_OK 0
 #define VIDEO_STORE_ENCODER_RESP_ERROR 1
+
+// constants
+#define MAX_PRESET_SIZE 30
+#define MAX_OUTPUT_PATTERN_SIZE 1024
 #endif /* VIAM_ENCODER_H */
