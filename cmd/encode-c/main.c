@@ -84,7 +84,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  // close
   ret = video_store_h264_encoder_close(&e);
   if (ret != VIDEO_STORE_ENCODER_RESP_OK) {
     printf("Failed to close encoder: %d\n", ret);

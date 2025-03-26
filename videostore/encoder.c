@@ -167,17 +167,17 @@ int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
   // correctly interpret the pts and dts of the packets that come out of the
   // encoder
   segmenterStream->time_base = encoderCtx->time_base;
+
   // encoder
   e->encoderCtx = encoderCtx;
 
   // segmenter
   e->segmenterCtx = segmenterCtx;
-  /* e->segmenterStream = segmenterStream; */
   ret = VIDEO_STORE_ENCODER_RESP_OK;
 cleanup:
   if (ret != VIDEO_STORE_ENCODER_RESP_OK) {
-    av_log(NULL, AV_LOG_ERROR, "setup_encoder_segmenter doing cleanup\n");
     // error cleanup
+    av_log(NULL, AV_LOG_ERROR, "setup_encoder_segmenter doing cleanup\n");
     if (segmenterCtx != NULL) {
       avformat_free_context(segmenterCtx);
     }
@@ -220,7 +220,9 @@ void close_encoder_segmenter(struct video_store_h264_encoder *e) {
   }
   e->frameCount = 0;
 }
+// END internal functions
 
+// BEGIN C API Implementation
 int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
                                   const int segmentSeconds,              // IN
                                   const char *outputPattern,             // IN
@@ -356,9 +358,6 @@ cleanup:
 
   return ret;
 }
-// END internal functions
-
-// BEGIN C API Implementation
 int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
                                    void *payload,                      // IN
                                    size_t payloadSize                  // IN
