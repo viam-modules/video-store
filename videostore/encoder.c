@@ -447,10 +447,6 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
     ret = VIDEO_STORE_ENCODER_RESP_ERROR;
     goto cleanup;
   }
-  av_log(NULL, AV_LOG_INFO,
-         "avcodec_receive_packet: OUT: e->encoderPkt->pts: %lld, "
-         "e->encoderPkt->dts: %lld, e->encoderPkt->stream_index: %d\n",
-         e->encoderPkt->pts, e->encoderPkt->dts, e->encoderPkt->stream_index);
 
   ret = av_interleaved_write_frame(e->segmenterCtx, e->encoderPkt);
   if (ret < 0) {
@@ -464,7 +460,6 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
   e->frameCount++;
 
 cleanup:
-  /* av_packet_unref(e->decoderPkt); */
   av_packet_unref(e->encoderPkt);
   return ret;
 }
@@ -486,20 +481,25 @@ int video_store_h264_encoder_close(struct video_store_h264_encoder **ppE // OUT
            "*ppE\n");
     return VIDEO_STORE_ENCODER_RESP_ERROR;
   }
+
+  // encoder and segmenter
   close_encoder_segmenter(*ppE);
   av_packet_free(&(*ppE)->encoderPkt);
 
   // decoder
   av_frame_free(&(*ppE)->decoderFrame);
-  /* av_packet_free(&(*ppE)->decoderPkt); */
   avcodec_free_context(&(*ppE)->decoderCtx);
+
+  // strings
   free((void *)(*ppE)->outputPattern);
   free((void *)(*ppE)->preset);
   (*ppE)->outputPattern = NULL;
   (*ppE)->preset = NULL;
+
   // struct
   free(*ppE);
   *ppE = NULL;
+
   return VIDEO_STORE_ENCODER_RESP_OK;
 }
 // END C API Implementation

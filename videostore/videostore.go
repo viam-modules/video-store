@@ -1,11 +1,6 @@
 // Package videostore contains the implementation of the video storage camera component.
 package videostore
 
-/*
-#include <libavutil/frame.h>
-*/
-import "C"
-
 import (
 	"context"
 	"errors"
@@ -27,22 +22,14 @@ var Model = resource.ModelNamespace("viam").WithFamily("video").WithModel("stora
 
 const (
 	// Default values for the video storage camera component.
-	defaultFramerate      = 20 // frames per second
 	defaultSegmentSeconds = 30 // seconds
 	defaultVideoBitrate   = 1000000
-	defaultVideoPreset    = "medium"
 	defaultVideoFormat    = "mp4"
-	defaultUploadPath     = ".viam/capture/video-upload"
-	defaultStoragePath    = ".viam/video-storage"
-	defaultLogLevel       = "error"
 
-	deleterInterval       = 1  // minutes
-	retryInterval         = 1  // seconds
-	asyncTimeout          = 60 // seconds
-	numFetchFrameAttempts = 3  // iterations
-	tempPath              = "/tmp"
-
-	mimeTypeYUYV = "image/yuyv422"
+	deleterInterval = 1  // minutes
+	retryInterval   = 1  // seconds
+	asyncTimeout    = 60 // seconds
+	tempPath        = "/tmp"
 )
 
 var presets = map[string]struct{}{
@@ -69,22 +56,22 @@ type videostore struct {
 	concater     *concater
 }
 
-// VideoStore stores video and provides APIs to request the stored video
+// VideoStore stores video and provides APIs to request the stored video.
 type VideoStore interface {
 	Fetch(ctx context.Context, r *FetchRequest) (*FetchResponse, error)
 	Save(ctx context.Context, r *SaveRequest) (*SaveResponse, error)
 	Close()
 }
 
-// CodecType repreasents a codec
+// CodecType repreasents a codec.
 type CodecType int
 
 const (
 	// CodecTypeUnknown is an invalid type.
 	CodecTypeUnknown CodecType = iota
-	// CodecTypeH264 represents h264 codec
+	// CodecTypeH264 represents h264 codec.
 	CodecTypeH264
-	// CodecTypeH265 represents h265 codec
+	// CodecTypeH265 represents h265 codec.
 	CodecTypeH265
 )
 
@@ -101,13 +88,13 @@ func (t CodecType) String() string {
 	}
 }
 
-// RTPVideoStore stores video derived from RTP packets and provides APIs to request the stored video
+// RTPVideoStore stores video derived from RTP packets and provides APIs to request the stored video.
 type RTPVideoStore interface {
 	VideoStore
 	Segmenter() *RawSegmenter
 }
 
-// SaveRequest is the request to the Save method
+// SaveRequest is the request to the Save method.
 type SaveRequest struct {
 	From     time.Time
 	To       time.Time
@@ -115,12 +102,12 @@ type SaveRequest struct {
 	Async    bool
 }
 
-// SaveResponse is the response to the Save method
+// SaveResponse is the response to the Save method.
 type SaveResponse struct {
 	Filename string
 }
 
-// Validate returns an error if the SaveRequest is invalid
+// Validate returns an error if the SaveRequest is invalid.
 func (r *SaveRequest) Validate() error {
 	if r.From.After(r.To) {
 		return errors.New("'from' timestamp is after 'to' timestamp")
@@ -131,18 +118,18 @@ func (r *SaveRequest) Validate() error {
 	return nil
 }
 
-// FetchRequest is the request to the Fetch method
+// FetchRequest is the request to the Fetch method.
 type FetchRequest struct {
 	From time.Time
 	To   time.Time
 }
 
-// FetchResponse is the resonse to the Fetch method
+// FetchResponse is the resonse to the Fetch method.
 type FetchResponse struct {
 	Video []byte
 }
 
-// Validate returns an error if the FetchRequest is invalid
+// Validate returns an error if the FetchRequest is invalid.
 func (r *FetchRequest) Validate() error {
 	if r.From.After(r.To) {
 		return errors.New("'from' timestamp is after 'to' timestamp")
@@ -150,7 +137,7 @@ func (r *FetchRequest) Validate() error {
 	return nil
 }
 
-// NewFramePollingVideoStore returns a VideoStore that stores video it encoded from polling frames from a camera.Camera
+// NewFramePollingVideoStore returns a VideoStore that stores video it encoded from polling frames from a camera.Camera.
 func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore, error) {
 	if config.Type != SourceTypeFrame {
 		return nil, fmt.Errorf("config type must be %s", SourceTypeFrame)
@@ -213,7 +200,7 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	return vs, nil
 }
 
-// NewReadOnlyVideoStore returns a VideoStore that can return stored video but doesn't create new video segements
+// NewReadOnlyVideoStore returns a VideoStore that can return stored video but doesn't create new video segements.
 func NewReadOnlyVideoStore(config Config, logger logging.Logger) (VideoStore, error) {
 	if config.Type != SourceTypeReadOnly {
 		return nil, fmt.Errorf("config type must be %s", SourceTypeReadOnly)
@@ -245,7 +232,7 @@ func NewReadOnlyVideoStore(config Config, logger logging.Logger) (VideoStore, er
 	}, nil
 }
 
-// NewRTPVideoStore returns a VideoStore that stores video it receives from the caller
+// NewRTPVideoStore returns a VideoStore that stores video it receives from the caller.
 func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, error) {
 	if config.Type != SourceTypeRTP {
 		return nil, fmt.Errorf("config type must be %s", SourceTypeRTP)
@@ -492,6 +479,8 @@ func (vs *videostore) Close() {
 		vs.workers.Stop()
 	}
 	if vs.rawSegmenter != nil {
-		vs.rawSegmenter.Close()
+		if err := vs.rawSegmenter.Close(); err != nil {
+			vs.logger.Errorf(err.Error())
+		}
 	}
 }
