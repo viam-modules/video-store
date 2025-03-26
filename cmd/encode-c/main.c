@@ -14,14 +14,12 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // write
   av_log_set_level(AV_LOG_DEBUG);
-  // init
   int bitrate = 100000;
   int fps = 20;
   char preset[] = "medium";
   struct video_store_h264_encoder *e = NULL;
-  // confirm init followed by close is valid
+
   int ret = video_store_h264_encoder_init(
       &e, 30, "./mp4s/h264_%Y-%m-%d_%H-%M-%S.mp4", bitrate, fps, preset);
   if (ret != VIDEO_STORE_ENCODER_RESP_OK) {
