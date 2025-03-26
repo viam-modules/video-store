@@ -68,7 +68,7 @@ func newComponent(
 	// without processing frames.
 	c, err := camera.FromDependencies(deps, config.Camera)
 	if err != nil {
-		logger.Error("failed to get camera from dependencies, video-store will not be storing video", err)
+		logger.Errorf("failed to get camera from dependencies, video-store will not be storing video: %s", err)
 		c = nil
 	}
 
@@ -83,6 +83,7 @@ func newComponent(
 			return nil, err
 		}
 	} else {
+		vsConfig.Type = videostore.SourceTypeReadOnly
 		vs, err = videostore.NewReadOnlyVideoStore(vsConfig, logger)
 		if err != nil {
 			return nil, err
