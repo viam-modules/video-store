@@ -35,12 +35,12 @@ int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
   }
   encoderCtx->bit_rate = e->bitrate;
   encoderCtx->pix_fmt = AV_PIX_FMT_YUV420P;
+  encoderCtx->time_base = (AVRational){.num = 1, .den = e->targetFrameRate};
   encoderCtx->width = width;
   encoderCtx->height = height;
   // TODO(seanp): Do we want b frames? This could make it more complicated to
   // split clips.
   encoderCtx->max_b_frames = 0;
-  encoderCtx->time_base = (AVRational){.num = 1, .den = e->targetFrameRate};
 
   ret = av_dict_set(&encoderOpts, "preset", e->preset, 0);
   if (ret < 0) {
@@ -86,6 +86,13 @@ int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
     ret = VIDEO_STORE_ENCODER_RESP_ERROR;
     goto cleanup;
   }
+
+  // NOTE: (Nick S) this needs to be set before avformat_write_header is called
+  // and before avcodec_parameters_copy is called to ensure the time_base is
+  // consistent both in the first and subsequent segments
+  // mp4 files with different time bases can't be concatenated together
+  segmenterStream->time_base = encoderCtx->time_base;
+
   codecParams = avcodec_parameters_alloc();
 
   ret = avcodec_parameters_from_context(codecParams, encoderCtx);
@@ -165,7 +172,8 @@ int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
 
   // NOTE: (Nick S) this needs to be set so that the segmenter knows how to
   // correctly interpret the pts and dts of the packets that come out of the
-  // encoder
+  // encoder, it gets reset when avformat_write_header is called so we need to
+  // set it here again
   segmenterStream->time_base = encoderCtx->time_base;
 
   // encoder
