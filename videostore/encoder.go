@@ -43,9 +43,6 @@ func newEncoder(
 	storagePath string,
 	logger logging.Logger,
 ) (*encoder, error) {
-	// Initialize without codec context and source frame. We will spin up
-	// the codec context and source frame when we get the first frame or when
-	// a resize is needed.
 	enc := &encoder{
 		logger:         logger,
 		bitrate:        videoBitrate,
@@ -73,8 +70,6 @@ func (e *encoder) initialize() error {
 	presetCStr := C.CString(e.preset)
 	defer C.free(unsafe.Pointer(presetCStr))
 
-	e.logger.Infof("video_store_h264_encoder_init: e.segmentSeconds: %d, path: %s, bitrate: %d, framerate: %d, preset: %s",
-		e.segmentSeconds, e.storagePath+"/"+outputPattern, e.bitrate, e.framerate, e.preset)
 	ret := C.video_store_h264_encoder_init(
 		&cEncoder,
 		C.int(e.segmentSeconds),
@@ -93,12 +88,10 @@ func (e *encoder) initialize() error {
 	return nil
 }
 
-// encode encodes the given frame and returns the encoded data
-// in bytes along with the PTS and DTS timestamps.
-// PTS is calculated based on the frame count and source framerate.
+// encode encodes the given frame
+// handles changing frame sizes
 // If the polling loop is not running at the source framerate, the
 // PTS will lag behind actual run time.
-// TODO: propagate error
 func (e *encoder) encode(frame []byte) {
 	payloadC := C.CBytes(frame)
 	defer C.free(payloadC)
