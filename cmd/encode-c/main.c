@@ -15,9 +15,9 @@ int main(int argc, char *argv[]) {
   }
 
   av_log_set_level(AV_LOG_DEBUG);
-  int bitrate = 100000;
+  int bitrate = 1000000;
   int fps = 20;
-  char preset[] = "medium";
+  char preset[] = "ultrafast";
   struct video_store_h264_encoder *e = NULL;
 
   int ret = video_store_h264_encoder_init(
@@ -32,7 +32,6 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  e = NULL;
   ret = video_store_h264_encoder_init(
       &e, 30, "./mp4s/h264_%Y-%m-%d_%H-%M-%S.mp4", bitrate, fps, preset);
   if (ret != VIDEO_STORE_ENCODER_RESP_OK) {
@@ -72,7 +71,6 @@ int main(int argc, char *argv[]) {
       break;
     }
 
-    sqlite3_sleep(50);
     printf("calling video_store_h264_encoder_frame");
     ret = video_store_h264_encoder_write(
         e, (uint8_t *)sqlite3_column_blob(statement, 0),

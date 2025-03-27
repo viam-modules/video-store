@@ -87,12 +87,6 @@ int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
     goto cleanup;
   }
 
-  // NOTE: (Nick S) this needs to be set before avformat_write_header is called
-  // and before avcodec_parameters_copy is called to ensure the time_base is
-  // consistent both in the first and subsequent segments
-  // mp4 files with different time bases can't be concatenated together
-  segmenterStream->time_base = encoderCtx->time_base;
-
   codecParams = avcodec_parameters_alloc();
 
   ret = avcodec_parameters_from_context(codecParams, encoderCtx);
@@ -162,6 +156,11 @@ int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
     goto cleanup;
   }
 
+  // NOTE: (Nick S) this needs to be set before avformat_write_header is called
+  // is called to ensure the time_base is
+  // consistent both in the first and subsequent segments
+  // mp4 files with different time bases can't be concatenated together
+  segmenterStream->time_base = encoderCtx->time_base;
   ret = avformat_write_header(segmenterCtx, &segmenterOpts);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
