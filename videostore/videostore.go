@@ -23,7 +23,6 @@ var Model = resource.ModelNamespace("viam").WithFamily("video").WithModel("stora
 const (
 	// Constant values for the video storage camera component.
 	segmentSeconds = 30 // seconds
-	videoBitrate   = 1000000
 	videoFormat    = "mp4"
 
 	deleterInterval = 1  // minutes

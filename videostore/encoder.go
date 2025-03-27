@@ -45,7 +45,7 @@ func newEncoder(
 ) (*encoder, error) {
 	enc := &encoder{
 		logger:         logger,
-		bitrate:        videoBitrate,
+		bitrate:        encoderConfig.Bitrate,
 		framerate:      framerate,
 		preset:         encoderConfig.Preset,
 		sizeGB:         sizeGB,
