@@ -48,12 +48,12 @@ func newEncoder(
 	// a resize is needed.
 	enc := &encoder{
 		logger:         logger,
-		bitrate:        defaultVideoBitrate,
+		bitrate:        videoBitrate,
 		framerate:      framerate,
 		preset:         encoderConfig.Preset,
 		sizeGB:         sizeGB,
 		storagePath:    storagePath,
-		segmentSeconds: defaultSegmentSeconds,
+		segmentSeconds: segmentSeconds,
 	}
 
 	return enc, nil

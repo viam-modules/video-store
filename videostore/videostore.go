@@ -21,10 +21,10 @@ import (
 var Model = resource.ModelNamespace("viam").WithFamily("video").WithModel("storage")
 
 const (
-	// Default values for the video storage camera component.
-	defaultSegmentSeconds = 30 // seconds
-	defaultVideoBitrate   = 1000000
-	defaultVideoFormat    = "mp4"
+	// Constant values for the video storage camera component.
+	segmentSeconds = 30 // seconds
+	videoBitrate   = 1000000
+	videoFormat    = "mp4"
 
 	deleterInterval = 1  // minutes
 	retryInterval   = 1  // seconds
@@ -159,10 +159,9 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 		return nil, err
 	}
 	vs.concater, err = newConcater(
-		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
-		defaultSegmentSeconds,
+		logger,
 	)
 	if err != nil {
 		return nil, err
@@ -214,10 +213,9 @@ func NewReadOnlyVideoStore(config Config, logger logging.Logger) (VideoStore, er
 	}
 
 	concater, err := newConcater(
-		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
-		defaultSegmentSeconds,
+		logger,
 	)
 	if err != nil {
 		return nil, err
@@ -246,18 +244,17 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	}
 
 	concater, err := newConcater(
-		logger,
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
-		defaultSegmentSeconds,
+		logger,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	rawSegmenter, err := newRawSegmenter(logger,
+	rawSegmenter, err := newRawSegmenter(
 		config.Storage.StoragePath,
-		defaultSegmentSeconds,
+		logger,
 	)
 	if err != nil {
 		return nil, err
@@ -453,7 +450,7 @@ func cleanupStorage(storagePath string, maxStorageSizeGB int, logger logging.Log
 // is written to storage before concatenation.
 // TODO: (seanp) Optimize this to immediately run as soon as the current segment is completed.
 func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path string) {
-	segmentDur := time.Duration(defaultSegmentSeconds) * time.Second
+	segmentDur := time.Duration(segmentSeconds) * time.Second
 	totalTimeout := time.Duration(asyncTimeout)*time.Second + segmentDur
 	ctx, cancel := context.WithTimeout(ctx, totalTimeout)
 	defer cancel()

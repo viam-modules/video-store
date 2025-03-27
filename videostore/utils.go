@@ -347,9 +347,9 @@ func cacheFirstVid(first *videoInfo, current videoInfo) {
 func generateOutputFilePath(camName, fromStr, metadata, path string) string {
 	var outputFilename string
 	if metadata == "" {
-		outputFilename = fmt.Sprintf("%s_%s.%s", camName, fromStr, defaultVideoFormat)
+		outputFilename = fmt.Sprintf("%s_%s.%s", camName, fromStr, videoFormat)
 	} else {
-		outputFilename = fmt.Sprintf("%s_%s_%s.%s", camName, fromStr, metadata, defaultVideoFormat)
+		outputFilename = fmt.Sprintf("%s_%s_%s.%s", camName, fromStr, metadata, videoFormat)
 	}
 	return filepath.Join(path, outputFilename)
 }
