@@ -126,9 +126,5 @@ func ToFrameVideoStoreVideoConfig(
 		},
 	}
 
-	if err := fvsc.Validate(); err != nil {
-		return zero, err
-	}
-
 	return fvsc, nil
 }

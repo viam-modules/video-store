@@ -39,11 +39,7 @@ type RawSegmenter struct {
 //       -------
 //    (WritePacket)
 
-func newRawSegmenter(
-	logger logging.Logger,
-	storagePath string,
-	segmentSeconds int,
-) (*RawSegmenter, error) {
+func newRawSegmenter(storagePath string, logger logging.Logger) (*RawSegmenter, error) {
 	s := &RawSegmenter{
 		logger:         logger,
 		storagePath:    storagePath,

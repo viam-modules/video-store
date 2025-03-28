@@ -31,9 +31,8 @@ type concater struct {
 }
 
 func newConcater(
-	logger logging.Logger,
 	storagePath, uploadPath string,
-	segmentSeconds int,
+	logger logging.Logger,
 ) (*concater, error) {
 	c := &concater{
 		logger:      logger,

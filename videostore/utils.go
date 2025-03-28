@@ -109,30 +109,6 @@ func parseCodecType(codec string) codecType {
 	}
 }
 
-// lookupCodecIDByType returns the FFmpeg codec ID for the provided codec type.
-func lookupCodecIDByType(codec codecType) C.enum_AVCodecID {
-	switch codec {
-	case codecH264:
-		return C.AV_CODEC_ID_H264
-	case codecH265:
-		return C.AV_CODEC_ID_H265
-	default:
-		return C.AV_CODEC_ID_NONE
-	}
-}
-
-// lookupCodecID returns the codec ID for the provided codec.
-func lookupCodecTypeByID(codecID C.enum_AVCodecID) codecType {
-	switch codecID {
-	case C.AV_CODEC_ID_H264:
-		return codecH264
-	case C.AV_CODEC_ID_H265:
-		return codecH265
-	default:
-		return codecUnknown
-	}
-}
-
 // ffmpegError returns a string representation of the ffmpeg error code.
 func ffmpegError(ret C.int) string {
 	const errbufSize = 256
@@ -371,9 +347,9 @@ func cacheFirstVid(first *videoInfo, current videoInfo) {
 func generateOutputFilePath(camName, fromStr, metadata, path string) string {
 	var outputFilename string
 	if metadata == "" {
-		outputFilename = fmt.Sprintf("%s_%s.%s", camName, fromStr, defaultVideoFormat)
+		outputFilename = fmt.Sprintf("%s_%s.%s", camName, fromStr, videoFormat)
 	} else {
-		outputFilename = fmt.Sprintf("%s_%s_%s.%s", camName, fromStr, metadata, defaultVideoFormat)
+		outputFilename = fmt.Sprintf("%s_%s_%s.%s", camName, fromStr, metadata, videoFormat)
 	}
 	return filepath.Join(path, outputFilename)
 }
