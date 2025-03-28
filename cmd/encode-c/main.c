@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+// exercises the encode.h api
+// useful for running under valgrind
+// create sqlite.db using cmd/create-encode-db/main.go
 int main(int argc, char *argv[]) {
   if (argc != 2 && argc != 3) {
     printf("usage: %s <sqlite.db> [short]\n", argv[0]);
