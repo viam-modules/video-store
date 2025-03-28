@@ -3,7 +3,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/frame.h>
-#include <libswscale/swscale.h>
+#include <stdint.h>
 
 typedef struct video_store_h264_encoder {
   // decoder

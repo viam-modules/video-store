@@ -1,11 +1,10 @@
 #include "encoder.h"
-#include "libavcodec/avcodec.h"
 #include "libavcodec/packet.h"
-#include "libavformat/avformat.h"
-#include "libavutil/frame.h"
 #include "libavutil/log.h"
 #include "libavutil/rational.h"
-#include <stdint.h>
+#include <libavutil/error.h>
+#include <libavutil/opt.h>
+#include <stdlib.h>
 // BEGIN internal functions
 int setup_encoder_segmenter(struct video_store_h264_encoder *e, // OUT
                             const int width,                    // IN
@@ -256,14 +255,14 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
   }
 
   // BEGIN frame decoder
-  const AVCodec *frameCodec = avcodec_find_decoder(AV_CODEC_ID_MJPEG);
-  if (frameCodec == NULL) {
+  const AVCodec *decoderCodec = avcodec_find_decoder(AV_CODEC_ID_MJPEG);
+  if (decoderCodec == NULL) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_h264_encoder_init failed to find JPEG decoder\n");
     goto cleanup;
   }
 
-  decoderCtx = avcodec_alloc_context3(frameCodec);
+  decoderCtx = avcodec_alloc_context3(decoderCodec);
   if (decoderCtx == NULL) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_h264_encoder_init failed to allocate JPEG context\n");
@@ -271,7 +270,7 @@ int video_store_h264_encoder_init(struct video_store_h264_encoder **ppE, // OUT
   }
 
   decoderCtx->pix_fmt = AV_PIX_FMT_YUV420P;
-  ret = avcodec_open2(decoderCtx, frameCodec, NULL);
+  ret = avcodec_open2(decoderCtx, decoderCodec, NULL);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_h264_encoder_init failed to open the JPEG codec "
@@ -433,8 +432,11 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
   // to split the video files at keyframe boundaries.
   // if it has been a second or more, add an iframe
   if (e->decoderFrame->pts % e->encoderCtx->time_base.den == 0) {
-    e->decoderFrame->flags |= AV_FRAME_FLAG_KEY;
+    e->decoderFrame->key_frame = 1;
     e->decoderFrame->pict_type = AV_PICTURE_TYPE_I;
+  } else {
+    e->decoderFrame->key_frame = 0;
+    e->decoderFrame->pict_type = AV_PICTURE_TYPE_NONE;
   }
 
   ret = avcodec_send_frame(e->encoderCtx, e->decoderFrame);
@@ -454,6 +456,7 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
     ret = VIDEO_STORE_ENCODER_RESP_ERROR;
     goto cleanup;
   }
+  e->frameCount++;
 
   ret = av_interleaved_write_frame(e->segmenterCtx, e->encoderPkt);
   if (ret < 0) {
@@ -464,7 +467,6 @@ int video_store_h264_encoder_write(struct video_store_h264_encoder *e, // IN
     ret = VIDEO_STORE_ENCODER_RESP_ERROR;
     goto cleanup;
   }
-  e->frameCount++;
 
 cleanup:
   av_packet_unref(e->encoderPkt);
