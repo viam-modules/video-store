@@ -23,7 +23,6 @@ type encoder struct {
 	framerate      int
 	bitrate        int
 	preset         string
-	sizeGB         int
 	storagePath    string
 	segmentSeconds int
 
@@ -39,7 +38,6 @@ const (
 func newEncoder(
 	encoderConfig EncoderConfig,
 	framerate int,
-	sizeGB int,
 	storagePath string,
 	logger logging.Logger,
 ) (*encoder, error) {
@@ -48,7 +46,6 @@ func newEncoder(
 		bitrate:        encoderConfig.Bitrate,
 		framerate:      framerate,
 		preset:         encoderConfig.Preset,
-		sizeGB:         sizeGB,
 		storagePath:    storagePath,
 		segmentSeconds: segmentSeconds,
 	}

@@ -152,11 +152,15 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 		config:      config,
 		workers:     utils.NewBackgroundStoppableWorkers(),
 	}
-	// Create concater to handle concatenation of video clips when requested.
+	if err := createDir(config.Storage.StoragePath); err != nil {
+		return nil, err
+	}
 	err := createDir(vs.config.Storage.UploadPath)
 	if err != nil {
 		return nil, err
 	}
+
+	// Create concater to handle concatenation of video clips when requested.
 	vs.concater, err = newConcater(
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
@@ -169,7 +173,6 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	encoder, err := newEncoder(
 		vs.config.Encoder,
 		vs.config.FramePoller.Framerate,
-		vs.config.Storage.SizeGB,
 		vs.config.Storage.StoragePath,
 		logger,
 	)
@@ -207,6 +210,9 @@ func NewReadOnlyVideoStore(config Config, logger logging.Logger) (VideoStore, er
 		return nil, err
 	}
 
+	if err := createDir(config.Storage.StoragePath); err != nil {
+		return nil, err
+	}
 	if err := createDir(config.Storage.UploadPath); err != nil {
 		return nil, err
 	}
@@ -238,6 +244,9 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		return nil, err
 	}
 
+	if err := createDir(config.Storage.StoragePath); err != nil {
+		return nil, err
+	}
 	if err := createDir(config.Storage.UploadPath); err != nil {
 		return nil, err
 	}
