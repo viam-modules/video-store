@@ -82,7 +82,6 @@ $(BIN_OUTPUT_PATH)/concat-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | 
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(OBJS) ./cmd/concat-c/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  -g -o $(BIN_OUTPUT_PATH)/concat-c
 
-encoder-c: $(BIN_OUTPUT_PATH)/encoder-c
 $(BIN_OUTPUT_PATH)/encoder-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
 	rm -f $(BIN_OUTPUT_PATH)/encoder-c

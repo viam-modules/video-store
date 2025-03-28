@@ -19,6 +19,7 @@ import (
 	"go.viam.com/utils/rpc"
 )
 
+// This function produces the sqlite3.db you can use to feed in to encoder-c
 func main() {
 	err := godotenv.Load()
 	if err != nil {
