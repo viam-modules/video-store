@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unsafe"
@@ -214,7 +215,8 @@ func createAndSortFileWithDateList(filePaths []string) []fileWithDate {
 	for _, filePath := range filePaths {
 		date, err := extractDateTimeFromFilename(filePath)
 		if err == nil {
-			validFiles = append(validFiles, fileWithDate{name: filePath, startTime: date})
+			dateUTC := date.UTC()
+			validFiles = append(validFiles, fileWithDate{name: filePath, startTime: dateUTC})
 		}
 	}
 	sortFilesByDate(validFiles)
@@ -229,31 +231,25 @@ func sortFilesByDate(files []fileWithDate) {
 }
 
 // extractDateTimeFromFilename extracts the date and time from the filename.
+// Returns time in the inputted timezone.
 func extractDateTimeFromFilename(filePath string) (time.Time, error) {
-	const minParts = 2
 	baseName := filepath.Base(filePath)
-	parts := strings.Split(baseName, "_")
-	if len(parts) < minParts {
-		return time.Time{}, fmt.Errorf("invalid file name: %s", baseName)
+	nameWithoutExt := strings.TrimSuffix(baseName, filepath.Ext(baseName))
+
+	// Unix timestamp case - keep in UTC
+	if timestamp, err := strconv.ParseInt(nameWithoutExt, 10, 64); err == nil {
+		return time.Unix(timestamp, 0), nil
 	}
-	datePart := parts[0]
-	timePart := strings.TrimSuffix(parts[1], filepath.Ext(parts[1]))
-	dateTimeStr := datePart + "_" + timePart
-	return ParseDateTimeString(dateTimeStr)
+
+	// Datetime format case - keep in local time
+	return ParseDateTimeString(nameWithoutExt)
 }
 
-// ParseDateTimeString parses a date and time string in the format "2006-01-02_15-04-05".
-// Returns a time.Time object and an error if the string is not in the correct format.
+// ParseDateTimeString parses a datetime string in our format (2006-01-02_15-04-05)
+// and returns it in local time.
 func ParseDateTimeString(datetime string) (time.Time, error) {
-	dateTime, err := time.Parse("2006-01-02_15-04-05", datetime)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return dateTime, nil
-}
-
-func formatDateTimeToString(dateTime time.Time) string {
-	return dateTime.Format("2006-01-02_15-04-05")
+	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time
+	return time.ParseInLocation(TimeFormat, datetime, time.Local)
 }
 
 // matchStorageToRange identifies video files that overlap with the requested time range (start to end)
@@ -343,15 +339,23 @@ func cacheFirstVid(first *videoInfo, current videoInfo) {
 	}
 }
 
-// generateOutputFilename generates the output filename for the video file.
-func generateOutputFilePath(camName, fromStr, metadata, path string) string {
-	var outputFilename string
-	if metadata == "" {
-		outputFilename = fmt.Sprintf("%s_%s.%s", camName, fromStr, videoFormat)
-	} else {
-		outputFilename = fmt.Sprintf("%s_%s_%s.%s", camName, fromStr, metadata, videoFormat)
+// generateOutputFilePath generates the output filename for the video file.
+// The filename timestamp is formatted in local time.
+func generateOutputFilePath(prefix string, timestamp time.Time, metadata, dir string) string {
+	// Format timestamp in local time for user-friendly filenames
+	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time for outputs.
+	// We do not rely on localtime strftime for actual segments. They are stored in Unix UTC time.
+	localTime := timestamp.In(time.Local)
+	filename := localTime.Format(TimeFormat)
+
+	if prefix != "" {
+		filename = fmt.Sprintf("%s_%s", prefix, filename)
 	}
-	return filepath.Join(path, outputFilename)
+	if metadata != "" {
+		filename = fmt.Sprintf("%s_%s", filename, metadata)
+	}
+
+	return filepath.Join(dir, filename+".mp4")
 }
 
 // validateTimeRange validates the start and end time range against storage files.

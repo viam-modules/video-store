@@ -31,7 +31,7 @@ type encoder struct {
 }
 
 const (
-	outputPattern = "%Y-%m-%d_%H-%M-%S.mp4"
+	outputPattern = "%s.mp4"
 	gigabyte      = 1024 * 1024 * 1024
 )
 

@@ -25,10 +25,13 @@ const (
 	segmentSeconds = 30 // seconds
 	videoFormat    = "mp4"
 
-	deleterInterval = 1  // minutes
-	retryInterval   = 1  // seconds
-	asyncTimeout    = 60 // seconds
-	tempPath        = "/tmp"
+	deleterInterval       = 1  // minutes
+	retryInterval         = 1  // seconds
+	asyncTimeout          = 60 // seconds
+	tempPath              = "/tmp"
+
+	// TimeFormat is how we format the timestamp in output filenames and do commands.
+	TimeFormat = "2006-01-02_15-04-05"
 )
 
 var presets = map[string]struct{}{
@@ -286,13 +289,17 @@ func (vs *videostore) Segmenter() *RawSegmenter {
 }
 
 func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse, error) {
+	// Convert incoming local times to UTC for consistent timestamp handling
+	// All internal operations and segmenter timestamps are in UTC
+	r.From = r.From.UTC()
+	r.To = r.To.UTC()
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
-	vs.logger.Debug("fetch command received")
+	vs.logger.Debug("fetch command received and validated")
 	fetchFilePath := generateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
-		formatDateTimeToString(r.From),
+		r.From,
 		"",
 		tempPath)
 
@@ -320,16 +327,17 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 }
 
 func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, error) {
+	// Convert incoming local times to UTC for consistent timestamp handling
+	// All internal operations and segmenter timestamps are in UTC
+	r.From = r.From.UTC()
+	r.To = r.To.UTC()
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
-	vs.logger.Debug("save command received")
-	if err := r.Validate(); err != nil {
-		return nil, err
-	}
+	vs.logger.Debug("save command received and validated")
 	uploadFilePath := generateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
-		formatDateTimeToString(r.From),
+		r.From,
 		r.Metadata,
 		vs.config.Storage.UploadPath,
 	)
