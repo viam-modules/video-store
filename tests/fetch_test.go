@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,7 +15,8 @@ import (
 
 // pathForFetchCmd constructs the .mp4 path based on the "from" field in the command.
 func pathForFetchCmd(fromTimestamp string) string {
-	return "/tmp/" + videoStoreComponentName + "_" + fromTimestamp + ".mp4"
+	cleanedTimestamp := strings.TrimSuffix(fromTimestamp, "Z")
+	return "/tmp/" + videoStoreComponentName + "_" + cleanedTimestamp + ".mp4"
 }
 
 // assertNoFile checks that the given file path does NOT exist.
@@ -119,6 +121,13 @@ func TestFetchDoCommand(t *testing.T) {
 		"to":      "2024/09/06 15:01:33",
 	}
 
+	// Valid UTC time range.
+	fetchCmdUTC := map[string]interface{}{
+		"command": "fetch",
+		"from":    "2024-09-06_15-00-33Z",
+		"to":      "2024-09-06_15-00-50Z",
+	}
+
 	t.Run("Test Fetch DoCommand Valid Time Range Under GRPC Limit.", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
@@ -133,6 +142,23 @@ func TestFetchDoCommand(t *testing.T) {
 		test.That(t, ok, test.ShouldBeTrue)
 		test.That(t, video, test.ShouldNotBeEmpty)
 		filePath := pathForFetchCmd(fetchCmd1["from"].(string))
+		assertNoFile(t, filePath)
+	})
+
+	t.Run("Test Fetch DoCommand Valid UTC Time Range Under GRPC Limit.", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config1)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		vs, err := camera.FromRobot(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
+		res, err := vs.DoCommand(timeoutCtx, fetchCmdUTC)
+		test.That(t, err, test.ShouldBeNil)
+		video, ok := res["video"].(string)
+		test.That(t, ok, test.ShouldBeTrue)
+		test.That(t, video, test.ShouldNotBeEmpty)
+		filePath := pathForFetchCmd(fetchCmdUTC["from"].(string))
 		assertNoFile(t, filePath)
 	})
 

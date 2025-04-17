@@ -248,7 +248,10 @@ func extractDateTimeFromFilename(filePath string) (time.Time, error) {
 // ParseDateTimeString parses a datetime string in our format (2006-01-02_15-04-05)
 // and returns it in local time.
 func ParseDateTimeString(datetime string) (time.Time, error) {
-	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time
+	if strings.HasSuffix(datetime, "Z") {
+		return time.Parse(TimeFormat, strings.TrimSuffix(datetime, "Z"))
+	}
+	//nolint:gosmopolitan // intentional parsing into local time
 	return time.ParseInLocation(TimeFormat, datetime, time.Local)
 }
 
