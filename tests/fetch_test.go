@@ -145,6 +145,21 @@ func TestFetchDoCommand(t *testing.T) {
 		assertNoFile(t, filePath)
 	})
 
+	t.Run("Test Fetch DoCommand Valid Time Range Over GRPC Limit.", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config1)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		vs, err := camera.FromRobot(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
+		_, err = vs.DoCommand(timeoutCtx, fetchCmd2)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "grpc")
+		filePath := pathForFetchCmd(fetchCmd2["from"].(string))
+		assertNoFile(t, filePath)
+	})
+
 	t.Run("Test Fetch DoCommand Valid UTC Time Range Under GRPC Limit.", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
@@ -159,21 +174,6 @@ func TestFetchDoCommand(t *testing.T) {
 		test.That(t, ok, test.ShouldBeTrue)
 		test.That(t, video, test.ShouldNotBeEmpty)
 		filePath := pathForFetchCmd(fetchCmdUTC["from"].(string))
-		assertNoFile(t, filePath)
-	})
-
-	t.Run("Test Fetch DoCommand Valid Time Range Over GRPC Limit.", func(t *testing.T) {
-		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-		r, err := setupViamServer(timeoutCtx, config1)
-		test.That(t, err, test.ShouldBeNil)
-		defer r.Close(timeoutCtx)
-		vs, err := camera.FromRobot(r, videoStoreComponentName)
-		test.That(t, err, test.ShouldBeNil)
-		_, err = vs.DoCommand(timeoutCtx, fetchCmd2)
-		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "grpc")
-		filePath := pathForFetchCmd(fetchCmd2["from"].(string))
 		assertNoFile(t, filePath)
 	})
 
