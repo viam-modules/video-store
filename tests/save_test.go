@@ -22,6 +22,8 @@ const (
 	invalidFromTimestamp       = "2024-09-06_14-00-03"
 	invalidToTimestamp         = "3024-09-06_15-00-33"
 	invalidDatetimeFormat      = "2024/09/06 15:01:33"
+	validFromTimestampUTC      = "2024-09-06_15-00-33Z"
+	validToTimestampUTC        = "2024-09-06_15-01-33Z"
 )
 
 func TestSaveDoCommand(t *testing.T) {
@@ -133,6 +135,14 @@ func TestSaveDoCommand(t *testing.T) {
 		"async":    true,
 	}
 
+	// Valid UTC time range
+	saveCmdUTC := map[string]interface{}{
+		"command":  "save",
+		"from":     validFromTimestampUTC,
+		"to":       validToTimestampUTC,
+		"metadata": "test-metadata-utc",
+	}
+
 	t.Run("Test Save DoCommand Valid Range", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
@@ -212,6 +222,35 @@ func TestSaveDoCommand(t *testing.T) {
 		_, err = vs.DoCommand(timeoutCtx, saveCmd5)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "'to' timestamp is in the future")
+	})
+
+	t.Run("Test Save DoCommand Valid UTC Range", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config1)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		vs, err := camera.FromRobot(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
+		res, err := vs.DoCommand(timeoutCtx, saveCmdUTC)
+		test.That(t, err, test.ShouldBeNil)
+		filename, ok := res["filename"].(string)
+		test.That(t, ok, test.ShouldBeTrue)
+
+		// Calculate expected timestamp from fromTime (parsed as UTC, converted to local for filename)
+		fromTimeUTC, err := time.Parse(videostore.TimeFormat, "2024-09-06_15-00-33") // Parse without Z
+		test.That(t, err, test.ShouldBeNil)
+		fromTimeLocal := fromTimeUTC.Local() // Convert to local time for filename generation
+		expectedFilename := fmt.Sprintf("%s_%s_%s.mp4",
+			videoStoreComponentName,
+			fromTimeLocal.Format(videostore.TimeFormat),
+			"test-metadata-utc")
+		test.That(t, filename, test.ShouldEqual, expectedFilename)
+		test.That(t, filename, test.ShouldContainSubstring, "test-metadata-utc")
+
+		filePath := filepath.Join(testUploadPath, filename)
+		testVideoPlayback(t, filePath)
+		testVideoDuration(t, filePath, 60)
 	})
 
 	t.Run("Test leftover concat txt files are cleaned up", func(t *testing.T) {
