@@ -101,18 +101,24 @@ The `From` and `To` timestamps are used to specify the start and end times for v
 
 #### Datetime Format
 
-The datetime format used is: `YYYY-MM-DD_HH-MM-SS`
+The datetime format used is:
 
+- Local Time: `YYYY-MM-DD_HH-MM-SS`
+- UTC Time: `YYYY-MM-DD_HH-MM-SSZ`
+
+Where:
 - `YYYY`: Year (e.g., 2023)
 - `MM`: Month (e.g., 01 for January)
 - `DD`: Day (e.g., 15)
 - `HH`: Hour in 24-hour format (e.g., 14 for 2 PM)
 - `MM`: Minutes (e.g., 30)
 - `SS`: Seconds (e.g., 45)
+- `Z`: Optional suffix indicating the time is in UTC.
 
 #### Datetime Example
 
-- `2024-01-15_14-30-45` represents January 15, 2024, at 2:30:45 PM.
+- `2024-01-15_14-30-45` represents January 15, 2024, at 2:30:45 PM **local time**.
+- `2024-01-15_14-30-45Z` represents January 15, 2024, at 2:30:45 PM **UTC**.
 
 ### `Save`
 
