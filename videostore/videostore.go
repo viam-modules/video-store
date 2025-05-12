@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 // Package videostore contains the implementation of the video storage camera component.
 package videostore
 
