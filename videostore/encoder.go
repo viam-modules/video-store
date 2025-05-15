@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"errors"
+	"path/filepath"
 	"sync"
 	"unsafe"
 
@@ -31,9 +32,20 @@ type encoder struct {
 }
 
 const (
-	outputPattern = "%s.mp4"
-	gigabyte      = 1024 * 1024 * 1024
+	// outputPattern = "%s.mp4"
+	// outputPattern = "%Y-%m-%d_%H-%M-%S.mp4"
+	gigabyte = 1024 * 1024 * 1024
 )
+
+// var outputPattern string
+
+// func init() {
+// 	if runtime.GOOS == "windows" {
+// 		outputPattern = "%Y-%m-%d_%H-%M-%S.mp4"
+// 	} else {
+// 		outputPattern = "%s.mp4"
+// 	}
+// }
 
 func newEncoder(
 	encoderConfig EncoderConfig,
@@ -61,7 +73,7 @@ func (e *encoder) initialize() error {
 		return errors.New("*encoder init called more than once")
 	}
 
-	outputPatternCStr := C.CString(e.storagePath + "/" + outputPattern)
+	outputPatternCStr := C.CString(filepath.Join(e.storagePath, outputPattern))
 	defer C.free(unsafe.Pointer(outputPatternCStr))
 
 	presetCStr := C.CString(e.preset)
