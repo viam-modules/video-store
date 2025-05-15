@@ -32,20 +32,8 @@ type encoder struct {
 }
 
 const (
-	// outputPattern = "%s.mp4"
-	// outputPattern = "%Y-%m-%d_%H-%M-%S.mp4"
 	gigabyte = 1024 * 1024 * 1024
 )
-
-// var outputPattern string
-
-// func init() {
-// 	if runtime.GOOS == "windows" {
-// 		outputPattern = "%Y-%m-%d_%H-%M-%S.mp4"
-// 	} else {
-// 		outputPattern = "%s.mp4"
-// 	}
-// }
 
 func newEncoder(
 	encoderConfig EncoderConfig,
