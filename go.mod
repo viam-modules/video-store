@@ -2,8 +2,6 @@ module github.com/viam-modules/video-store
 
 go 1.23.8
 
-toolchain go1.24.3
-
 require (
 	github.com/AlekSi/gocov-xml v1.0.0
 	github.com/axw/gocov v1.1.0
