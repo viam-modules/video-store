@@ -72,9 +72,10 @@ func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 	// that allows for segmenting output files. The output pattern is a strftime pattern
 	// that specifies the output file name. The pattern is set to the current time.
 	// print the output pattern
-	outputPatternCStr := C.CString(filepath.Join(rs.storagePath, outputPattern))
+	outputPatternPath := filepath.Join(rs.storagePath, outputPattern)
+	rs.logger.Debugf("raw segmenter using output pattern: %s", outputPatternPath)
+	outputPatternCStr := C.CString(outputPatternPath)
 	defer C.free(unsafe.Pointer(outputPatternCStr))
-	rs.logger.Infof("output pattern: %s", filepath.Join(rs.storagePath, outputPattern))
 	var cRS *C.raw_seg
 	var ret C.int
 	switch codec {
