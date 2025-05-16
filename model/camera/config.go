@@ -35,30 +35,30 @@ type Config struct {
 }
 
 // Validate validates the configuration for the video storage camera component.
-func (cfg *Config) Validate(path string) ([]string, []string, []string, error) {
+func (cfg *Config) Validate(path string) ([]string, []string, error) {
 	if cfg.Storage == (Storage{}) {
-		return nil, nil, nil, utils.NewConfigValidationFieldRequiredError(path, "storage")
+		return nil, nil, utils.NewConfigValidationFieldRequiredError(path, "storage")
 	}
 	if cfg.Storage.SizeGB == 0 {
-		return nil, nil, nil, utils.NewConfigValidationFieldRequiredError(path, "size_gb")
+		return nil, nil, utils.NewConfigValidationFieldRequiredError(path, "size_gb")
 	}
 	if cfg.Sync == "" {
-		return nil, nil, nil, utils.NewConfigValidationFieldRequiredError(path, "sync")
+		return nil, nil, utils.NewConfigValidationFieldRequiredError(path, "sync")
 	}
 	if cfg.Framerate < 0 {
-		return nil, nil, nil, fmt.Errorf("invalid framerate %d, must be greater than 0", cfg.Framerate)
+		return nil, nil, fmt.Errorf("invalid framerate %d, must be greater than 0", cfg.Framerate)
 	}
 
 	_, err := ToFrameVideoStoreVideoConfig(cfg, "someprefix", nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	// This allows for an implicit camera dependency so we do not need to explicitly
 	// add the camera dependency in the config.
 	if cfg.Camera != "" {
-		return []string{cfg.Camera}, nil, nil, nil
+		return []string{cfg.Camera}, nil, nil
 	}
-	return []string{}, nil, nil, nil
+	return []string{}, nil, nil
 }
 
 func applyVideoEncoderDefaults(c Video) videostore.EncoderConfig {
