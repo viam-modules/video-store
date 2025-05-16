@@ -57,7 +57,7 @@ func newRawSegmenter(storagePath string, logger logging.Logger) (*RawSegmenter, 
 // Close must be called to free the resources taken during Init
 // Note: May write to disk
 func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
-	rs.logger.Infof("initializing raw segmenter with codec %s", codec)
+	rs.logger.Debugf("initializing raw segmenter with codec %s, width %d, height %d", codec, width, height)
 	if width <= 0 || height <= 0 {
 		return errors.New("both width and height must be greater than zero")
 	}
