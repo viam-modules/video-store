@@ -17,4 +17,3 @@ jobs:
         run: |
           TARGET_OS=windows make
         shell: bash
-

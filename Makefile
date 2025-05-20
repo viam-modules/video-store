@@ -7,6 +7,15 @@ SOURCE_ARCH := $(call normalize_arch,$(SOURCE_ARCH))
 TARGET_ARCH := $(call normalize_arch,$(TARGET_ARCH))
 
 BIN_OUTPUT_PATH = bin/$(TARGET_OS)-$(TARGET_ARCH)
+ifeq ($(TARGET_OS),windows)
+	BIN_SUFFIX := .exe
+endif
+BIN_VIDEO_STORE := $(BIN_OUTPUT_PATH)/video-store$(BIN_SUFFIX)
+BIN_CONCAT := $(BIN_OUTPUT_PATH)/concat$(BIN_SUFFIX)
+BIN_CONCAT_C := $(BIN_OUTPUT_PATH)/concat-c$(BIN_SUFFIX)
+BIN_ENCODER_C := $(BIN_OUTPUT_PATH)/encoder-c$(BIN_SUFFIX)
+BIN_RAW_SEGMENTER_C := $(BIN_OUTPUT_PATH)/raw-segmenter-c$(BIN_SUFFIX)
+BIN_VIDEO_INFO_C := $(BIN_OUTPUT_PATH)/video-info-c$(BIN_SUFFIX)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
 
 ifeq ($(SOURCE_OS),linux)
@@ -97,44 +106,43 @@ endif
 endif
 .PHONY: lint tool-install test clean clean-all clean-ffmpeg module build valgrind valgrind-run
 
-all: $(FFMPEG_BUILD) $(BIN_OUTPUT_PATH)/video-store $(BIN_OUTPUT_PATH)/concat
+all: $(FFMPEG_BUILD) $(BIN_VIDEO_STORE) $(BIN_CONCAT)
 
-$(BIN_OUTPUT_PATH)/video-store: videostore/*.go cmd/module/*.go videostore/*.c videostore/*.h $(FFMPEG_BUILD)
+$(BIN_VIDEO_STORE): videostore/*.go cmd/module/*.go videostore/*.c videostore/*.h $(FFMPEG_BUILD)
 	go mod tidy
-	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_OUTPUT_PATH)/video-store cmd/module/cmd.go
+	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_VIDEO_STORE) cmd/module/cmd.go
 
-$(BIN_OUTPUT_PATH)/concat: videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD)
+$(BIN_CONCAT): videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD)
 	go mod tidy
-	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_OUTPUT_PATH)/concat cmd/concat/cmd.go
+	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_CONCAT) cmd/concat/cmd.go
 
 AR = ar
 $(BUILD_DIR)/libviamav.a:
 	$(AR) crs $@ $(BUILD_DIR)/concat.o $(BUILD_DIR)/rawsegmenter.o
 
-$(BIN_OUTPUT_PATH)/concat-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+$(BIN_CONCAT_C): $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
-	rm -f $(BIN_OUTPUT_PATH)/concat-c
+	rm -f $(BIN_CONCAT_C)
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(OBJS) ./cmd/concat-c/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  -g -o $(BIN_OUTPUT_PATH)/concat-c
+	$(CC) $(OBJS) ./cmd/concat-c/main.c $(CGO_LDFLAGS) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  -g -o $(BIN_CONCAT_C)
 
-$(BIN_OUTPUT_PATH)/encoder-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+$(BIN_ENCODER_C): $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
-	rm -f $(BIN_OUTPUT_PATH)/encoder-c
+	rm -f $(BIN_ENCODER_C)
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(OBJS) ./cmd/encode-c/main.c $(CGO_LDFLAGS) $(shell pkg-config --cflags sqlite3) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  $(shell pkg-config --libs sqlite3) -g -o $(BIN_OUTPUT_PATH)/encoder-c
+	$(CC) $(OBJS) ./cmd/encode-c/main.c $(CGO_LDFLAGS) $(shell pkg-config --cflags sqlite3) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  $(shell pkg-config --libs sqlite3) -g -o $(BIN_ENCODER_C)
 
-
-$(BIN_OUTPUT_PATH)/raw-segmenter-c: $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+$(BIN_RAW_SEGMENTER_C): $(FFMPEG_BUILD) $(OBJS) $(BUILD_DIR)/libviamav.a | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/concat-c --------"
-	rm -f $(BIN_OUTPUT_PATH)/raw-segmenter-c
+	rm -f $(BIN_RAW_SEGMENTER_C)
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(OBJS) ./cmd/raw-segmenter-c/main.c $(CGO_LDFLAGS) $(shell pkg-config --cflags sqlite3) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  $(shell pkg-config --libs sqlite3) -g -o $(BIN_OUTPUT_PATH)/raw-segmenter-c
+	$(CC) $(OBJS) ./cmd/raw-segmenter-c/main.c $(CGO_LDFLAGS) $(shell pkg-config --cflags sqlite3) -ldl -L$(BUILD_DIR) -lviamav $(CGO_CFLAGS)  $(shell pkg-config --libs sqlite3) -g -o $(BIN_RAW_SEGMENTER_C)
 
-$(BIN_OUTPUT_PATH)/video-info-c: $(FFMPEG_BUILD) $(OBJS) | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
+$(BIN_VIDEO_INFO_C): $(FFMPEG_BUILD) $(OBJS) | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
 	@echo "-------- Make $(BIN_OUTPUT_PATH)/video-info-c --------"
-	rm -f $(BIN_OUTPUT_PATH)/video-info-c
+	rm -f $(BIN_VIDEO_INFO_C)
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(OBJS) ./cmd/video-info-c/main.c $(CGO_LDFLAGS) -ldl $(CGO_CFLAGS) -g -o $(BIN_OUTPUT_PATH)/video-info-c
+	$(CC) $(OBJS) ./cmd/video-info-c/main.c $(CGO_LDFLAGS) -ldl $(CGO_CFLAGS) -g -o $(BIN_VIDEO_INFO_C)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo "-------- Make $(@) --------"
@@ -181,7 +189,7 @@ lint: tool-install $(FFMPEG_BUILD)
 	go mod tidy
 	CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml --timeout=2m
 
-test: $(BIN_OUTPUT_PATH)/video-store
+test: $(BIN_VIDEO_STORE)
 ifeq ($(shell which ffmpeg > /dev/null 2>&1; echo $$?), 1)
 ifeq ($(SOURCE_OS),linux)
 	sudo apt update && sudo apt install -y ffmpeg
@@ -194,14 +202,14 @@ ifeq ($(shell which artifact > /dev/null 2>&1; echo $$?), 1)
 	go install go.viam.com/utils/artifact/cmd/artifact@latest
 endif
 	artifact pull
-	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
+	cp $(BIN_VIDEO_STORE) bin/video-store$(BIN_SUFFIX)
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS=$(CGO_CFLAGS) go test -v ./...
 	rm bin/video-store
 
-module: $(BIN_OUTPUT_PATH)/video-store
-	cp $(BIN_OUTPUT_PATH)/video-store bin/video-store
-	tar czf module.tar.gz bin/video-store
-	rm bin/video-store
+module: $(BIN_VIDEO_STORE)
+	cp $(BIN_VIDEO_STORE) bin/video-store$(BIN_SUFFIX)
+	tar czf module.tar.gz bin/video-store$(BIN_SUFFIX)
+	rm bin/video-store$(BIN_SUFFIX)
 
 clean:
 	rm -rf bin
