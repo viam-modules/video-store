@@ -28,11 +28,12 @@ const (
 	deleterInterval = 1  // minutes
 	retryInterval   = 1  // seconds
 	asyncTimeout    = 60 // seconds
-	tempPath        = "/tmp"
 
 	// TimeFormat is how we format the timestamp in output filenames and do commands.
 	TimeFormat = "2006-01-02_15-04-05"
 )
+
+var tempPath = os.TempDir()
 
 var presets = map[string]struct{}{
 	"ultrafast": {},
