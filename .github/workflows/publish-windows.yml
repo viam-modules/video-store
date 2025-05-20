@@ -14,9 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Run make for Windows
+      - name: Run make module for Windows
         run: |
-          TARGET_OS=windows make
+          TARGET_OS=windows make module
         shell: bash
 
       - name: Upload videostore module to registry
