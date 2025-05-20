@@ -1,12 +1,8 @@
 name: Build and Publish videostore for Windows
 
 on:
-  push:
-    paths-ignore:
-      - 'README.md'
-  pull_request:
-    paths-ignore:
-      - 'README.md' 
+    release:
+      types: [published]
 
 jobs:
   publish-windows:
@@ -25,6 +21,6 @@ jobs:
           meta-path: meta.json
           module-path: module.tar.gz
           platform: windows/amd64
-          version: 0.0.7-rc2-windows
+          version: ${{ github.ref_name }}
           key-id: ${{ secrets.VIAM_DEV_API_KEY_ID }}
           key-value: ${{ secrets.VIAM_DEV_API_KEY }}
