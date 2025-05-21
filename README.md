@@ -93,13 +93,13 @@ Additionally, make sure to add your configured data manager service to the `depe
 }
 ```
 
-## DoCommand API
+### DoCommand API
 
-### From/To
+#### From/To
 
 The `From` and `To` timestamps are used to specify the start and end times for video clips. These timestamps must be provided in a specific datetime format to ensure proper parsing and formatting.
 
-#### Datetime Format
+##### Datetime Format
 
 The datetime format used is:
 
@@ -115,12 +115,12 @@ Where:
 - `SS`: Seconds (e.g., 45)
 - `Z`: Optional suffix indicating the time is in UTC.
 
-#### Datetime Example
+##### Datetime Example
 
 - `2024-01-15_14-30-45` represents January 15, 2024, at 2:30:45 PM **local time**.
 - `2024-01-15_14-30-45Z` represents January 15, 2024, at 2:30:45 PM **UTC**.
 
-### `Save`
+#### `Save`
 
 The save command retreives video from local storage, concatenates and trims underlying storage segments based on time range, and uploads the clip to the cloud.
 
@@ -132,7 +132,7 @@ The save command retreives video from local storage, concatenates and trims unde
 | `metadata`  | string              | optional          | Arbitrary metadata string.       |
 | `async`     | boolean             | optional          | Whether the operation is async.  |
 
-#### Save Request
+##### Save Request
 ```json
 {
   "command": "save",
@@ -142,7 +142,7 @@ The save command retreives video from local storage, concatenates and trims unde
 }
 ```
 
-#### Save Response
+##### Save Response
 ```json
 {
   "command": "save",
@@ -150,7 +150,7 @@ The save command retreives video from local storage, concatenates and trims unde
 }
 ```
 
-#### Async Save Request
+##### Async Save Request
 
 The async save command performs the same operation as the save command, but does not wait for the operation to complete. Use this command when you want to save video slices that include the current in-progress video storage segment. It will wait for the current segment to finish recording before saving the video slice.
 
@@ -168,7 +168,7 @@ The async save command performs the same operation as the save command, but does
 }
 ```
 
-#### Async Save Response
+##### Async Save Response
 ```json
 {
   "command": "save",
@@ -177,7 +177,7 @@ The async save command performs the same operation as the save command, but does
 }
 ```
 
-### `Fetch`
+#### `Fetch`
 
 The fetch command retrieves video from local storage, and sends the bytes directly back to the client.
 
@@ -187,7 +187,7 @@ The fetch command retrieves video from local storage, and sends the bytes direct
 | `from`    | timestamp  | required          | Start timestamp.     |
 | `to`      | timestamp  | required          | End timestamp.       |
 
-#### Fetch Request
+##### Fetch Request
 ```json
 {
   "command": "fetch",
@@ -196,7 +196,7 @@ The fetch command retrieves video from local storage, and sends the bytes direct
 }
 ```
 
-#### Fetch Response
+##### Fetch Response
 ```json
 {
   "command": "fetch",
