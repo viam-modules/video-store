@@ -11,6 +11,7 @@ import (
 	"sync"
 	"unsafe"
 
+	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/logging"
 )
 
@@ -32,7 +33,6 @@ type encoder struct {
 
 const (
 	outputPattern = "%s.mp4"
-	gigabyte      = 1024 * 1024 * 1024
 )
 
 func newEncoder(
@@ -78,7 +78,7 @@ func (e *encoder) initialize() error {
 
 	if ret != C.VIDEO_STORE_ENCODER_RESP_OK {
 		err := errors.New("failed to initialize encoder")
-		e.logger.Errorf("%s: %d: %s", err.Error(), ret, ffmpegError(ret))
+		e.logger.Errorf("%s: %d: %s", err.Error(), ret, vsutils.FFmpegError(int(ret)))
 		return err
 	}
 	e.cEncoder = cEncoder

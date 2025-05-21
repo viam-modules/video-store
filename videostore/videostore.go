@@ -10,10 +10,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/viam-modules/video-store/videostore/indexer"
+	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	rutils "go.viam.com/rdk/utils"
+	"go.viam.com/rdk/utils/diskusage"
 	"go.viam.com/utils"
 )
 
@@ -25,13 +28,9 @@ const (
 	segmentSeconds = 30 // seconds
 	videoFormat    = "mp4"
 
-	deleterInterval = 1  // minutes
-	retryInterval   = 1  // seconds
-	asyncTimeout    = 60 // seconds
-	tempPath        = "/tmp"
-
-	// TimeFormat is how we format the timestamp in output filenames and do commands.
-	TimeFormat = "2006-01-02_15-04-05"
+	retryInterval = 1  // seconds
+	asyncTimeout  = 60 // seconds
+	tempPath      = "/tmp"
 )
 
 var presets = map[string]struct{}{
@@ -56,6 +55,7 @@ type videostore struct {
 
 	rawSegmenter *RawSegmenter
 	concater     *concater
+	indexer      *indexer.Indexer
 }
 
 // VideoStore stores video and provides APIs to request the stored video.
@@ -63,6 +63,7 @@ type VideoStore interface {
 	Fetch(ctx context.Context, r *FetchRequest) (*FetchResponse, error)
 	Save(ctx context.Context, r *SaveRequest) (*SaveResponse, error)
 	Close()
+	GetStorageState(ctx context.Context) (*StorageState, error)
 }
 
 // CodecType repreasents a codec.
@@ -139,8 +140,16 @@ func (r *FetchRequest) Validate() error {
 	return nil
 }
 
+// StorageState summarizes the state of the stored video segments and storage config info.
+type StorageState struct {
+	VideoRanges              indexer.VideoRanges
+	StorageLimitGB           int
+	DeviceStorageRemainingGB float64
+	StoragePath              string
+}
+
 // NewFramePollingVideoStore returns a VideoStore that stores video it encoded from polling frames from a camera.Camera.
-func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore, error) {
+func NewFramePollingVideoStore(_ context.Context, config Config, logger logging.Logger) (VideoStore, error) {
 	if config.Type != SourceTypeFrame {
 		return nil, fmt.Errorf("config type must be %s", SourceTypeFrame)
 	}
@@ -155,10 +164,10 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 		config:      config,
 		workers:     utils.NewBackgroundStoppableWorkers(),
 	}
-	if err := createDir(config.Storage.StoragePath); err != nil {
+	if err := vsutils.CreateDir(config.Storage.StoragePath); err != nil {
 		return nil, err
 	}
-	err := createDir(vs.config.Storage.UploadPath)
+	err := vsutils.CreateDir(vs.config.Storage.UploadPath)
 	if err != nil {
 		return nil, err
 	}
@@ -188,6 +197,11 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 		return nil, err
 	}
 
+	vs.indexer = indexer.NewIndexer(config.Storage.StoragePath, config.Storage.SizeGB, logger)
+
+	vs.workers.Add(func(ctx context.Context) {
+		vs.indexer.Run(ctx)
+	})
 	vs.workers.Add(func(ctx context.Context) {
 		vs.fetchFrames(
 			ctx,
@@ -199,13 +213,12 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 			config.FramePoller.Framerate,
 			encoder)
 	})
-	vs.workers.Add(vs.deleter)
 
 	return vs, nil
 }
 
 // NewReadOnlyVideoStore returns a VideoStore that can return stored video but doesn't create new video segements.
-func NewReadOnlyVideoStore(config Config, logger logging.Logger) (VideoStore, error) {
+func NewReadOnlyVideoStore(_ context.Context, config Config, logger logging.Logger) (VideoStore, error) {
 	if config.Type != SourceTypeReadOnly {
 		return nil, fmt.Errorf("config type must be %s", SourceTypeReadOnly)
 	}
@@ -213,10 +226,10 @@ func NewReadOnlyVideoStore(config Config, logger logging.Logger) (VideoStore, er
 		return nil, err
 	}
 
-	if err := createDir(config.Storage.StoragePath); err != nil {
+	if err := vsutils.CreateDir(config.Storage.StoragePath); err != nil {
 		return nil, err
 	}
-	if err := createDir(config.Storage.UploadPath); err != nil {
+	if err := vsutils.CreateDir(config.Storage.UploadPath); err != nil {
 		return nil, err
 	}
 
@@ -229,9 +242,12 @@ func NewReadOnlyVideoStore(config Config, logger logging.Logger) (VideoStore, er
 		return nil, err
 	}
 
+	indexer := indexer.NewIndexer(config.Storage.StoragePath, config.Storage.SizeGB, logger)
+
 	return &videostore{
 		typ:      config.Type,
 		concater: concater,
+		indexer:  indexer,
 		logger:   logger,
 		config:   config,
 		workers:  utils.NewBackgroundStoppableWorkers(),
@@ -239,7 +255,7 @@ func NewReadOnlyVideoStore(config Config, logger logging.Logger) (VideoStore, er
 }
 
 // NewRTPVideoStore returns a VideoStore that stores video it receives from the caller.
-func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, error) {
+func NewRTPVideoStore(_ context.Context, config Config, logger logging.Logger) (RTPVideoStore, error) {
 	if config.Type != SourceTypeRTP {
 		return nil, fmt.Errorf("config type must be %s", SourceTypeRTP)
 	}
@@ -247,10 +263,10 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		return nil, err
 	}
 
-	if err := createDir(config.Storage.StoragePath); err != nil {
+	if err := vsutils.CreateDir(config.Storage.StoragePath); err != nil {
 		return nil, err
 	}
-	if err := createDir(config.Storage.UploadPath); err != nil {
+	if err := vsutils.CreateDir(config.Storage.UploadPath); err != nil {
 		return nil, err
 	}
 
@@ -271,16 +287,19 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		return nil, err
 	}
 
+	indexer := indexer.NewIndexer(config.Storage.StoragePath, config.Storage.SizeGB, logger)
+
 	vs := &videostore{
 		typ:          config.Type,
 		concater:     concater,
 		rawSegmenter: rawSegmenter,
+		indexer:      indexer,
 		logger:       logger,
 		config:       config,
 		workers:      utils.NewBackgroundStoppableWorkers(),
 	}
 
-	vs.workers.Add(vs.deleter)
+	vs.workers.Add(func(ctx context.Context) { vs.indexer.Run(ctx) })
 	return vs, nil
 }
 
@@ -297,7 +316,7 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		return nil, err
 	}
 	vs.logger.Debug("fetch command received and validated")
-	fetchFilePath := generateOutputFilePath(
+	fetchFilePath := vsutils.GenerateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
 		r.From,
 		"",
@@ -319,7 +338,7 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err
 	}
-	videoBytes, err := readVideoFile(fetchFilePath)
+	videoBytes, err := vsutils.ReadVideoFile(fetchFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +354,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 		return nil, err
 	}
 	vs.logger.Debug("save command received and validated")
-	uploadFilePath := generateOutputFilePath(
+	uploadFilePath := vsutils.GenerateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
 		r.From,
 		r.Metadata,
@@ -409,58 +428,6 @@ func (vs *videostore) processFrames(
 	}
 }
 
-// deleter is a go routine that cleans up old clips if storage is full. Runs on interval
-// and deletes the oldest clip until the storage size is below the configured max.
-func (vs *videostore) deleter(ctx context.Context) {
-	ticker := time.NewTicker(deleterInterval * time.Minute)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			// Perform the deletion of the oldest clip
-			if err := cleanupStorage(vs.config.Storage.StoragePath, vs.config.Storage.SizeGB, vs.logger); err != nil {
-				vs.logger.Error("failed to clean up storage", err)
-				continue
-			}
-		}
-	}
-}
-
-func cleanupStorage(storagePath string, maxStorageSizeGB int, logger logging.Logger) error {
-	maxStorageSize := int64(maxStorageSizeGB) * gigabyte
-	currStorageSize, err := getDirectorySize(storagePath)
-	if err != nil {
-		return err
-	}
-	if currStorageSize < maxStorageSize {
-		return nil
-	}
-	files, err := getSortedFiles(storagePath)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
-		if currStorageSize < maxStorageSize {
-			break
-		}
-		logger.Debugf("deleting file: %s", file)
-		err := os.Remove(file.name)
-		if err != nil {
-			return err
-		}
-		logger.Debugf("deleted file: %s", file)
-		// NOTE: This is going to be super slow
-		// we should speed this up
-		currStorageSize, err = getDirectorySize(storagePath)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // asyncSave command will run the concat operation in the background.
 // It waits for the segment duration before running to ensure the last segment
 // is written to storage before concatenation.
@@ -491,9 +458,40 @@ func (vs *videostore) Close() {
 	if vs.workers != nil {
 		vs.workers.Stop()
 	}
-	if vs.rawSegmenter != nil {
-		if err := vs.rawSegmenter.Close(); err != nil {
-			vs.logger.Errorf(err.Error())
+
+	if vs.indexer != nil {
+		if err := vs.indexer.Close(); err != nil {
+			vs.logger.Errorw("error closing indexer", "error", err)
 		}
 	}
+
+	if vs.rawSegmenter != nil {
+		if err := vs.rawSegmenter.Close(); err != nil {
+			vs.logger.Errorw("error closing raw segmenter", "error", err)
+		}
+	}
+}
+
+// GetStorageState returns the current storage state for this VideoStore using the indexer.
+func (vs *videostore) GetStorageState(ctx context.Context) (*StorageState, error) {
+	if vs.indexer == nil {
+		return nil, errors.New("indexer not initialized")
+	}
+
+	videoRangesResult, err := vs.indexer.GetVideoList(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get storage state from indexer: %w", err)
+	}
+
+	fsUsage, err := diskusage.Statfs(vs.config.Storage.StoragePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get filesystem stats for remaining space: %w", err)
+	}
+
+	return &StorageState{
+		VideoRanges:              videoRangesResult,
+		StorageLimitGB:           vs.config.Storage.SizeGB,
+		StoragePath:              vs.config.Storage.StoragePath,
+		DeviceStorageRemainingGB: float64(fsUsage.AvailableBytes) / float64(vsutils.Gigabyte),
+	}, nil
 }
