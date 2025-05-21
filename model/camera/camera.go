@@ -38,7 +38,6 @@ const (
 	deleterInterval = 10               // minutes
 	retryInterval   = 1                // seconds
 	asyncTimeout    = 60               // seconds
-	tempPath        = "/tmp"
 )
 
 type component struct {

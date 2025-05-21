@@ -9,6 +9,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"unsafe"
 
@@ -56,6 +57,7 @@ func newRawSegmenter(storagePath string, logger logging.Logger) (*RawSegmenter, 
 // Close must be called to free the resources taken during Init
 // Note: May write to disk
 func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
+	rs.logger.Debugf("initializing raw segmenter with codec %s, width %d, height %d", codec, width, height)
 	if width <= 0 || height <= 0 {
 		return errors.New("both width and height must be greater than zero")
 	}
@@ -66,12 +68,15 @@ func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 		return errors.New("*rawSegmenter init called more than once")
 	}
 
-	var cRS *C.raw_seg
 	// Allocate output context for segmenter. The "segment" format is a special format
 	// that allows for segmenting output files. The output pattern is a strftime pattern
 	// that specifies the output file name. The pattern is set to the current time.
-	outputPatternCStr := C.CString(rs.storagePath + "/" + outputPattern)
+	// print the output pattern
+	outputPatternPath := filepath.Join(rs.storagePath, outputPattern)
+	rs.logger.Debugf("raw segmenter using output pattern: %s", outputPatternPath)
+	outputPatternCStr := C.CString(outputPatternPath)
 	defer C.free(unsafe.Pointer(outputPatternCStr))
+	var cRS *C.raw_seg
 	var ret C.int
 	switch codec {
 	case CodecTypeH264:

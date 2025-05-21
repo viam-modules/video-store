@@ -1,0 +1,19 @@
+name: Build videostore for Windows
+
+on:
+  push:
+    paths-ignore:
+      - 'README.md'
+  pull_request:
+    paths-ignore:
+      - 'README.md' 
+
+jobs:
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run make for Windows
+        run: |
+          TARGET_OS=windows make
+        shell: bash

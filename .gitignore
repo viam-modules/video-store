@@ -8,3 +8,4 @@ module.tar.gz
 build
 .artifact/cache
 .artifact/data
+x264

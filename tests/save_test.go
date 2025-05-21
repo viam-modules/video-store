@@ -254,7 +254,7 @@ func TestSaveDoCommand(t *testing.T) {
 	})
 
 	t.Run("Test leftover concat txt files are cleaned up", func(t *testing.T) {
-		leftoverConcatTxtPath := filepath.Join("/tmp", "concat_test1.txt")
+		leftoverConcatTxtPath := filepath.Join(os.TempDir(), "concat_test1.txt")
 		file, err := os.Create(leftoverConcatTxtPath)
 		test.That(t, err, test.ShouldBeNil)
 		file.Close()
