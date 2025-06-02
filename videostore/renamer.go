@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"go.viam.com/rdk/logging"
@@ -43,7 +42,6 @@ func (r *renamer) ProcessSegments(ctx context.Context) error {
 		return fmt.Errorf("failed to add directory to watcher: %w", err)
 	}
 	r.logger.Debugf("Renamer starting to watch directory:", r.watchDir)
-
 	for {
 		select {
 		case event, ok := <-watcher.Events:
@@ -55,7 +53,6 @@ func (r *renamer) ProcessSegments(ctx context.Context) error {
 				r.logger.Debug("MP4 file created:", event.Name)
 				r.queueFile(event.Name)
 			}
-
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return fmt.Errorf("watcher error channel closed unexpectedly")
@@ -86,16 +83,10 @@ func (r *renamer) queueFile(filePath string) {
 // convertFileToUTC converts a file with local timestamp to unix timestamp
 func (r *renamer) convertFileToUTC(filePath string) error {
 	filename := filepath.Base(filePath)
-	// Extract date and time from filename (example: 2025-05-30_17-05-36.mp4)
-	parts := strings.Split(strings.TrimSuffix(filename, ".mp4"), "_")
-	if len(parts) != 2 {
-		return fmt.Errorf("unexpected filename format: %s", filename)
-	}
-	dateStr := parts[0]
-	timeStr := strings.ReplaceAll(parts[1], "-", ":")
-	localTime, err := time.ParseInLocation("2006-01-02 15:04:05", dateStr+" "+timeStr, time.Local)
+	timestampStr := strings.TrimSuffix(filename, ".mp4")
+	localTime, err := ParseDateTimeString(timestampStr)
 	if err != nil {
-		return fmt.Errorf("failed to parse time from filename: %w", err)
+		return fmt.Errorf("failed to parse timestamp from filename %s: %w", filename, err)
 	}
 	unixTimestamp := localTime.Unix()
 	unixFilename := fmt.Sprintf("%d.mp4", unixTimestamp)
