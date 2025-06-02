@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -33,7 +34,10 @@ const (
 	TimeFormat = "2006-01-02_15-04-05"
 )
 
-var tempPath = os.TempDir()
+var (
+	tempPath              = os.TempDir()
+	windowsTmpStoragePath = filepath.Join(os.TempDir(), "viam", "video-storage")
+)
 
 var presets = map[string]struct{}{
 	"ultrafast": {},
@@ -57,6 +61,7 @@ type videostore struct {
 
 	rawSegmenter *RawSegmenter
 	concater     *concater
+	transformer  *transformProcessor
 }
 
 // VideoStore stores video and provides APIs to request the stored video.
@@ -163,6 +168,27 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	if err != nil {
 		return nil, err
 	}
+	var storagePath string
+	if runtime.GOOS == "windows" {
+		vs.logger.Info("creating temporary storage path for windows", windowsTmpStoragePath)
+		if err := createDir(windowsTmpStoragePath); err != nil {
+			return nil, fmt.Errorf("failed to create temporary storage path: %w", err)
+		}
+		storagePath = windowsTmpStoragePath
+		tp := NewTransformProcessor(
+			windowsTmpStoragePath,
+			config.Storage.StoragePath,
+			logger,
+		)
+		vs.transformer = tp
+		vs.workers.Add(func(ctx context.Context) {
+			if err := tp.ProcessSegments(ctx); err != nil {
+				vs.logger.Errorf("failed to process segments: %v", err)
+			}
+		})
+	} else {
+		storagePath = config.Storage.StoragePath
+	}
 
 	// Create concater to handle concatenation of video clips when requested.
 	vs.concater, err = newConcater(
@@ -177,7 +203,7 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	encoder, err := newEncoder(
 		vs.config.Encoder,
 		vs.config.FramePoller.Framerate,
-		vs.config.Storage.StoragePath,
+		storagePath,
 		logger,
 	)
 	if err != nil {
@@ -494,6 +520,11 @@ func (vs *videostore) Close() {
 	}
 	if vs.rawSegmenter != nil {
 		if err := vs.rawSegmenter.Close(); err != nil {
+			vs.logger.Errorf(err.Error())
+		}
+	}
+	if vs.transformer != nil {
+		if err := vs.transformer.Close(); err != nil {
 			vs.logger.Errorf(err.Error())
 		}
 	}
