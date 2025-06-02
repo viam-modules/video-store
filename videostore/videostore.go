@@ -61,7 +61,7 @@ type videostore struct {
 
 	rawSegmenter *RawSegmenter
 	concater     *concater
-	transformer  *transformProcessor
+	renamer      *renamer
 }
 
 // VideoStore stores video and provides APIs to request the stored video.
@@ -175,14 +175,13 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 			return nil, fmt.Errorf("failed to create temporary storage path: %w", err)
 		}
 		storagePath = windowsTmpStoragePath
-		tp := NewTransformProcessor(
+		vs.renamer = NewRenamer(
 			windowsTmpStoragePath,
 			config.Storage.StoragePath,
 			logger,
 		)
-		vs.transformer = tp
 		vs.workers.Add(func(ctx context.Context) {
-			if err := tp.ProcessSegments(ctx); err != nil {
+			if err := vs.renamer.ProcessSegments(ctx); err != nil {
 				vs.logger.Errorf("failed to process segments: %v", err)
 			}
 		})
@@ -523,8 +522,8 @@ func (vs *videostore) Close() {
 			vs.logger.Errorf(err.Error())
 		}
 	}
-	if vs.transformer != nil {
-		if err := vs.transformer.Close(); err != nil {
+	if vs.renamer != nil {
+		if err := vs.renamer.Close(); err != nil {
 			vs.logger.Errorf(err.Error())
 		}
 	}
