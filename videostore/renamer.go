@@ -41,7 +41,7 @@ func (r *renamer) ProcessSegments(ctx context.Context) error {
 	if err := watcher.Add(r.watchDir); err != nil {
 		return fmt.Errorf("failed to add directory to watcher: %w", err)
 	}
-	r.logger.Debugf("Renamer starting to watch directory:", r.watchDir)
+	r.logger.Debugf("renamer starting to watch directory:", r.watchDir)
 	for {
 		select {
 		case event, ok := <-watcher.Events:
@@ -50,7 +50,7 @@ func (r *renamer) ProcessSegments(ctx context.Context) error {
 			}
 			// Only process file creation events for MP4 files
 			if event.Op&fsnotify.Create == fsnotify.Create && strings.HasSuffix(event.Name, ".mp4") {
-				r.logger.Debug("MP4 file created:", event.Name)
+				r.logger.Debug("mp4 file created:", event.Name)
 				r.queueFile(event.Name)
 			}
 		case err, ok := <-watcher.Errors:
@@ -69,13 +69,13 @@ func (r *renamer) queueFile(filePath string) {
 	r.processLock.Lock()
 	defer r.processLock.Unlock()
 	r.pendingFiles = append(r.pendingFiles, filePath)
-	r.logger.Debug("Renamer file queued:", filePath)
+	r.logger.Debug("renamer file queued:", filePath)
 	// Process the oldest file when we have 2+ files (ensuring the previous is complete)
 	if len(r.pendingFiles) > 1 {
 		fileToProcess := r.pendingFiles[0]
 		r.pendingFiles = r.pendingFiles[1:]
 		if err := r.convertFileToUTC(fileToProcess); err != nil {
-			r.logger.Errorf("Failed to process %s: %v", fileToProcess, err)
+			r.logger.Errorf("failed to process %s: %v", fileToProcess, err)
 		}
 	}
 }
@@ -91,7 +91,7 @@ func (r *renamer) convertFileToUTC(filePath string) error {
 	unixTimestamp := localTime.Unix()
 	unixFilename := fmt.Sprintf("%d.mp4", unixTimestamp)
 	outputPath := filepath.Join(r.outputDir, unixFilename)
-	r.logger.Debugf("Converting %s to UTC: %s", filename, unixFilename)
+	r.logger.Debugf("converting %s to UTC: %s", filename, unixFilename)
 	if err := os.Rename(filePath, outputPath); err != nil {
 		return fmt.Errorf("failed to rename file %s to %s: %w", filePath, outputPath, err)
 	}
@@ -101,13 +101,13 @@ func (r *renamer) convertFileToUTC(filePath string) error {
 
 // Close processes any remaining files in the queue and cleans up resources
 func (r *renamer) Close() error {
-	r.logger.Debug("Closing renamer, processing remaining file")
+	r.logger.Debug("closing renamer, processing remaining file")
 	r.processLock.Lock()
 	defer r.processLock.Unlock()
 	// Process any remaining files in the queue
 	var lastErr error
 	for _, filePath := range r.pendingFiles {
-		r.logger.Info("Processing remaining file:", filePath)
+		r.logger.Info("processing remaining file:", filePath)
 
 		if err := r.convertFileToUTC(filePath); err != nil {
 			r.logger.Errorf("Failed to process %s during shutdown: %v", filePath, err)
