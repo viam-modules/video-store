@@ -175,7 +175,7 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 			return nil, fmt.Errorf("failed to create temporary storage path: %w", err)
 		}
 		storagePath = windowsTmpStoragePath
-		vs.renamer = NewRenamer(
+		vs.renamer = newRenamer(
 			windowsTmpStoragePath,
 			config.Storage.StoragePath,
 			logger,

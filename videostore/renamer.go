@@ -2,6 +2,7 @@ package videostore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +13,7 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-// transformProcessor watches a directory and converts local timestamps to UTC
+// renamer watches a directory and converts local timestamps to unix timestamps
 type renamer struct {
 	watchDir     string
 	outputDir    string
@@ -21,8 +22,8 @@ type renamer struct {
 	logger       logging.Logger
 }
 
-// NewTransformProcessor creates a new processor
-func NewRenamer(watchDir, outputDir string, logger logging.Logger) *renamer {
+// NewRenamer creates a new processor
+func newRenamer(watchDir, outputDir string, logger logging.Logger) *renamer {
 	return &renamer{
 		watchDir:     watchDir,
 		outputDir:    outputDir,
@@ -46,7 +47,7 @@ func (r *renamer) ProcessSegments(ctx context.Context) error {
 		select {
 		case event, ok := <-watcher.Events:
 			if !ok {
-				return fmt.Errorf("watcher closed unexpectedly")
+				return errors.New("watcher closed unexpectedly")
 			}
 			// Only process file creation events for MP4 files
 			if event.Op&fsnotify.Create == fsnotify.Create && strings.HasSuffix(event.Name, ".mp4") {
@@ -55,7 +56,7 @@ func (r *renamer) ProcessSegments(ctx context.Context) error {
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
-				return fmt.Errorf("watcher error channel closed unexpectedly")
+				return errors.New("watcher error channel closed unexpectedly")
 			}
 			return fmt.Errorf("watcher error: %w", err)
 		case <-ctx.Done():
