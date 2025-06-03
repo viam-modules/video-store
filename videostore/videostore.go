@@ -280,6 +280,34 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		return nil, err
 	}
 
+	vs := &videostore{
+		typ:     config.Type,
+		logger:  logger,
+		config:  config,
+		workers: utils.NewBackgroundStoppableWorkers(),
+	}
+
+	var storagePath string
+	if runtime.GOOS == "windows" {
+		vs.logger.Info("creating temporary storage path for windows", windowsTmpStoragePath)
+		if err := createDir(windowsTmpStoragePath); err != nil {
+			return nil, fmt.Errorf("failed to create temporary storage path: %w", err)
+		}
+		storagePath = windowsTmpStoragePath
+		vs.renamer = newRenamer(
+			windowsTmpStoragePath,
+			config.Storage.StoragePath,
+			logger,
+		)
+		vs.workers.Add(func(ctx context.Context) {
+			if err := vs.renamer.ProcessSegments(ctx); err != nil {
+				vs.logger.Errorf("failed to process segments: %v", err)
+			}
+		})
+	} else {
+		storagePath = config.Storage.StoragePath
+	}
+
 	concater, err := newConcater(
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
@@ -288,23 +316,16 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	if err != nil {
 		return nil, err
 	}
+	vs.concater = concater
 
 	rawSegmenter, err := newRawSegmenter(
-		config.Storage.StoragePath,
+		storagePath,
 		logger,
 	)
 	if err != nil {
 		return nil, err
 	}
-
-	vs := &videostore{
-		typ:          config.Type,
-		concater:     concater,
-		rawSegmenter: rawSegmenter,
-		logger:       logger,
-		config:       config,
-		workers:      utils.NewBackgroundStoppableWorkers(),
-	}
+	vs.rawSegmenter = rawSegmenter
 
 	vs.workers.Add(vs.deleter)
 	return vs, nil

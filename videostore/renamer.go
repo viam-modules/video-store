@@ -22,7 +22,6 @@ type renamer struct {
 	logger       logging.Logger
 }
 
-// NewRenamer creates a new processor
 func newRenamer(watchDir, outputDir string, logger logging.Logger) *renamer {
 	return &renamer{
 		watchDir:     watchDir,
