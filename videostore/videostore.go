@@ -181,7 +181,7 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 			logger,
 		)
 		vs.workers.Add(func(ctx context.Context) {
-			if err := vs.renamer.ProcessSegments(ctx); err != nil {
+			if err := vs.renamer.processSegments(ctx); err != nil {
 				vs.logger.Errorf("failed to process segments: %v", err)
 			}
 		})
@@ -300,7 +300,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 			logger,
 		)
 		vs.workers.Add(func(ctx context.Context) {
-			if err := vs.renamer.ProcessSegments(ctx); err != nil {
+			if err := vs.renamer.processSegments(ctx); err != nil {
 				vs.logger.Errorf("failed to process segments: %v", err)
 			}
 		})
@@ -544,7 +544,7 @@ func (vs *videostore) Close() {
 		}
 	}
 	if vs.renamer != nil {
-		if err := vs.renamer.Close(); err != nil {
+		if err := vs.renamer.close(); err != nil {
 			vs.logger.Errorf(err.Error())
 		}
 	}

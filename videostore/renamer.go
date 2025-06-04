@@ -31,8 +31,8 @@ func newRenamer(watchDir, outputDir string, logger logging.Logger) *renamer {
 	}
 }
 
-// ProcessSegments watches the directory and processes new files
-func (r *renamer) ProcessSegments(ctx context.Context) error {
+// processSegments watches the directory and processes new files
+func (r *renamer) processSegments(ctx context.Context) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("failed to create watcher: %w", err)
@@ -99,8 +99,8 @@ func (r *renamer) convertFileToUTC(filePath string) error {
 	return nil
 }
 
-// Close processes any remaining files in the queue and cleans up resources
-func (r *renamer) Close() error {
+// close processes any remaining files in the queue and cleans up resources
+func (r *renamer) close() error {
 	r.logger.Debug("closing renamer, processing remaining file")
 	r.processLock.Lock()
 	defer r.processLock.Unlock()
