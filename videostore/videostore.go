@@ -168,10 +168,10 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	if err != nil {
 		return nil, err
 	}
-	var storagePath string
+	var directStoragePath string
 	if runtime.GOOS == "windows" {
 		var err error
-		storagePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath)
+		directStoragePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath)
 		if err != nil {
 			return nil, err
 		}
@@ -181,7 +181,7 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 			}
 		})
 	} else {
-		storagePath = config.Storage.StoragePath
+		directStoragePath = config.Storage.StoragePath
 	}
 
 	// Create concater to handle concatenation of video clips when requested.
@@ -197,7 +197,7 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	encoder, err := newEncoder(
 		vs.config.Encoder,
 		vs.config.FramePoller.Framerate,
-		storagePath,
+		directStoragePath,
 		logger,
 	)
 	if err != nil {
@@ -282,10 +282,10 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		workers: utils.NewBackgroundStoppableWorkers(),
 	}
 
-	var storagePath string
+	var directStoragePath string
 	if runtime.GOOS == "windows" {
 		var err error
-		storagePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath)
+		directStoragePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath)
 		if err != nil {
 			return nil, err
 		}
@@ -295,7 +295,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 			}
 		})
 	} else {
-		storagePath = config.Storage.StoragePath
+		directStoragePath = config.Storage.StoragePath
 	}
 
 	concater, err := newConcater(
@@ -309,7 +309,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	vs.concater = concater
 
 	rawSegmenter, err := newRawSegmenter(
-		storagePath,
+		directStoragePath,
 		logger,
 	)
 	if err != nil {
