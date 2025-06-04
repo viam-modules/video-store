@@ -170,16 +170,11 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	}
 	var storagePath string
 	if runtime.GOOS == "windows" {
-		vs.logger.Debug("creating temporary storage path for windows", windowsTmpStoragePath)
-		if err := createDir(windowsTmpStoragePath); err != nil {
-			return nil, fmt.Errorf("failed to create temporary storage path: %w", err)
+		var err error
+		storagePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath)
+		if err != nil {
+			return nil, err
 		}
-		storagePath = windowsTmpStoragePath
-		vs.renamer = newRenamer(
-			windowsTmpStoragePath,
-			config.Storage.StoragePath,
-			logger,
-		)
 		vs.workers.Add(func(ctx context.Context) {
 			if err := vs.renamer.processSegments(ctx); err != nil {
 				vs.logger.Errorf("failed to process segments: %v", err)
@@ -289,16 +284,11 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 
 	var storagePath string
 	if runtime.GOOS == "windows" {
-		vs.logger.Debug("creating temporary storage path for windows", windowsTmpStoragePath)
-		if err := createDir(windowsTmpStoragePath); err != nil {
-			return nil, fmt.Errorf("failed to create temporary storage path: %w", err)
+		var err error
+		storagePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath)
+		if err != nil {
+			return nil, err
 		}
-		storagePath = windowsTmpStoragePath
-		vs.renamer = newRenamer(
-			windowsTmpStoragePath,
-			config.Storage.StoragePath,
-			logger,
-		)
 		vs.workers.Add(func(ctx context.Context) {
 			if err := vs.renamer.processSegments(ctx); err != nil {
 				vs.logger.Errorf("failed to process segments: %v", err)
@@ -548,4 +538,13 @@ func (vs *videostore) Close() {
 			vs.logger.Errorf(err.Error())
 		}
 	}
+}
+
+func setupWindowsStoragePath(logger logging.Logger, storagePath string) (string, *renamer, error) {
+	logger.Debug("creating temporary storage path for windows", windowsTmpStoragePath)
+	if err := createDir(windowsTmpStoragePath); err != nil {
+		return "", nil, fmt.Errorf("failed to create temporary storage path: %w", err)
+	}
+	renamer := newRenamer(windowsTmpStoragePath, storagePath, logger)
+	return windowsTmpStoragePath, renamer, nil
 }
