@@ -41,7 +41,7 @@ func (r *renamer) processSegments(ctx context.Context) error {
 	if err := watcher.Add(r.watchDir); err != nil {
 		return fmt.Errorf("failed to add directory to watcher: %w", err)
 	}
-	r.logger.Debugf("renamer starting to watch directory:", r.watchDir)
+	r.logger.Debugf("starting to watch directory:", r.watchDir)
 	for {
 		select {
 		case event, ok := <-watcher.Events:
@@ -65,12 +65,15 @@ func (r *renamer) processSegments(ctx context.Context) error {
 }
 
 // queueFile adds a file to the processing queue
+// When we get a file creation event, the file is still being written to by the segmenter.
+// The file is queued and only processed when the next segment file is created. We should never
+// have more than 2 files in the queue at a time.
 func (r *renamer) queueFile(filePath string) {
 	r.processLock.Lock()
 	defer r.processLock.Unlock()
 	r.pendingFiles = append(r.pendingFiles, filePath)
-	r.logger.Debug("renamer file queued:", filePath)
-	// Process the oldest file when we have 2+ files (ensuring the previous is complete)
+	r.logger.Debug("files queued:", filePath)
+	r.logger.Debug("queue files pending:", len(r.pendingFiles))
 	if len(r.pendingFiles) > 1 {
 		fileToProcess := r.pendingFiles[0]
 		r.pendingFiles = r.pendingFiles[1:]
