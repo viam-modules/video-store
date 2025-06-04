@@ -112,7 +112,11 @@ func (r *renamer) convertFilenameToUnixTimestamp(filePath string) error {
 	return nil
 }
 
-// close processes any remaining files in the queue and cleans up resources
+// close flushes any remaining files in the queue to disk
+//
+// When the renamer is closed, there will be a remaining file in the queue that
+// still needs to be processed. The segmenter closes out before the renamer,
+// so we can safely processes the last file during closeout.
 func (r *renamer) close() error {
 	r.logger.Debug("closing renamer, processing remaining file")
 	r.processLock.Lock()
