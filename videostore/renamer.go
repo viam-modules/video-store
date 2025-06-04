@@ -83,7 +83,11 @@ func (r *renamer) queueFile(filePath string) {
 	}
 }
 
-// convertFileToUTC converts a file with local timestamp to unix timestamp
+// convertFilenameToUnixTimestamp converts a filename with local timestamp to
+// to unix timestamp format
+// Converting to unix timestamp is only necessary on Windows systems where the
+// local time is used in the filename. FFmpeg is unable to use strftime to format
+// filenames in unix timestamp format, so we need to convert using golang here.
 func (r *renamer) convertFilenameToUnixTimestamp(filePath string) error {
 	filename := filepath.Base(filePath)
 	timestampStr := strings.TrimSuffix(filename, ".mp4")
