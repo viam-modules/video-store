@@ -32,6 +32,11 @@ func newRenamer(watchDir, outputDir string, logger logging.Logger) *renamer {
 }
 
 // processSegments watches the directory and processes new files
+//
+// This function loops indefinitely, watching for new MP4 files created
+// in the specified directory. When a new file is detected, it is queued for processing.
+// We do not need to spawn routines to process events as the segmenter will only produce
+// events every 30 seconds.
 func (r *renamer) processSegments(ctx context.Context) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -65,6 +70,7 @@ func (r *renamer) processSegments(ctx context.Context) error {
 }
 
 // queueFile adds a file to the processing queue
+//
 // When we get a file creation event, the file is still being written to by the segmenter.
 // The file is queued and only processed when the next segment file is created. We should never
 // have more than 2 files in the queue at a time.
@@ -83,8 +89,8 @@ func (r *renamer) queueFile(filePath string) {
 	}
 }
 
-// convertFilenameToUnixTimestamp converts a filename with local timestamp to
-// to unix timestamp format
+// convertFilenameToUnixTimestamp converts a filename to unix timestamp format
+//
 // Converting to unix timestamp is only necessary on Windows systems where the
 // local time is used in the filename. FFmpeg is unable to use strftime to format
 // filenames in unix timestamp format, so we need to convert using golang here.
