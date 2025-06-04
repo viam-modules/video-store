@@ -170,7 +170,7 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	}
 	var storagePath string
 	if runtime.GOOS == "windows" {
-		vs.logger.Info("creating temporary storage path for windows", windowsTmpStoragePath)
+		vs.logger.Debug("creating temporary storage path for windows", windowsTmpStoragePath)
 		if err := createDir(windowsTmpStoragePath); err != nil {
 			return nil, fmt.Errorf("failed to create temporary storage path: %w", err)
 		}
@@ -289,7 +289,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 
 	var storagePath string
 	if runtime.GOOS == "windows" {
-		vs.logger.Info("creating temporary storage path for windows", windowsTmpStoragePath)
+		vs.logger.Debug("creating temporary storage path for windows", windowsTmpStoragePath)
 		if err := createDir(windowsTmpStoragePath); err != nil {
 			return nil, fmt.Errorf("failed to create temporary storage path: %w", err)
 		}
