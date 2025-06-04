@@ -77,14 +77,14 @@ func (r *renamer) queueFile(filePath string) {
 	if len(r.pendingFiles) > 1 {
 		fileToProcess := r.pendingFiles[0]
 		r.pendingFiles = r.pendingFiles[1:]
-		if err := r.convertFileToUTC(fileToProcess); err != nil {
+		if err := r.convertFilenameToUnixTimestamp(fileToProcess); err != nil {
 			r.logger.Errorf("failed to process %s: %v", fileToProcess, err)
 		}
 	}
 }
 
 // convertFileToUTC converts a file with local timestamp to unix timestamp
-func (r *renamer) convertFileToUTC(filePath string) error {
+func (r *renamer) convertFilenameToUnixTimestamp(filePath string) error {
 	filename := filepath.Base(filePath)
 	timestampStr := strings.TrimSuffix(filename, ".mp4")
 	localTime, err := ParseDateTimeString(timestampStr)
@@ -112,7 +112,7 @@ func (r *renamer) close() error {
 	for _, filePath := range r.pendingFiles {
 		r.logger.Info("processing remaining file:", filePath)
 
-		if err := r.convertFileToUTC(filePath); err != nil {
+		if err := r.convertFilenameToUnixTimestamp(filePath); err != nil {
 			r.logger.Errorf("Failed to process %s during shutdown: %v", filePath, err)
 			lastErr = err // Keep the last error to return
 		}
