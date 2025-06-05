@@ -171,7 +171,7 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	var directStoragePath string
 	if runtime.GOOS == "windows" {
 		var err error
-		directStoragePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath)
+		directStoragePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath, config.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +285,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	var directStoragePath string
 	if runtime.GOOS == "windows" {
 		var err error
-		directStoragePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath)
+		directStoragePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath, config.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -540,11 +540,12 @@ func (vs *videostore) Close() {
 	}
 }
 
-func setupWindowsStoragePath(logger logging.Logger, storagePath string) (string, *renamer, error) {
-	logger.Debug("creating temporary storage path for windows", windowsTmpStoragePath)
-	if err := createDir(windowsTmpStoragePath); err != nil {
+func setupWindowsStoragePath(logger logging.Logger, storagePath, name string) (string, *renamer, error) {
+	cameraStoragePath := filepath.Join(windowsTmpStoragePath, name)
+	logger.Debug("creating temporary storage path for windows", cameraStoragePath)
+	if err := createDir(cameraStoragePath); err != nil {
 		return "", nil, fmt.Errorf("failed to create temporary storage path: %w", err)
 	}
-	renamer := newRenamer(windowsTmpStoragePath, storagePath, logger)
-	return windowsTmpStoragePath, renamer, nil
+	renamer := newRenamer(cameraStoragePath, storagePath, logger)
+	return cameraStoragePath, renamer, nil
 }

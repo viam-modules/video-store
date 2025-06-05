@@ -116,6 +116,7 @@ func ToFrameVideoStoreVideoConfig(
 	}
 
 	fvsc := videostore.Config{
+		Name:    name,
 		Type:    videostore.SourceTypeFrame,
 		Encoder: applyVideoEncoderDefaults(config.Video),
 		Storage: storage,
