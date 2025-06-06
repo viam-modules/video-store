@@ -2,14 +2,14 @@ package videostore
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"go.viam.com/rdk/logging"
 )
 
@@ -31,63 +31,114 @@ func newRenamer(watchDir, outputDir string, logger logging.Logger) *renamer {
 	}
 }
 
-// processSegments watches the directory and processes new files
+// processSegments periodically scans the directory for new files to process
 //
-// This function loops indefinitely, watching for new MP4 files created
-// in the specified directory. When a new file is detected, it is queued for processing.
-// We do not need to spawn routines to process events as the segmenter will only produce
-// events every 30 seconds.
+// This function polls the directory regularly, looking for MP4 files
+// and processing them in order of creation.
 func (r *renamer) processSegments(ctx context.Context) error {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return fmt.Errorf("failed to create watcher: %w", err)
-	}
-	defer watcher.Close()
-	if err := watcher.Add(r.watchDir); err != nil {
-		return fmt.Errorf("failed to add directory to watcher: %w", err)
-	}
-	r.logger.Debugf("starting to watch directory:", r.watchDir)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	r.logger.Debugf("Starting to scan directory: %s", r.watchDir)
 	for {
 		select {
-		case event, ok := <-watcher.Events:
-			if !ok {
-				return errors.New("watcher closed unexpectedly")
-			}
-			// Only process file creation events for MP4 files
-			if event.Op&fsnotify.Create == fsnotify.Create && strings.HasSuffix(event.Name, ".mp4") {
-				r.logger.Debug("mp4 file created:", event.Name)
-				r.queueFile(event.Name)
-			}
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return errors.New("watcher error channel closed unexpectedly")
-			}
-			return fmt.Errorf("watcher error: %w", err)
 		case <-ctx.Done():
-			r.logger.Debug("context done, stopping watcher")
+			r.logger.Debug("Context done, stopping scanner and flushing remaining files")
+			// if err := r.close(); err != nil {
+			// 	return fmt.Errorf("error during close: %w", err)
+			// }
 			return nil
+		case <-ticker.C:
+			if err := r.scanAndProcessFiles(); err != nil {
+				r.logger.Errorf("Error scanning directory: %v", err)
+			}
 		}
 	}
 }
 
-// queueFile adds a file to the processing queue
-//
-// When we get a file creation event, the file is still being written to by the segmenter.
-// The file is queued and only processed when the next segment file is created. We should never
-// have more than 2 files in the queue at a time.
-func (r *renamer) queueFile(filePath string) {
-	r.processLock.Lock()
-	defer r.processLock.Unlock()
-	r.pendingFiles = append(r.pendingFiles, filePath)
-	r.logger.Debug("files queued:", filePath)
-	r.logger.Debug("queue files pending:", len(r.pendingFiles))
-	if len(r.pendingFiles) > 1 {
-		fileToProcess := r.pendingFiles[0]
-		r.pendingFiles = r.pendingFiles[1:]
-		if err := r.convertFilenameToUnixTimestamp(fileToProcess); err != nil {
-			r.logger.Errorf("failed to process %s: %v", fileToProcess, err)
+// scanAndProcessFiles looks for files in the watch directory and processes them
+func (r *renamer) scanAndProcessFiles() error {
+	entries, err := os.ReadDir(r.watchDir)
+	if err != nil {
+		return fmt.Errorf("failed to read directory: %w", err)
+	}
+	// Filter for MP4 files
+	var mpegFiles []string
+	for _, entry := range entries {
+		// Sanity skip for rogue dirs in our tmp path
+		if entry.IsDir() {
+			continue
+		}
+		// Find all MP4 files
+		name := entry.Name()
+		if strings.HasSuffix(name, ".mp4") {
+			fullPath := filepath.Join(r.watchDir, name)
+			mpegFiles = append(mpegFiles, fullPath)
 		}
 	}
+
+	// Sort files by modification time (oldest first)
+	// Since there should only ever be 2 files in the directory at a time,
+	// we can afford to sort them when we scan the directory.
+	sort.Slice(mpegFiles, func(i, j int) bool {
+		infoI, _ := os.Stat(mpegFiles[i])
+		infoJ, _ := os.Stat(mpegFiles[j])
+		return infoI.ModTime().Before(infoJ.ModTime())
+	})
+
+	// Process files if we have any
+	if len(mpegFiles) > 0 {
+		r.processLock.Lock()
+		defer r.processLock.Unlock()
+
+		// Update our pending files list
+		oldPending := r.pendingFiles
+		r.pendingFiles = mpegFiles
+
+		// Only process files we haven't seen before
+		var newFiles []string
+		for _, file := range mpegFiles {
+			isNew := true
+			for _, old := range oldPending {
+				if file == old {
+					isNew = false
+					break
+				}
+			}
+			if isNew {
+				newFiles = append(newFiles, file)
+			}
+		}
+		if len(newFiles) > 0 {
+			r.logger.Debugf("Found %d new MP4 files", len(newFiles))
+		}
+		// Process all files except the most recent one
+		if len(mpegFiles) > 1 {
+			for _, fileToProcess := range mpegFiles[:len(mpegFiles)-1] {
+				// Sanity check for rogue file deletion
+				_, err := os.Stat(fileToProcess)
+				if err != nil {
+					if os.IsNotExist(err) {
+						r.logger.Debugf("File %s does not exist, skipping", fileToProcess)
+						continue
+					}
+					r.logger.Errorf("Failed to stat file %s: %v", fileToProcess, err)
+					continue
+				}
+				// if fileInfo.Size() < 1024 {
+				// 	r.logger.Debugf("Skipping small file %s (%d bytes)", fileToProcess, fileInfo.Size())
+				// 	continue
+				// }
+				r.logger.Debugf("Processing file: %s", fileToProcess)
+				if err := r.convertFilenameToUnixTimestamp(fileToProcess); err != nil {
+					r.logger.Errorf("Failed to process %s: %v", fileToProcess, err)
+				}
+			}
+		} else {
+			r.logger.Debug("Only one active file found, skipping processing")
+		}
+	}
+
+	return nil
 }
 
 // convertFilenameToUnixTimestamp converts a filename to unix timestamp format
