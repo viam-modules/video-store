@@ -137,7 +137,7 @@ func (r *renamer) convertFilenameToUnixTimestamp(filePath string) error {
 	return nil
 }
 
-// close flushes any remaining files in the queue to disk
+// close flushes any remaining files that have not been processed yet
 func (r *renamer) close() error {
 	r.logger.Debug("Closing renamer, processing ALL remaining files")
 	files, err := r.getSortedMPEGFiles()
