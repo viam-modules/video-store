@@ -64,7 +64,8 @@ func (r *renamer) processSegments(ctx context.Context) error {
 			}
 			return fmt.Errorf("watcher error: %w", err)
 		case <-ctx.Done():
-			return ctx.Err()
+			r.logger.Debug("context done, stopping watcher")
+			return nil
 		}
 	}
 }
