@@ -35,8 +35,8 @@ const (
 )
 
 var (
-	tempPath              = os.TempDir()
-	windowsTmpStoragePath = filepath.Join(os.TempDir(), "viam", "video-storage")
+	tempPath                    = os.TempDir()
+	windowsTmpStoragePathPrefix = filepath.Join(os.TempDir(), "viam", "video-storage")
 )
 
 var presets = map[string]struct{}{
@@ -541,11 +541,11 @@ func (vs *videostore) Close() {
 }
 
 func setupWindowsStoragePath(logger logging.Logger, storagePath, name string) (string, *renamer, error) {
-	cameraStoragePath := filepath.Join(windowsTmpStoragePath, name)
-	logger.Debug("creating temporary storage path for windows", cameraStoragePath)
-	if err := createDir(cameraStoragePath); err != nil {
+	windowsTmpStoragePath := filepath.Join(windowsTmpStoragePathPrefix, name)
+	logger.Debug("creating temporary storage path for windows", windowsTmpStoragePath)
+	if err := createDir(windowsTmpStoragePath); err != nil {
 		return "", nil, fmt.Errorf("failed to create temporary storage path: %w", err)
 	}
-	renamer := newRenamer(cameraStoragePath, storagePath, logger)
-	return cameraStoragePath, renamer, nil
+	renamer := newRenamer(windowsTmpStoragePath, storagePath, logger)
+	return windowsTmpStoragePath, renamer, nil
 }
