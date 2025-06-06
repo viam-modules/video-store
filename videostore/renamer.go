@@ -2,12 +2,12 @@ package videostore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"go.viam.com/rdk/logging"
@@ -15,19 +15,16 @@ import (
 
 // renamer watches a directory and converts local timestamps to unix timestamps
 type renamer struct {
-	watchDir     string
-	outputDir    string
-	pendingFiles []string
-	processLock  sync.Mutex
-	logger       logging.Logger
+	watchDir  string
+	outputDir string
+	logger    logging.Logger
 }
 
 func newRenamer(watchDir, outputDir string, logger logging.Logger) *renamer {
 	return &renamer{
-		watchDir:     watchDir,
-		outputDir:    outputDir,
-		pendingFiles: []string{},
-		logger:       logger,
+		watchDir:  watchDir,
+		outputDir: outputDir,
+		logger:    logger,
 	}
 }
 
@@ -43,9 +40,9 @@ func (r *renamer) processSegments(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			r.logger.Debug("Context done, stopping scanner and flushing remaining files")
-			// if err := r.close(); err != nil {
-			// 	return fmt.Errorf("error during close: %w", err)
-			// }
+			if err := r.close(); err != nil {
+				return fmt.Errorf("error during close: %w", err)
+			}
 			return nil
 		case <-ticker.C:
 			if err := r.scanAndProcessFiles(); err != nil {
@@ -55,90 +52,50 @@ func (r *renamer) processSegments(ctx context.Context) error {
 	}
 }
 
-// scanAndProcessFiles looks for files in the watch directory and processes them
-func (r *renamer) scanAndProcessFiles() error {
+// getSortedMPEGFiles retrieves and sorts MP4 files in the watch directory
+func (r *renamer) getSortedMPEGFiles() ([]string, error) {
 	entries, err := os.ReadDir(r.watchDir)
 	if err != nil {
-		return fmt.Errorf("failed to read directory: %w", err)
+		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 	// Filter for MP4 files
 	var mpegFiles []string
 	for _, entry := range entries {
-		// Sanity skip for rogue dirs in our tmp path
 		if entry.IsDir() {
+			r.logger.Debugf("Skipping directory entry: %s", entry.Name())
 			continue
 		}
-		// Find all MP4 files
 		name := entry.Name()
 		if strings.HasSuffix(name, ".mp4") {
 			fullPath := filepath.Join(r.watchDir, name)
 			mpegFiles = append(mpegFiles, fullPath)
 		}
 	}
-
 	// Sort files by modification time (oldest first)
-	// Since there should only ever be 2 files in the directory at a time,
-	// we can afford to sort them when we scan the directory.
 	sort.Slice(mpegFiles, func(i, j int) bool {
 		infoI, _ := os.Stat(mpegFiles[i])
 		infoJ, _ := os.Stat(mpegFiles[j])
 		return infoI.ModTime().Before(infoJ.ModTime())
 	})
 
-	// Process files if we have any
-	if len(mpegFiles) > 0 {
-		r.processLock.Lock()
-		defer r.processLock.Unlock()
+	return mpegFiles, nil
+}
 
-		// Update our pending files list
-		oldPending := r.pendingFiles
-		r.pendingFiles = mpegFiles
-
-		// Only process files we haven't seen before
-		var newFiles []string
-		for _, file := range mpegFiles {
-			isNew := true
-			for _, old := range oldPending {
-				if file == old {
-					isNew = false
-					break
-				}
-			}
-			if isNew {
-				newFiles = append(newFiles, file)
-			}
-		}
-		if len(newFiles) > 0 {
-			r.logger.Debugf("Found %d new MP4 files", len(newFiles))
-		}
-		// Process all files except the most recent one
-		if len(mpegFiles) > 1 {
-			for _, fileToProcess := range mpegFiles[:len(mpegFiles)-1] {
-				// Sanity check for rogue file deletion
-				_, err := os.Stat(fileToProcess)
-				if err != nil {
-					if os.IsNotExist(err) {
-						r.logger.Debugf("File %s does not exist, skipping", fileToProcess)
-						continue
-					}
-					r.logger.Errorf("Failed to stat file %s: %v", fileToProcess, err)
-					continue
-				}
-				// if fileInfo.Size() < 1024 {
-				// 	r.logger.Debugf("Skipping small file %s (%d bytes)", fileToProcess, fileInfo.Size())
-				// 	continue
-				// }
-				r.logger.Debugf("Processing file: %s", fileToProcess)
-				if err := r.convertFilenameToUnixTimestamp(fileToProcess); err != nil {
-					r.logger.Errorf("Failed to process %s: %v", fileToProcess, err)
-				}
-			}
-		} else {
-			r.logger.Debug("Only one active file found, skipping processing")
+// processFiles renames a list of files
+func (r *renamer) processFiles(files []string) error {
+	if len(files) == 0 {
+		return errors.New("no files provided for processing")
+	}
+	var lastErr error
+	for _, file := range files {
+		r.logger.Debugf("Processing file: %s", file)
+		if err := r.convertFilenameToUnixTimestamp(file); err != nil {
+			r.logger.Errorf("Failed to process %s: %v", file, err)
+			lastErr = err
 		}
 	}
 
-	return nil
+	return lastErr
 }
 
 // convertFilenameToUnixTimestamp converts a filename to unix timestamp format
@@ -164,28 +121,32 @@ func (r *renamer) convertFilenameToUnixTimestamp(filePath string) error {
 	return nil
 }
 
-// close flushes any remaining files in the queue to disk
+// scanAndProcessFiles scans the watch directory for MP4 files to process
 //
-// When the renamer is closed, there will be a remaining file in the queue that
-// still needs to be processed. The segmenter closes out before the renamer,
-// so we can safely processes the last file during closeout.
-func (r *renamer) close() error {
-	r.logger.Debug("closing renamer, processing remaining file")
-	r.processLock.Lock()
-	defer r.processLock.Unlock()
-	// Process any remaining files in the queue
-	var lastErr error
-	for _, filePath := range r.pendingFiles {
-		r.logger.Info("processing remaining file:", filePath)
-
-		if err := r.convertFilenameToUnixTimestamp(filePath); err != nil {
-			r.logger.Errorf("Failed to process %s during shutdown: %v", filePath, err)
-			lastErr = err // Keep the last error to return
-		}
+// It excludes the most recent file to avoid processing it while it's still
+// being written by the segmenter.
+func (r *renamer) scanAndProcessFiles() error {
+	files, err := r.getSortedMPEGFiles()
+	if err != nil {
+		return err
 	}
-	r.pendingFiles = nil
-	if lastErr != nil {
-		return fmt.Errorf("errors occurred while processing remaining files: %w", lastErr)
+	if len(files) <= 1 {
+		r.logger.Debug("One or fewer active files found, skipping processing")
+		return nil
+	}
+
+	return r.processFiles(files[:len(files)-1]) // Exclude the most recent file
+}
+
+// close flushes any remaining files in the queue to disk
+func (r *renamer) close() error {
+	r.logger.Debug("Closing renamer, processing ALL remaining files")
+	files, err := r.getSortedMPEGFiles()
+	if err != nil {
+		return fmt.Errorf("failed to get files during close: %w", err)
+	}
+	if err := r.processFiles(files); err != nil {
+		return fmt.Errorf("errors occurred while flushing remaining files: %w", err)
 	}
 
 	return nil

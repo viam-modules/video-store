@@ -61,7 +61,9 @@ type videostore struct {
 
 	rawSegmenter *RawSegmenter
 	concater     *concater
+
 	renamer      *renamer
+	renameWorker *utils.StoppableWorkers
 }
 
 // VideoStore stores video and provides APIs to request the stored video.
@@ -155,11 +157,12 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	}
 
 	vs := &videostore{
-		latestFrame: &atomic.Value{},
-		typ:         config.Type,
-		logger:      logger,
-		config:      config,
-		workers:     utils.NewBackgroundStoppableWorkers(),
+		latestFrame:  &atomic.Value{},
+		typ:          config.Type,
+		logger:       logger,
+		config:       config,
+		workers:      utils.NewBackgroundStoppableWorkers(),
+		renameWorker: utils.NewBackgroundStoppableWorkers(),
 	}
 	if err := createDir(config.Storage.StoragePath); err != nil {
 		return nil, err
@@ -175,7 +178,7 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 		if err != nil {
 			return nil, err
 		}
-		vs.workers.Add(func(ctx context.Context) {
+		vs.renameWorker.Add(func(ctx context.Context) {
 			if err := vs.renamer.processSegments(ctx); err != nil {
 				vs.logger.Errorf("failed to process segments: %v", err)
 			}
@@ -276,10 +279,11 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	}
 
 	vs := &videostore{
-		typ:     config.Type,
-		logger:  logger,
-		config:  config,
-		workers: utils.NewBackgroundStoppableWorkers(),
+		typ:          config.Type,
+		logger:       logger,
+		config:       config,
+		workers:      utils.NewBackgroundStoppableWorkers(),
+		renameWorker: utils.NewBackgroundStoppableWorkers(),
 	}
 
 	var directStoragePath string
@@ -289,7 +293,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		if err != nil {
 			return nil, err
 		}
-		vs.workers.Add(func(ctx context.Context) {
+		vs.renameWorker.Add(func(ctx context.Context) {
 			if err := vs.renamer.processSegments(ctx); err != nil {
 				vs.logger.Errorf("failed to process segments: %v", err)
 			}
@@ -533,10 +537,9 @@ func (vs *videostore) Close() {
 			vs.logger.Errorf(err.Error())
 		}
 	}
-	if vs.renamer != nil {
-		if err := vs.renamer.close(); err != nil {
-			vs.logger.Errorf(err.Error())
-		}
+	if vs.renameWorker != nil {
+		// Stop will cause renamer to flush out all remaining files
+		vs.renameWorker.Stop()
 	}
 }
 
