@@ -52,13 +52,29 @@ func (r *renamer) processSegments(ctx context.Context) error {
 	}
 }
 
+// scanAndProcessFiles scans the watch directory for MP4 files and processes them
+//
+// It excludes the most recent file to avoid processing it while it's still
+// being written by the segmenter.
+func (r *renamer) scanAndProcessFiles() error {
+	files, err := r.getSortedMPEGFiles()
+	if err != nil {
+		return err
+	}
+	if len(files) <= 1 {
+		r.logger.Debug("one or fewer active files found, skipping processing")
+		return nil
+	}
+
+	return r.processFiles(files[:len(files)-1]) // Exclude the most recent file
+}
+
 // getSortedMPEGFiles retrieves and sorts MP4 files in the watch directory
 func (r *renamer) getSortedMPEGFiles() ([]string, error) {
 	entries, err := os.ReadDir(r.watchDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
-	// Filter for MP4 files
 	var mpegFiles []string
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -119,23 +135,6 @@ func (r *renamer) convertFilenameToUnixTimestamp(filePath string) error {
 	}
 
 	return nil
-}
-
-// scanAndProcessFiles scans the watch directory for MP4 files to process
-//
-// It excludes the most recent file to avoid processing it while it's still
-// being written by the segmenter.
-func (r *renamer) scanAndProcessFiles() error {
-	files, err := r.getSortedMPEGFiles()
-	if err != nil {
-		return err
-	}
-	if len(files) <= 1 {
-		r.logger.Debug("One or fewer active files found, skipping processing")
-		return nil
-	}
-
-	return r.processFiles(files[:len(files)-1]) // Exclude the most recent file
 }
 
 // close flushes any remaining files in the queue to disk
