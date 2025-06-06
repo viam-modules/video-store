@@ -211,6 +211,10 @@ module: $(BIN_VIDEO_STORE)
 	tar czf module.tar.gz bin/video-store$(BIN_SUFFIX)
 	rm bin/video-store$(BIN_SUFFIX)
 
+update-rdk:
+	go get go.viam.com/rdk@latest
+	go mod tidy
+
 clean:
 	rm -rf bin
 	rm -rf build
