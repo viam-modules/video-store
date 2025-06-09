@@ -20,7 +20,8 @@ func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error 
 	if logger.GetLevel() == logging.DEBUG {
 		videostore.SetLibAVLogLevel("debug")
 	} else {
-		videostore.SetLibAVLogLevel("error")
+		videostore.SetLibAVLogLevel("fatal")
+
 	}
 	videostore.SetFFmpegLogCallback()
 

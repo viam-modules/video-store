@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -31,7 +30,9 @@ func newRenamer(watchDir, outputDir string, logger logging.Logger) *renamer {
 // processSegments periodically scans the directory for new files to process
 //
 // This function polls the directory regularly, looking for MP4 files
-// and processing them in order of creation.
+// and processing them to convert their filenames from local datetime
+// to unix timestamps. It runs until the context is done, at which point
+// it flushes any remaining files and exits gracefully.
 func (r *renamer) processSegments(ctx context.Context) error {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -40,37 +41,31 @@ func (r *renamer) processSegments(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			r.logger.Debug("Context done, stopping scanner and flushing remaining files")
-			if err := r.close(); err != nil {
-				return fmt.Errorf("error during close: %w", err)
+			if err := r.scanAndProcessFiles(); err != nil {
+				r.logger.Debugf("Error scanning directory: %v", err)
 			}
 			return nil
 		case <-ticker.C:
 			if err := r.scanAndProcessFiles(); err != nil {
-				r.logger.Errorf("Error scanning directory: %v", err)
+				r.logger.Debugf("Error scanning directory: %v", err)
 			}
 		}
 	}
 }
 
 // scanAndProcessFiles scans the watch directory for MP4 files and processes them
-//
-// It excludes the most recent file to avoid processing it while it's still
-// being written by the segmenter.
 func (r *renamer) scanAndProcessFiles() error {
-	files, err := r.getSortedMPEGFiles()
+	files, err := r.getMPEGFiles()
 	if err != nil {
 		return err
 	}
-	if len(files) <= 1 {
-		r.logger.Debug("one or fewer active files found, skipping processing")
-		return nil
-	}
 
-	return r.processFiles(files[:len(files)-1]) // Exclude the most recent file
+	return r.processFiles(files)
+
 }
 
 // getSortedMPEGFiles retrieves and sorts MP4 files in the watch directory
-func (r *renamer) getSortedMPEGFiles() ([]string, error) {
+func (r *renamer) getMPEGFiles() ([]string, error) {
 	entries, err := os.ReadDir(r.watchDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
@@ -82,17 +77,19 @@ func (r *renamer) getSortedMPEGFiles() ([]string, error) {
 			continue
 		}
 		name := entry.Name()
-		if strings.HasSuffix(name, ".mp4") {
-			fullPath := filepath.Join(r.watchDir, name)
+		if !strings.HasSuffix(name, ".mp4") {
+			r.logger.Debugf("Skipping non-MP4 file: %s", name)
+			continue
+		}
+		fullPath := filepath.Join(r.watchDir, name)
+		// Check if the video segment is completed with MOOV atom present
+		_, err := getVideoInfo(fullPath)
+		if err == nil {
 			mpegFiles = append(mpegFiles, fullPath)
+		} else {
+			r.logger.Debugf("Not a valid video file, skipping %s: %v", fullPath, err)
 		}
 	}
-	// Sort files by modification time (oldest first)
-	sort.Slice(mpegFiles, func(i, j int) bool {
-		infoI, _ := os.Stat(mpegFiles[i])
-		infoJ, _ := os.Stat(mpegFiles[j])
-		return infoI.ModTime().Before(infoJ.ModTime())
-	})
 
 	return mpegFiles, nil
 }
@@ -128,20 +125,6 @@ func (r *renamer) convertFilenameToUnixTimestamp(filePath string) error {
 	r.logger.Debugf("converting %s to UTC: %s", filename, unixFilename)
 	if err := os.Rename(filePath, outputPath); err != nil {
 		return fmt.Errorf("failed to rename file %s to %s: %w", filePath, outputPath, err)
-	}
-
-	return nil
-}
-
-// close flushes any remaining files that have not been processed yet
-func (r *renamer) close() error {
-	r.logger.Debug("Closing renamer, processing ALL remaining files")
-	files, err := r.getSortedMPEGFiles()
-	if err != nil {
-		return fmt.Errorf("failed to get files during close: %w", err)
-	}
-	if err := r.processFiles(files); err != nil {
-		return fmt.Errorf("errors occurred while flushing remaining files: %w", err)
 	}
 
 	return nil
