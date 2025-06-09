@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -28,10 +29,14 @@ const (
 	deleterInterval = 1  // minutes
 	retryInterval   = 1  // seconds
 	asyncTimeout    = 60 // seconds
-	tempPath        = "/tmp"
 
 	// TimeFormat is how we format the timestamp in output filenames and do commands.
 	TimeFormat = "2006-01-02_15-04-05"
+)
+
+var (
+	tempPath                    = os.TempDir()
+	windowsTmpStoragePathPrefix = filepath.Join(os.TempDir(), "viam", "video-storage")
 )
 
 var presets = map[string]struct{}{
@@ -56,6 +61,9 @@ type videostore struct {
 
 	rawSegmenter *RawSegmenter
 	concater     *concater
+
+	// renamer      *renamer
+	renameWorker *utils.StoppableWorkers
 }
 
 // VideoStore stores video and provides APIs to request the stored video.
@@ -149,11 +157,12 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	}
 
 	vs := &videostore{
-		latestFrame: &atomic.Value{},
-		typ:         config.Type,
-		logger:      logger,
-		config:      config,
-		workers:     utils.NewBackgroundStoppableWorkers(),
+		latestFrame:  &atomic.Value{},
+		typ:          config.Type,
+		logger:       logger,
+		config:       config,
+		workers:      utils.NewBackgroundStoppableWorkers(),
+		renameWorker: utils.NewBackgroundStoppableWorkers(),
 	}
 	if err := createDir(config.Storage.StoragePath); err != nil {
 		return nil, err
@@ -161,6 +170,17 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	err := createDir(vs.config.Storage.UploadPath)
 	if err != nil {
 		return nil, err
+	}
+	var directStoragePath string
+	var renamer *renamer
+	if runtime.GOOS == "windows" {
+		var err error
+		directStoragePath, renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath, config.Name)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		directStoragePath = config.Storage.StoragePath
 	}
 
 	// Create concater to handle concatenation of video clips when requested.
@@ -176,7 +196,7 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 	encoder, err := newEncoder(
 		vs.config.Encoder,
 		vs.config.FramePoller.Framerate,
-		vs.config.Storage.StoragePath,
+		directStoragePath,
 		logger,
 	)
 	if err != nil {
@@ -187,7 +207,9 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 		logger.Warnf("encoder init failed: %s", err.Error())
 		return nil, err
 	}
-
+	if renamer != nil {
+		vs.renameWorker.Add(renamer.processSegments)
+	}
 	vs.workers.Add(func(ctx context.Context) {
 		vs.fetchFrames(
 			ctx,
@@ -254,6 +276,19 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		return nil, err
 	}
 
+	var directStoragePath string
+	var renamer *renamer
+	if runtime.GOOS == "windows" {
+		var err error
+		directStoragePath, renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath, config.Name)
+		if err != nil {
+			return nil, err
+		}
+
+	} else {
+		directStoragePath = config.Storage.StoragePath
+	}
+
 	concater, err := newConcater(
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
@@ -264,7 +299,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	}
 
 	rawSegmenter, err := newRawSegmenter(
-		config.Storage.StoragePath,
+		directStoragePath,
 		logger,
 	)
 	if err != nil {
@@ -278,9 +313,15 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		logger:       logger,
 		config:       config,
 		workers:      utils.NewBackgroundStoppableWorkers(),
+		renameWorker: utils.NewBackgroundStoppableWorkers(),
 	}
 
 	vs.workers.Add(vs.deleter)
+
+	if renamer != nil {
+		vs.renameWorker.Add(renamer.processSegments)
+	}
+
 	return vs, nil
 }
 
@@ -496,4 +537,18 @@ func (vs *videostore) Close() {
 			vs.logger.Errorf(err.Error())
 		}
 	}
+	if vs.renameWorker != nil {
+		// Stop will cause renamer to flush out all remaining files
+		vs.renameWorker.Stop()
+	}
+}
+
+func setupWindowsStoragePath(logger logging.Logger, storagePath, name string) (string, *renamer, error) {
+	windowsTmpStoragePath := filepath.Join(windowsTmpStoragePathPrefix, name)
+	logger.Debug("creating temporary storage path for windows", windowsTmpStoragePath)
+	if err := createDir(windowsTmpStoragePath); err != nil {
+		return "", nil, fmt.Errorf("failed to create temporary storage path: %w", err)
+	}
+	renamer := newRenamer(windowsTmpStoragePath, storagePath, logger)
+	return windowsTmpStoragePath, renamer, nil
 }

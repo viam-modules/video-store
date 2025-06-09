@@ -20,8 +20,9 @@ import (
 
 const (
 	conactTxtFilePattern = "concat_%s.txt"
-	concatTxtDir         = "/tmp"
 )
+
+var concatTxtDir = os.TempDir()
 
 type concater struct {
 	logger      logging.Logger

@@ -1,0 +1,26 @@
+name: Build and Publish videostore for Windows
+
+on:
+    release:
+      types: [published]
+
+jobs:
+  publish-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run make module for Windows
+        run: |
+          TARGET_OS=windows make module
+        shell: bash
+
+      - name: Upload videostore module to registry
+        uses: viamrobotics/upload-module@v1
+        with:
+          meta-path: meta.json
+          module-path: module.tar.gz
+          platform: windows/amd64
+          version: ${{ github.ref_name }}
+          key-id: ${{ secrets.VIAM_DEV_API_KEY_ID }}
+          key-value: ${{ secrets.VIAM_DEV_API_KEY }}

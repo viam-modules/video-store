@@ -134,6 +134,8 @@ func SetFFmpegLogCallback() {
 // lookupLogID returns the log ID for the provided log level.
 func lookupLogID(level string) C.int {
 	switch level {
+	case "fatal":
+		return C.AV_LOG_FATAL
 	case "error":
 		return C.AV_LOG_ERROR
 	case "warn":
