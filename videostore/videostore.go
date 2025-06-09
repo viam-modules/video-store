@@ -62,7 +62,7 @@ type videostore struct {
 	rawSegmenter *RawSegmenter
 	concater     *concater
 
-	renamer      *renamer
+	// renamer      *renamer
 	renameWorker *utils.StoppableWorkers
 }
 
@@ -172,17 +172,13 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 		return nil, err
 	}
 	var directStoragePath string
+	var renamer *renamer
 	if runtime.GOOS == "windows" {
 		var err error
-		directStoragePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath, config.Name)
+		directStoragePath, renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath, config.Name)
 		if err != nil {
 			return nil, err
 		}
-		vs.renameWorker.Add(func(ctx context.Context) {
-			if err := vs.renamer.processSegments(ctx); err != nil {
-				vs.logger.Errorf("failed to process segments: %v", err)
-			}
-		})
 	} else {
 		directStoragePath = config.Storage.StoragePath
 	}
@@ -211,7 +207,13 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 		logger.Warnf("encoder init failed: %s", err.Error())
 		return nil, err
 	}
-
+	if renamer != nil {
+		vs.renameWorker.Add(func(ctx context.Context) {
+			if err := renamer.processSegments(ctx); err != nil {
+				vs.logger.Errorf("failed to process segments: %v", err)
+			}
+		})
+	}
 	vs.workers.Add(func(ctx context.Context) {
 		vs.fetchFrames(
 			ctx,
@@ -278,26 +280,15 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 		return nil, err
 	}
 
-	vs := &videostore{
-		typ:          config.Type,
-		logger:       logger,
-		config:       config,
-		workers:      utils.NewBackgroundStoppableWorkers(),
-		renameWorker: utils.NewBackgroundStoppableWorkers(),
-	}
-
 	var directStoragePath string
+	var renamer *renamer
 	if runtime.GOOS == "windows" {
 		var err error
-		directStoragePath, vs.renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath, config.Name)
+		directStoragePath, renamer, err = setupWindowsStoragePath(logger, config.Storage.StoragePath, config.Name)
 		if err != nil {
 			return nil, err
 		}
-		vs.renameWorker.Add(func(ctx context.Context) {
-			if err := vs.renamer.processSegments(ctx); err != nil {
-				vs.logger.Errorf("failed to process segments: %v", err)
-			}
-		})
+
 	} else {
 		directStoragePath = config.Storage.StoragePath
 	}
@@ -310,7 +301,6 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	if err != nil {
 		return nil, err
 	}
-	vs.concater = concater
 
 	rawSegmenter, err := newRawSegmenter(
 		directStoragePath,
@@ -319,9 +309,27 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	if err != nil {
 		return nil, err
 	}
-	vs.rawSegmenter = rawSegmenter
+
+	vs := &videostore{
+		typ:          config.Type,
+		concater:     concater,
+		rawSegmenter: rawSegmenter,
+		logger:       logger,
+		config:       config,
+		workers:      utils.NewBackgroundStoppableWorkers(),
+		renameWorker: utils.NewBackgroundStoppableWorkers(),
+	}
 
 	vs.workers.Add(vs.deleter)
+
+	if renamer != nil {
+		vs.renameWorker.Add(func(ctx context.Context) {
+			if err := renamer.processSegments(ctx); err != nil {
+				vs.logger.Errorf("failed to process segments: %v", err)
+			}
+		})
+	}
+
 	return vs, nil
 }
 
