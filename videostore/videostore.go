@@ -208,11 +208,7 @@ func NewFramePollingVideoStore(config Config, logger logging.Logger) (VideoStore
 		return nil, err
 	}
 	if renamer != nil {
-		vs.renameWorker.Add(func(ctx context.Context) {
-			if err := renamer.processSegments(ctx); err != nil {
-				vs.logger.Errorf("failed to process segments: %v", err)
-			}
-		})
+		vs.renameWorker.Add(renamer.processSegments)
 	}
 	vs.workers.Add(func(ctx context.Context) {
 		vs.fetchFrames(
@@ -323,11 +319,7 @@ func NewRTPVideoStore(config Config, logger logging.Logger) (RTPVideoStore, erro
 	vs.workers.Add(vs.deleter)
 
 	if renamer != nil {
-		vs.renameWorker.Add(func(ctx context.Context) {
-			if err := renamer.processSegments(ctx); err != nil {
-				vs.logger.Errorf("failed to process segments: %v", err)
-			}
-		})
+		vs.renameWorker.Add(renamer.processSegments)
 	}
 
 	return vs, nil

@@ -32,7 +32,7 @@ func newRenamer(watchDir, outputDir string, logger logging.Logger) *renamer {
 // and processing them to convert their filenames from local datetime
 // to unix timestamps. It runs until the context is done, at which point
 // it flushes any remaining files and exits gracefully.
-func (r *renamer) processSegments(ctx context.Context) error {
+func (r *renamer) processSegments(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	r.logger.Debugf("Starting to scan directory: %s", r.watchDir)
@@ -40,27 +40,22 @@ func (r *renamer) processSegments(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			r.logger.Debug("Context done, stopping scanner and flushing remaining files")
-			if err := r.scanAndProcessFiles(); err != nil {
-				r.logger.Errorf("Error flushing directory: %v", err)
-			}
-			return nil
+			r.scanAndProcessFiles()
+			return
 		case <-ticker.C:
-			if err := r.scanAndProcessFiles(); err != nil {
-				r.logger.Errorf("Error scanning directory: %v", err)
-			}
+			r.scanAndProcessFiles()
 		}
 	}
 }
 
 // scanAndProcessFiles scans the watch directory for MP4 files and processes them
-func (r *renamer) scanAndProcessFiles() error {
+func (r *renamer) scanAndProcessFiles() {
 	files, err := r.getMPEGFiles()
 	if err != nil {
-		return err
+		r.logger.Errorf("Failed to get MPEG files: %v", err)
+		return
 	}
-
-	return r.processFiles(files)
-
+	r.processFiles(files)
 }
 
 // getMPEGFiles retrieves valid and complete MP4 files in the watch directory
@@ -94,38 +89,38 @@ func (r *renamer) getMPEGFiles() ([]string, error) {
 }
 
 // processFiles renames a list of files
-func (r *renamer) processFiles(files []string) error {
+func (r *renamer) processFiles(files []string) {
 	if len(files) == 0 {
 		r.logger.Debug("No files to process")
-		return nil
+		return
 	}
-	var lastErr error
 	for _, file := range files {
 		r.logger.Debugf("Processing file: %s", file)
-		if err := r.convertFilenameToUnixTimestamp(file); err != nil {
-			r.logger.Errorf("Failed to process %s: %v", file, err)
-			lastErr = err
+		// if err := r.convertFilenameToUnixTimestamp(file); err != nil {
+		unixFilename, err := r.convertFilenameToUnixTimestamp(file)
+		if err != nil {
+			r.logger.Debugf("Failed to convert %s: %v", file, err)
+			continue
+		}
+
+		r.logger.Debugf("converting %s to UTC: %s", file, unixFilename)
+		if err := os.Rename(file, unixFilename); err != nil {
+			r.logger.Errorf("Failed to rename file %s to %s: %v", file, unixFilename, err)
 		}
 	}
-
-	return lastErr
 }
 
 // convertFilenameToUnixTimestamp changes filename from local datetime to unix timestamp
-func (r *renamer) convertFilenameToUnixTimestamp(filePath string) error {
+func (r *renamer) convertFilenameToUnixTimestamp(filePath string) (string, error) {
 	filename := filepath.Base(filePath)
 	timestampStr := strings.TrimSuffix(filename, ".mp4")
 	localTime, err := ParseDateTimeString(timestampStr)
 	if err != nil {
-		return fmt.Errorf("failed to parse timestamp from filename %s: %w", filename, err)
+		return "", fmt.Errorf("failed to parse timestamp from filename %s: %w", filename, err)
 	}
 	unixTimestamp := localTime.Unix()
 	unixFilename := fmt.Sprintf("%d.mp4", unixTimestamp)
 	outputPath := filepath.Join(r.outputDir, unixFilename)
-	r.logger.Debugf("converting %s to UTC: %s", filename, unixFilename)
-	if err := os.Rename(filePath, outputPath); err != nil {
-		return fmt.Errorf("failed to rename file %s to %s: %w", filePath, outputPath, err)
-	}
 
-	return nil
+	return outputPath, nil
 }
