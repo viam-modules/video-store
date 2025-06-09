@@ -64,7 +64,7 @@ func (r *renamer) scanAndProcessFiles() error {
 
 }
 
-// getSortedMPEGFiles retrieves and sorts MP4 files in the watch directory
+// getMPEGFiles retrieves valid and complete MP4 files in the watch directory
 func (r *renamer) getMPEGFiles() ([]string, error) {
 	entries, err := os.ReadDir(r.watchDir)
 	if err != nil {
