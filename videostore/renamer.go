@@ -2,7 +2,6 @@ package videostore
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,12 +41,12 @@ func (r *renamer) processSegments(ctx context.Context) error {
 		case <-ctx.Done():
 			r.logger.Debug("Context done, stopping scanner and flushing remaining files")
 			if err := r.scanAndProcessFiles(); err != nil {
-				r.logger.Debugf("Error scanning directory: %v", err)
+				r.logger.Errorf("Error flushing directory: %v", err)
 			}
 			return nil
 		case <-ticker.C:
 			if err := r.scanAndProcessFiles(); err != nil {
-				r.logger.Debugf("Error scanning directory: %v", err)
+				r.logger.Errorf("Error scanning directory: %v", err)
 			}
 		}
 	}
@@ -97,7 +96,8 @@ func (r *renamer) getMPEGFiles() ([]string, error) {
 // processFiles renames a list of files
 func (r *renamer) processFiles(files []string) error {
 	if len(files) == 0 {
-		return errors.New("no files provided for processing")
+		r.logger.Debug("No files to process")
+		return nil
 	}
 	var lastErr error
 	for _, file := range files {
