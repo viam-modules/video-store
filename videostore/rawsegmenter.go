@@ -13,6 +13,7 @@ import (
 	"sync"
 	"unsafe"
 
+	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/logging"
 )
 
@@ -46,7 +47,7 @@ func newRawSegmenter(storagePath string, logger logging.Logger) (*RawSegmenter, 
 		storagePath:    storagePath,
 		segmentSeconds: segmentSeconds,
 	}
-	err := createDir(s.storagePath)
+	err := vsutils.CreateDir(s.storagePath)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +100,7 @@ func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 
 	if ret != C.VIDEO_STORE_RAW_SEG_RESP_OK {
 		err := errors.New("failed to initialize raw segmenter")
-		rs.logger.Errorf("%s: %d: %s", err.Error(), ret, ffmpegError(ret))
+		rs.logger.Errorf("%s: %d: %s", err.Error(), ret, vsutils.FFmpegError(int(ret)))
 		return err
 	}
 	rs.cRawSeg = cRS
