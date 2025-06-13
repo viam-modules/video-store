@@ -54,6 +54,10 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("video store type can't be %s", c.Type)
 	}
 
+	if c.Name == "" {
+		return errors.New("name can't be empty")
+	}
+
 	if err := c.Storage.Validate(); err != nil {
 		return err
 	}
