@@ -367,14 +367,13 @@ func generateOutputFilePath(prefix string, timestamp time.Time, metadata, dir st
 // Extracts the start timestamp of the oldest file and the start of the most recent file.
 // Since the most recent segment file is still being written to by the segmenter
 // we do not want to include it in the time range.
-// func validateTimeRange(files []string, start, end time.Time) error {
-func validateTimeRange(files []fileWithDate, start, end time.Time) error {
+// TODO(RSDK-10986): Refactor helper to use indexer for time range validation.
+func validateTimeRange(files []fileWithDate, start time.Time) error {
 	if len(files) == 0 {
 		return errors.New("no storage files found")
 	}
 	oldestFileStart := files[0].startTime
-	newestFileStart := files[len(files)-1].startTime
-	if start.Before(oldestFileStart) || end.After(newestFileStart) {
+	if start.Before(oldestFileStart) {
 		return errors.New("time range is outside of storage range")
 	}
 	return nil

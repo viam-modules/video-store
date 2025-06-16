@@ -62,7 +62,7 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 		c.logger.Errorf("%s, path: %s", err.Error(), path)
 		return err
 	}
-	err = validateTimeRange(storageFiles, from, to)
+	err = validateTimeRange(storageFiles, from)
 	if err != nil {
 		return err
 	}
