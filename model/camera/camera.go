@@ -48,7 +48,7 @@ type component struct {
 }
 
 func newComponent(
-	_ context.Context,
+	ctx context.Context,
 	deps resource.Dependencies,
 	conf resource.Config,
 	logger logging.Logger,
@@ -77,13 +77,13 @@ func newComponent(
 	}
 	var vs videostore.VideoStore
 	if vsConfig.FramePoller.Camera != nil {
-		vs, err = videostore.NewFramePollingVideoStore(vsConfig, logger)
+		vs, err = videostore.NewFramePollingVideoStore(ctx, vsConfig, logger)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		vsConfig.Type = videostore.SourceTypeReadOnly
-		vs, err = videostore.NewReadOnlyVideoStore(vsConfig, logger)
+		vs, err = videostore.NewReadOnlyVideoStore(ctx, vsConfig, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -151,6 +151,13 @@ func (c *component) DoCommand(ctx context.Context, command map[string]interface{
 			"command": "fetch",
 			"video":   videoBytesBase64,
 		}, nil
+	case "get-storage-state":
+		c.logger.Debug("get-storage-state command received")
+		state, err := c.videostore.GetStorageState(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return GetStorageStateDoCommandResponse(state), nil
 	default:
 		return nil, errors.New("invalid command")
 	}

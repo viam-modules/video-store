@@ -5,7 +5,7 @@ import (
 	"context"
 
 	cam "github.com/viam-modules/video-store/model/camera"
-	"github.com/viam-modules/video-store/videostore"
+	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
@@ -18,12 +18,12 @@ func main() {
 
 func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
 	if logger.GetLevel() == logging.DEBUG {
-		videostore.SetLibAVLogLevel("debug")
+		vsutils.SetLibAVLogLevel("debug")
 	} else {
-		videostore.SetLibAVLogLevel("fatal")
+		vsutils.SetLibAVLogLevel("fatal")
 
 	}
-	videostore.SetFFmpegLogCallback()
+	vsutils.SetFFmpegLogCallback()
 
 	module, err := module.NewModuleFromArgs(ctx)
 	if err != nil {

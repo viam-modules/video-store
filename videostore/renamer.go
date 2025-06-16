@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/logging"
 )
 
@@ -77,7 +78,7 @@ func (r *renamer) getMPEGFiles() ([]string, error) {
 		}
 		fullPath := filepath.Join(r.watchDir, name)
 		// Check if the video segment is completed with MOOV atom present
-		_, err := getVideoInfo(fullPath)
+		_, err := vsutils.GetVideoInfo(fullPath)
 		if err == nil {
 			mpegFiles = append(mpegFiles, fullPath)
 		} else {
@@ -114,7 +115,7 @@ func (r *renamer) processFiles(files []string) {
 func (r *renamer) convertFilenameToUnixTimestamp(filePath string) (string, error) {
 	filename := filepath.Base(filePath)
 	timestampStr := strings.TrimSuffix(filename, ".mp4")
-	localTime, err := ParseDateTimeString(timestampStr)
+	localTime, err := vsutils.ParseDateTimeString(timestampStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse timestamp from filename %s: %w", filename, err)
 	}
