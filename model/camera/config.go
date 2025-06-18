@@ -6,6 +6,7 @@ import (
 
 	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/components/camera"
+	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
 
@@ -74,20 +75,13 @@ func applyVideoEncoderDefaults(c Video) videostore.EncoderConfig {
 	}
 }
 
-func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, error) {
-	var zero videostore.StorageConfig
+func applyStorageDefaults(c Storage, name string) videostore.StorageConfig {
 	if c.UploadPath == "" {
-		home, err := getHomeDir()
-		if err != nil {
-			return zero, err
-		}
+		home := rutils.PlatformHomeDir()
 		c.UploadPath = filepath.Join(home, defaultUploadPath, name)
 	}
 	if c.StoragePath == "" {
-		home, err := getHomeDir()
-		if err != nil {
-			return zero, err
-		}
+		home := rutils.PlatformHomeDir()
 		c.StoragePath = filepath.Join(home, defaultStoragePath, name)
 	}
 	return videostore.StorageConfig{
@@ -95,7 +89,7 @@ func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, err
 		OutputFileNamePrefix: name,
 		UploadPath:           c.UploadPath,
 		StoragePath:          c.StoragePath,
-	}, nil
+	}
 }
 
 // ToFrameVideoStoreVideoConfig converts a Config into a videostore.Config.
@@ -104,16 +98,12 @@ func ToFrameVideoStoreVideoConfig(
 	name string,
 	camera camera.Camera,
 ) (videostore.Config, error) {
-	var zero videostore.Config
 	framerate := config.Framerate
 	if config.Framerate == 0 {
 		framerate = defaultFramerate
 	}
 
-	storage, err := applyStorageDefaults(config.Storage, name)
-	if err != nil {
-		return zero, err
-	}
+	storage := applyStorageDefaults(config.Storage, name)
 
 	fvsc := videostore.Config{
 		Name:    name,
