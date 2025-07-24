@@ -517,7 +517,8 @@ func (vs *videostore) cleanupStorage(ctx context.Context) error {
 		return err
 	}
 	if currStorageSize < fallbackStorageLimit {
-		vs.logger.Debugf("[fallback deleter] storage size (%d bytes) is below fallback limit (%d bytes), no cleanup needed", currStorageSize, fallbackStorageLimit)
+		vs.logger.Debugf("[fallback deleter] storage size (%d bytes) is below "+
+			"fallback limit (%d bytes), no cleanup needed", currStorageSize, fallbackStorageLimit)
 		return nil
 	}
 
