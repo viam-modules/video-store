@@ -497,7 +497,7 @@ func (vs *videostore) fallbackDeleter(ctx context.Context) {
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 					return
 				}
-				vs.logger.Error("fallback deleter failed to clean up storage: ", err)
+				vs.logger.Error("[fallback deleter] failed to clean up storage: ", err)
 				continue
 			}
 		}
@@ -517,12 +517,12 @@ func (vs *videostore) cleanupStorage(ctx context.Context) error {
 		return err
 	}
 	if currStorageSize < fallbackStorageLimit {
-		vs.logger.Debugf("storage size (%d bytes) is below fallback limit (%d bytes), no cleanup needed", currStorageSize, fallbackStorageLimit)
+		vs.logger.Debugf("[fallback deleter] storage size (%d bytes) is below fallback limit (%d bytes), no cleanup needed", currStorageSize, fallbackStorageLimit)
 		return nil
 	}
 
 	vs.logger.Warnf(
-		"storage usage is %.1fx the configured max storage size limit (%d bytes used > %d bytes limit), "+
+		"[fallback deleter] storage usage is %.1fx the configured max storage size limit (%d bytes used > %d bytes limit), "+
 			"indexer is likely in an unhealthy state. Deleting oldest files manually to avoid system lockup",
 		fallbackDeletionLimitMultiplier,
 		currStorageSize,
@@ -542,22 +542,20 @@ func (vs *videostore) cleanupStorage(ctx context.Context) error {
 			break
 		}
 
-		filePath := filepath.Join(vs.config.Storage.StoragePath, file.Name)
-
-		fileInfo, err := os.Stat(filePath)
+		fileInfo, err := os.Stat(file.Name)
 		if err != nil {
-			vs.logger.Warnf("failed to stat file during fallback deletion %s: %v", filePath, err)
+			vs.logger.Warnf("[fallback deleter] failed to stat file during fallback deletion %s: %v", file.Name, err)
 			continue
 		}
 		fileSize := fileInfo.Size()
 
-		vs.logger.Infof("deleting file during fallback deletion: %s", filePath)
-		err = os.Remove(filePath)
+		vs.logger.Infof("[fallback deleter] deleting file during fallback deletion: %s", file.Name)
+		err = os.Remove(file.Name)
 		if err != nil {
-			vs.logger.Warnf("failed to delete file during fallback deletion %s: %v", filePath, err)
+			vs.logger.Warnf("[fallback deleter] failed to delete file during fallback deletion %s: %v", file.Name, err)
 			continue
 		}
-		vs.logger.Infof("deleted file during fallback deletion: %s", filePath)
+		vs.logger.Infof("[fallback deleter] deleted file during fallback deletion: %s", file.Name)
 		currStorageSize -= fileSize
 	}
 	return nil
