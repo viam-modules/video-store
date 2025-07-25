@@ -74,7 +74,7 @@ endif
 ifeq ($(SOURCE_OS),darwin)
 	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
 endif
-CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
+CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS)))
 ifeq ($(TARGET_OS),windows)
 	CGO_LDFLAGS += -static -static-libgcc -static-libstdc++
 endif
@@ -108,11 +108,11 @@ endif
 
 all: $(FFMPEG_BUILD) $(BIN_VIDEO_STORE) $(BIN_CONCAT)
 
-$(BIN_VIDEO_STORE): videostore/*.go cmd/module/*.go videostore/*.c videostore/*.h $(FFMPEG_BUILD)
+$(BIN_VIDEO_STORE): videostore/*.go cmd/module/*.go videostore/*.c videostore/utils/*.c videostore/*.h videostore/utils/*.h $(FFMPEG_BUILD)
 	go mod tidy
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_VIDEO_STORE) cmd/module/cmd.go
 
-$(BIN_CONCAT): videostore/*.go cmd/concat/*.go $(FFMPEG_BUILD)
+$(BIN_CONCAT): videostore/*.go cmd/concat/*.go videostore/*.c videostore/*.h $(FFMPEG_BUILD)
 	go mod tidy
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go build -o $(BIN_CONCAT) cmd/concat/cmd.go
 

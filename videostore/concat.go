@@ -15,6 +15,7 @@ import (
 	"unsafe"
 
 	"github.com/google/uuid"
+	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/logging"
 )
 
@@ -52,7 +53,7 @@ func newConcater(
 // returns the path to the concated video file.
 func (c *concater) Concat(from, to time.Time, path string) error {
 	// Find the storage files that match the concat query.
-	storageFiles, err := getSortedFiles(c.storagePath)
+	storageFiles, err := vsutils.GetSortedFiles(c.storagePath)
 	if err != nil {
 		c.logger.Error("failed to get sorted files", err)
 		return err
@@ -62,11 +63,11 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 		c.logger.Errorf("%s, path: %s", err.Error(), path)
 		return err
 	}
-	err = validateTimeRange(storageFiles, from)
+	err = vsutils.ValidateTimeRange(storageFiles, from)
 	if err != nil {
 		return err
 	}
-	concatEntries := matchStorageToRange(storageFiles, from, to, c.logger)
+	concatEntries := vsutils.MatchStorageToRange(storageFiles, from, to, c.logger)
 	if len(concatEntries) == 0 {
 		return errors.New("no matching video data to save")
 	}
@@ -100,12 +101,12 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 	case C.VIDEO_STORE_CONCAT_RESP_ERROR:
 		return errors.New("failed to concat segment files")
 	default:
-		return fmt.Errorf("failed to concat segment files: error: %s", ffmpegError(ret))
+		return fmt.Errorf("failed to concat segment files: error: %s", vsutils.FFmpegError(int(ret)))
 	}
 }
 
 // writeConcatFileEntries writes the concat file entries to a file.
-func writeConcatFileEntries(entries []concatFileEntry, filePath string) error {
+func writeConcatFileEntries(entries []vsutils.ConcatFileEntry, filePath string) error {
 	file, err := os.Create(filePath)
 	if err != nil {
 		return err
@@ -113,7 +114,7 @@ func writeConcatFileEntries(entries []concatFileEntry, filePath string) error {
 	defer file.Close()
 
 	for _, entry := range entries {
-		lines := entry.string()
+		lines := entry.Lines()
 		for _, line := range lines {
 			_, err := file.WriteString(line + "\n")
 			if err != nil {
