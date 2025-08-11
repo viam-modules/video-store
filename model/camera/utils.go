@@ -3,7 +3,6 @@ package camera
 import (
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/viam-modules/video-store/videostore"
@@ -11,15 +10,6 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 )
-
-// getHomeDir returns the home directory of the user.
-func getHomeDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return home, nil
-}
 
 // parseTimeRange parses the from/to timestamps from a command.
 func parseTimeRange(command map[string]interface{}) (from, to time.Time, err error) {
