@@ -11,6 +11,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/rdk/spatialmath"
 )
 
 func init() {
@@ -177,10 +178,14 @@ func (c *component) Image(_ context.Context, _ string, _ map[string]interface{})
 	return nil, camera.ImageMetadata{}, errors.New("camera.Image not implemented")
 }
 
-func (c *component) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+func (c *component) Images(_ context.Context, _ map[string]interface{}) ([]camera.NamedImage, resource.ResponseMetadata, error) {
 	return nil, resource.ResponseMetadata{}, errors.New("camera.Images not implemented")
 }
 
 func (c *component) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
 	return nil, errors.New("camera.NextPointCloud not implemented")
+}
+
+func (c *component) Geometries(_ context.Context, _ map[string]interface{}) ([]spatialmath.Geometry, error) {
+	return nil, errors.New("not implemented")
 }
