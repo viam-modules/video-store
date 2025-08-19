@@ -12,7 +12,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/rhysd/actionlint v1.6.24
-	go.viam.com/rdk v0.89.0-rc0
+	go.viam.com/rdk v0.89.0
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.1.159
 	golang.org/x/mobile v0.0.0-20240112133503-c713f31d574b
