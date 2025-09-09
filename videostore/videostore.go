@@ -309,7 +309,6 @@ func NewRTPVideoStore(ctx context.Context, config Config, logger logging.Logger)
 		if err != nil {
 			return nil, err
 		}
-
 	} else {
 		directStoragePath = config.Storage.StoragePath
 	}

@@ -21,7 +21,6 @@ func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error 
 		vsutils.SetLibAVLogLevel("debug")
 	} else {
 		vsutils.SetLibAVLogLevel("fatal")
-
 	}
 	vsutils.SetFFmpegLogCallback()
 
