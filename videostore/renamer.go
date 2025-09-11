@@ -12,7 +12,7 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-// renamer watches a directory and converts local timestamps to unix timestamps
+// renamer watches a directory and converts local timestamps to unix timestamps.
 type renamer struct {
 	watchDir  string
 	outputDir string
@@ -49,7 +49,7 @@ func (r *renamer) processSegments(ctx context.Context) {
 	}
 }
 
-// scanAndProcessFiles scans the watch directory for MP4 files and processes them
+// scanAndProcessFiles scans the watch directory for MP4 files and processes them.
 func (r *renamer) scanAndProcessFiles() {
 	files, err := r.getMPEGFiles()
 	if err != nil {
@@ -59,7 +59,7 @@ func (r *renamer) scanAndProcessFiles() {
 	r.processFiles(files)
 }
 
-// getMPEGFiles retrieves valid and complete MP4 files in the watch directory
+// getMPEGFiles retrieves valid and complete MP4 files in the watch directory.
 func (r *renamer) getMPEGFiles() ([]string, error) {
 	entries, err := os.ReadDir(r.watchDir)
 	if err != nil {
@@ -89,7 +89,7 @@ func (r *renamer) getMPEGFiles() ([]string, error) {
 	return mpegFiles, nil
 }
 
-// processFiles renames a list of files
+// processFiles renames a list of files.
 func (r *renamer) processFiles(files []string) {
 	if len(files) == 0 {
 		r.logger.Debug("No files to process")
@@ -111,7 +111,7 @@ func (r *renamer) processFiles(files []string) {
 	}
 }
 
-// convertFilenameToUnixTimestamp changes filename from local datetime to unix timestamp
+// convertFilenameToUnixTimestamp changes filename from local datetime to unix timestamp.
 func (r *renamer) convertFilenameToUnixTimestamp(filePath string) (string, error) {
 	filename := filepath.Base(filePath)
 	timestampStr := strings.TrimSuffix(filename, ".mp4")
