@@ -42,6 +42,7 @@ func (t SourceType) String() string {
 // Config configures a videostore.
 type Config struct {
 	Name        string
+	SourceName  *string
 	Type        SourceType
 	Storage     StorageConfig
 	Encoder     EncoderConfig
