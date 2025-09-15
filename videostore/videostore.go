@@ -14,6 +14,7 @@ import (
 
 	"github.com/viam-modules/video-store/videostore/indexer"
 	vsutils "github.com/viam-modules/video-store/videostore/utils"
+	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/video"
@@ -501,6 +502,14 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	return &SaveResponse{Filename: uploadFileName}, nil
 }
 
+func getSourceNamesFromNamedImages(namedImages []camera.NamedImage) []string {
+	sourceNames := make([]string, len(namedImages))
+	for i, namedImage := range namedImages {
+		sourceNames[i] = namedImage.SourceName
+	}
+	return sourceNames
+}
+
 func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerConfig,
 ) {
 	frameInterval := time.Second / time.Duration(framePoller.Framerate)
@@ -516,16 +525,38 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 				filterSourceNames = []string{*vs.config.SourceName}
 			}
 			namedImages, _, err := framePoller.Camera.Images(ctx, filterSourceNames, nil)
+			if err != nil {
+				vs.logger.Warn(
+					"failed to get images from camera: %s, filter source names: %v, error: %v",
+					framePoller.Camera.Name(),
+					filterSourceNames,
+					err,
+				)
+				time.Sleep(retryIntervalSeconds * time.Second)
+				continue
+			}
+			sourceNames := getSourceNamesFromNamedImages(namedImages)
 			if len(namedImages) == 0 {
-				vs.logger.Warn("no images received from camera: %s, source names: %v", framePoller.Camera.Name(), filterSourceNames)
+				vs.logger.Warn(
+					"no images received from camera: %s, filter source names: %v, source names: %v",
+					framePoller.Camera.Name(),
+					filterSourceNames,
+					sourceNames,
+				)
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
 			if len(namedImages) != 1 {
+				vs.logger.Warnf(
+					"expected 1 image, received %d from camera: %s, filter source names: %v, source names: %v",
+					len(namedImages),
+					framePoller.Camera.Name(),
+					filterSourceNames,
+					sourceNames,
+				)
 				if len(filterSourceNames) == 0 {
-					vs.logger.Warn("no source names were provided, received multiple images. Please specify a source name in the config to receive only one image.")
+					vs.logger.Warn("no source name was provided. Set a source name in config to receive one image.")
 				}
-				vs.logger.Warnf("expected 1 image, received %d from camera: %s, source names: %v", len(namedImages), framePoller.Camera.Name(), filterSourceNames)
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
