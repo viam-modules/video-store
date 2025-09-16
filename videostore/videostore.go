@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -529,7 +530,7 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 				vs.logger.Warn(
 					"failed to get images from camera: %s, filter source names: %v, error: %v",
 					framePoller.Camera.Name(),
-					filterSourceNames,
+					strings.Join(filterSourceNames, ", "),
 					err,
 				)
 				time.Sleep(retryIntervalSeconds * time.Second)
@@ -540,19 +541,19 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 				vs.logger.Warn(
 					"no images received from camera: %s, filter source names: %v, source names: %v",
 					framePoller.Camera.Name(),
-					filterSourceNames,
-					sourceNames,
+					strings.Join(filterSourceNames, ", "),
+					strings.Join(sourceNames, ", "),
 				)
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
 			if len(namedImages) != 1 {
 				vs.logger.Warnf(
-					"expected 1 image, received %d from camera: %s, filter source names: %v, source names: %v",
+					"expected 1 image, received %d from camera: %s, filter source names: [%s], source names: [%s]",
 					len(namedImages),
 					framePoller.Camera.Name(),
-					filterSourceNames,
-					sourceNames,
+					strings.Join(filterSourceNames, ", "),
+					strings.Join(sourceNames, ", "),
 				)
 				if len(filterSourceNames) == 0 {
 					vs.logger.Warn("no source name was provided. Set a source name in config to receive one image.")
