@@ -57,7 +57,7 @@ func newRawSegmenter(storagePath string, logger logging.Logger) (*RawSegmenter, 
 // Init initializes the *RawSegmenter
 // Close must be called to free the resources taken during Init
 // Note: May write to disk
-func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
+func (rs *RawSegmenter) Init(codec CodecType, width, height int, sps, pps, vps []byte) error {
 	rs.logger.Debugf("initializing raw segmenter with codec %s, width %d, height %d", codec, width, height)
 	if width <= 0 || height <= 0 {
 		return errors.New("both width and height must be greater than zero")
@@ -86,14 +86,26 @@ func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 			C.int(rs.segmentSeconds),
 			outputPatternCStr,
 			C.int(width),
-			C.int(height))
+			C.int(height),
+			(*C.uint8_t)(unsafe.Pointer((*byte)(unsafe.Pointer(&sps[0])))),
+			C.size_t(len(sps)),
+			(*C.uint8_t)(unsafe.Pointer((*byte)(unsafe.Pointer(&pps[0])))),
+			C.size_t(len(pps)),
+		)
 	case CodecTypeH265:
 		ret = C.video_store_raw_seg_init_h265(
 			&cRS,
 			C.int(rs.segmentSeconds),
 			outputPatternCStr,
 			C.int(width),
-			C.int(height))
+			C.int(height),
+			(*C.uint8_t)(unsafe.Pointer((*byte)(unsafe.Pointer(&sps[0])))),
+			C.size_t(len(sps)),
+			(*C.uint8_t)(unsafe.Pointer((*byte)(unsafe.Pointer(&pps[0])))),
+			C.size_t(len(pps)),
+			(*C.uint8_t)(unsafe.Pointer((*byte)(unsafe.Pointer(&vps[0])))),
+			C.size_t(len(vps)),
+		)
 	default:
 		return fmt.Errorf("rawSegmenter.Init called on invalid codec %s", codec)
 	}
