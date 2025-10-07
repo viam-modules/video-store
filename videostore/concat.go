@@ -61,7 +61,7 @@ func newConcater(
 
 // concat takes in from and to timestamps and concates the video files between them.
 // returns the path to the concated video file.
-func (c *concater) Concat(from, to time.Time, path string) error {
+func (c *concater) Concat(from, to time.Time, path, container string) error {
 	// Find the storage files that match the concat query.
 	storageFiles, err := vsutils.GetSortedFiles(c.storagePath)
 	if err != nil {
@@ -99,12 +99,14 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 
 	concatFilePathCStr := C.CString(concatFilePath)
 	outputPathCStr := C.CString(path)
+	containerCStr := C.CString(container)
 	defer func() {
 		C.free(unsafe.Pointer(concatFilePathCStr))
 		C.free(unsafe.Pointer(outputPathCStr))
 	}()
 
-	ret := C.video_store_concat(concatFilePathCStr, outputPathCStr)
+	// ret := C.video_store_concat(concatFilePathCStr, outputPathCStr)
+	ret := C.video_store_concat(concatFilePathCStr, outputPathCStr, containerCStr)
 	switch ret {
 	case C.VIDEO_STORE_CONCAT_RESP_OK:
 		return nil

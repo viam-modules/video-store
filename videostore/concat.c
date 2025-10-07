@@ -7,7 +7,9 @@
 #include <libavformat/avformat.h>
 #include <string.h>
 
-int video_store_concat(const char *concat_filepath, const char *output_path) {
+// int video_store_concat(const char *concat_filepath, const char *output_path) {
+
+int video_store_concat(const char *concat_filepath, const char *output_path, const char *container) {
   int ret = VIDEO_STORE_CONCAT_RESP_ERROR;
   AVPacket *packet = av_packet_alloc();
   AVDictionary *options = NULL;
@@ -158,16 +160,23 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
   outputPathOpened = 1;
 
   AVDictionary *mux_opts = NULL;
-  // av_dict_set(&mux_opts, "movflags", "+faststart", 0);
-  av_dict_set(&mux_opts, "movflags", "frag_keyframe+empty_moov+default_base_moof", 0);
+  // if container is specified check if it is fmp4 for mp4
+  // container is already defined as char array
+  if (container != NULL && strcmp(container, "fmp4") == 0) {
+      av_dict_set(&mux_opts, "movflags", "frag_keyframe+empty_moov+default_base_moof", 0);
+  } else {
+      av_dict_set(&mux_opts, "movflags", "faststart", 0);
+  }
+
+  // av_dict_set(&mux_opts, "movflags", "frag_keyframe+empty_moov+default_base_moof", 0);
   // av_dict_set(&mux_opts, "movflags", "frag_keyframe", 0);
   // ret = av_dict_set(&mux_opts, "movflags", "frag_keyframe+empty_moov", 0);
   // av_dict_set(&mux_opts, "movflags", "frag_keyframe+empty_moov+default_base_moof", 0);
-  if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR,
-           "video_store_concat failed to set muxer option: %s\n", av_err2str(ret));
-    goto cleanup;
-  }
+  // if (ret < 0) {
+  //   av_log(NULL, AV_LOG_ERROR,
+  //          "video_store_concat failed to set muxer option: %s\n", av_err2str(ret));
+  //   goto cleanup;
+  // }
 
   ret = avformat_write_header(outputCtx, &mux_opts);
   // ret = avformat_write_header(outputCtx, NULL);

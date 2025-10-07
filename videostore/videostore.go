@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -109,10 +110,11 @@ type RTPVideoStore interface {
 
 // SaveRequest is the request to the Save method.
 type SaveRequest struct {
-	From     time.Time
-	To       time.Time
-	Metadata string
-	Async    bool
+	From      time.Time
+	To        time.Time
+	Metadata  string
+	Container string
+	Async     bool
 }
 
 // SaveResponse is the response to the Save method.
@@ -133,8 +135,9 @@ func (r *SaveRequest) Validate() error {
 
 // FetchRequest is the request to the Fetch method.
 type FetchRequest struct {
-	From time.Time
-	To   time.Time
+	From      time.Time
+	To        time.Time
+	Container string
 }
 
 // FetchResponse is the resonse to the Fetch method.
@@ -374,7 +377,9 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		r.From,
 		"",
 		tempPath)
-
+	if r.Container == "" {
+		r.Container = "mp4"
+	}
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
 	// of writing.
@@ -387,11 +392,13 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 			vs.logger.Warnf("failed to delete temporary file (%s): %v", fetchFilePath, err)
 		}
 	}()
-	if err := vs.concater.Concat(r.From, r.To, fetchFilePath); err != nil {
+	if err := vs.concater.Concat(r.From, r.To, fetchFilePath, r.Container); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err
 	}
 	videoBytes, err := vsutils.ReadVideoFile(fetchFilePath)
+	// videoBytes, err := vsutils.ReadVideoFile("/home/viam/output_faststart.mp4")
+
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +419,9 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		r.From,
 		"",
 		tempPath)
-
+	if r.Container == "" {
+		r.Container = "mp4"
+	}
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
 	// of writing.
@@ -425,15 +434,43 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 			vs.logger.Warnf("failed to delete temporary file (%s): %v", fetchFilePath, err)
 		}
 	}()
-	if err := vs.concater.Concat(r.From, r.To, fetchFilePath); err != nil {
+	if err := vs.concater.Concat(r.From, r.To, fetchFilePath, r.Container); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return nil
 	}
 
 	// stream chunks using func streamMP4(ctx context.Context, path string, emit func([]byte) error) error {
-	if err := streamMP4(ctx, fetchFilePath, emit); err != nil {
-		vs.logger.Error("failed to stream mp4 file ", err)
-		return nil
+	// if err := streamMP4(ctx, fetchFilePath, emit); err != nil {
+	// 	vs.logger.Error("failed to stream mp4 file ", err)
+	// 	return nil
+	// }
+	// Read video file in 64KB chunks and emit each chunk
+	const chunkSize = 64 * 1024
+	file, err := os.Open(fetchFilePath)
+	if err != nil {
+		vs.logger.Error("failed to open file for streaming: ", err)
+	}
+	defer file.Close()
+
+	buf := make([]byte, chunkSize)
+	for {
+		n, err := file.Read(buf)
+		if err != nil && err != io.EOF {
+			vs.logger.Error("failed to read file for streaming: ", err)
+			return nil
+		}
+		if n == 0 {
+			break
+		}
+		if err := emit(buf[:n]); err != nil {
+			vs.logger.Error("failed to emit chunk: ", err)
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 	}
 
 	return nil
@@ -463,7 +500,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 		return &SaveResponse{Filename: uploadFileName}, nil
 	}
 
-	if err := vs.concater.Concat(r.From, r.To, uploadFilePath); err != nil {
+	if err := vs.concater.Concat(r.From, r.To, uploadFilePath, "mp4"); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err
 	}
@@ -618,7 +655,7 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 	select {
 	case <-timer.C:
 		vs.logger.Debugf("executing concat for %s", path)
-		err := vs.concater.Concat(from, to, path)
+		err := vs.concater.Concat(from, to, path, "mp4")
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 		}
