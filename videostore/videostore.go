@@ -439,11 +439,6 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		return nil
 	}
 
-	// stream chunks using func streamMP4(ctx context.Context, path string, emit func([]byte) error) error {
-	// if err := streamMP4(ctx, fetchFilePath, emit); err != nil {
-	// 	vs.logger.Error("failed to stream mp4 file ", err)
-	// 	return nil
-	// }
 	// Read video file in 64KB chunks and emit each chunk
 	const chunkSize = 64 * 1024
 	file, err := os.Open(fetchFilePath)
