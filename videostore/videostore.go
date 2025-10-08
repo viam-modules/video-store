@@ -313,7 +313,6 @@ func NewRTPVideoStore(ctx context.Context, config Config, logger logging.Logger)
 		if err != nil {
 			return nil, err
 		}
-
 	} else {
 		directStoragePath = config.Storage.StoragePath
 	}
@@ -397,7 +396,6 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		return nil, err
 	}
 	videoBytes, err := vsutils.ReadVideoFile(fetchFilePath)
-
 	if err != nil {
 		return nil, err
 	}
@@ -442,6 +440,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 	// This avoids loading the entire file into memory at once
 	// which is important for large video files.
 	const chunkSize = 64 * 1024
+	// #nosec G304: path is internally generated, not user supplied
 	file, err := os.Open(fetchFilePath)
 	if err != nil {
 		vs.logger.Error("failed to open file for streaming: ", err)
