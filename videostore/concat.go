@@ -105,7 +105,6 @@ func (c *concater) Concat(from, to time.Time, path, container string) error {
 		C.free(unsafe.Pointer(outputPathCStr))
 	}()
 
-	// ret := C.video_store_concat(concatFilePathCStr, outputPathCStr)
 	ret := C.video_store_concat(concatFilePathCStr, outputPathCStr, containerCStr)
 	switch ret {
 	case C.VIDEO_STORE_CONCAT_RESP_OK:
@@ -169,7 +168,7 @@ func goFrameCallback(data *C.uint8_t, size C.int, stream_index C.int, pts C.int6
 	handle := cgo.Handle(user)
 	cb := handle.Value().(func([]byte) error)
 	goData := C.GoBytes(unsafe.Pointer(data), size)
-	_ = cb(goData) // You can handle error propagation if needed
+	_ = cb(goData)
 }
 
 func streamMP4(ctx context.Context, path string, emit func([]byte) error) error {
