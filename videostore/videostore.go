@@ -496,6 +496,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 		return &SaveResponse{Filename: uploadFileName}, nil
 	}
 
+	// TODO(seanp): Currently forcing mp4 on save. Add support for other containers?
 	if err := vs.concater.Concat(r.From, r.To, uploadFilePath, "mp4"); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err
