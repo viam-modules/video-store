@@ -49,7 +49,6 @@ int video_store_concat(const char *concat_filepath, const char *output_path, con
     goto cleanup;
   }
 
-  // ret = avformat_alloc_output_context2(&outputCtx, NULL, NULL, output_path);
   ret = avformat_alloc_output_context2(&outputCtx, NULL, "mp4", output_path);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
@@ -234,8 +233,6 @@ int video_store_emit_frames(const char *input_path, frame_callback_t cb, void *u
 
     while ((ret = av_read_frame(fmt_ctx, pkt)) >= 0) {
         // Emit only video frames (optional: check stream type)
-        // AVStream *stream = fmt_ctx->streams[pkt->stream_index];
-        // if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
         cb(pkt->data, pkt->size, pkt->stream_index, pkt->pts, user);
         av_packet_unref(pkt);
     }
