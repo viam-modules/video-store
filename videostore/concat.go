@@ -3,27 +3,14 @@ package videostore
 /*
 #include "concat.h"
 #include <stdlib.h>
-
-// Forward declaration for cgo callback bridge
-extern void goFrameCallback(uint8_t *data, int size, void *user);
-
-// C trampoline to call Go callback
-// static inline int emit_frames_bridge(const char *input_path, uintptr_t handle) {
-//     return video_store_emit_frames(input_path, goFrameCallback, handle);
-// }
-static inline int emit_frames_bridge(const char *input_path, void *user) {
-    return video_store_emit_frames(input_path, goFrameCallback, user);
-}
 */
 import "C"
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime/cgo"
 	"time"
 	"unsafe"
 
@@ -164,27 +151,4 @@ func generateConcatFilePath() string {
 	fileName := fmt.Sprintf(conactTxtFilePattern, uniqueID)
 	filePath := filepath.Join(concatTxtDir, fileName)
 	return filePath
-}
-
-//export goFrameCallback
-func goFrameCallback(data *C.uint8_t, size C.int, user unsafe.Pointer) {
-	handle := cgo.Handle(user)
-	cb := handle.Value().(func([]byte) error)
-	goData := C.GoBytes(unsafe.Pointer(data), size)
-	_ = cb(goData)
-}
-
-func streamMP4(_ context.Context, path string, emit func([]byte) error) error {
-	handle := cgo.NewHandle(emit)
-	defer handle.Delete()
-
-	cPath := C.CString(path)
-	defer C.free(unsafe.Pointer(cPath))
-
-	//nolint:all
-	ret := C.emit_frames_bridge(cPath, unsafe.Pointer(handle))
-	if ret != 0 {
-		return errors.New("video_store_emit_frames failed")
-	}
-	return nil
 }

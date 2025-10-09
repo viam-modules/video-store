@@ -207,39 +207,3 @@ cleanup:
 
   return ret;
 }
-
-typedef void (*frame_callback_t)(uint8_t *data, int size, int stream_index, int64_t pts, void *user);
-
-int video_store_emit_frames(const char *input_path, frame_callback_t cb, void *user) {
-    AVFormatContext *fmt_ctx = NULL;
-    AVPacket *pkt = NULL;
-    int ret = -1;
-
-    if ((ret = avformat_open_input(&fmt_ctx, input_path, NULL, NULL)) < 0) {
-        av_log(NULL, AV_LOG_ERROR, "Failed to open input: %s\n", av_err2str(ret));
-        return ret;
-    }
-    if ((ret = avformat_find_stream_info(fmt_ctx, NULL)) < 0) {
-        av_log(NULL, AV_LOG_ERROR, "Failed to find stream info: %s\n", av_err2str(ret));
-        goto cleanup;
-    }
-
-    pkt = av_packet_alloc();
-    if (!pkt) {
-        av_log(NULL, AV_LOG_ERROR, "Failed to allocate packet\n");
-        ret = AVERROR(ENOMEM);
-        goto cleanup;
-    }
-
-    while ((ret = av_read_frame(fmt_ctx, pkt)) >= 0) {
-        // Emit only video frames (optional: check stream type)
-        cb(pkt->data, pkt->size, pkt->stream_index, pkt->pts, user);
-        av_packet_unref(pkt);
-    }
-    ret = 0; // Success
-
-cleanup:
-    if (pkt) av_packet_free(&pkt);
-    if (fmt_ctx) avformat_close_input(&fmt_ctx);
-    return ret == AVERROR_EOF ? 0 : ret;
-}
