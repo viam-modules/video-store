@@ -49,7 +49,7 @@ static void append_hvcc_array(uint8_t *p, int *idx,
                               const uint8_t *buf, int len)
 {
     if (!buf || len <= 0) return;
-    p[(*idx)++] = 0x80 | (nal_type & 0x3F);     // array_completeness=1, nal_unit_type
+    p[(*idx)++] = 0x80 | (nal_type & 0x3F);    // array_completeness=1, nal_unit_type
     AV_WB16(p + *idx, 1);  *idx += 2;          // numNalus = 1
     AV_WB16(p + *idx, len); *idx += 2;         // nalUnitLength
     memcpy(p + *idx, buf, len); *idx += len;   // nalUnit
@@ -64,14 +64,9 @@ static int make_hvcC_from_vps_sps_pps(const uint8_t *vps_in, int vps_len_in,
     if (!sps_in || sps_len_in < 4 || !pps_in || pps_len_in < 1)
         return AVERROR_INVALIDDATA;
 
-    // Trim a single Annex-B start code if present
-    // TODO: remove Annex-B skip since we now pack with avcC
-    const uint8_t *vps = vps_in, *sps = sps_in, *pps = pps_in;
-    int vps_len = vps_len_in, sps_len = sps_len_in, pps_len = pps_len_in;
-
     // hvcC size estimate: 23 header + arrays (each: 3 + 2 + len)
-    int arrays = (vps && vps_len>0 ? 1 : 0) + 1 + 1; // VPS? + SPS + PPS
-    int size = 23 + arrays * 3 + (vps? (2+vps_len) : 0) + (2+sps_len) + (2+pps_len);
+    int arrays = (vps_in && vps_len_in>0 ? 1 : 0) + 1 + 1; // VPS? + SPS + PPS
+    int size = 23 + arrays * 3 + (vps_in ? (2+vps_len_in) : 0) + (2+sps_len_in) + (2+pps_len_in);
 
     uint8_t *p = av_malloc(size + AV_INPUT_BUFFER_PADDING_SIZE);
     if (!p) return AVERROR(ENOMEM);
@@ -105,9 +100,9 @@ static int make_hvcC_from_vps_sps_pps(const uint8_t *vps_in, int vps_len_in,
 
     p[i++] = (uint8_t)arrays; // numOfArrays
 
-    if (vps && vps_len > 0) append_hvcc_array(p, &i, 32, vps, vps_len); // VPS
-    append_hvcc_array(p, &i, 33, sps, sps_len);                         // SPS
-    append_hvcc_array(p, &i, 34, pps, pps_len);                         // PPS
+    if (vps_in && vps_len_in > 0) append_hvcc_array(p, &i, 32, vps_in, vps_len_in); // VPS
+    append_hvcc_array(p, &i, 33, sps_in, sps_len_in);                               // SPS
+    append_hvcc_array(p, &i, 34, pps_in, pps_len_in);                               // PPS
 
     *extradata = p;
     *extradata_size = i;
