@@ -204,6 +204,10 @@ cleanup:
     av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_packet_free\n");
     av_packet_free(&packet);
   }
+  if (mux_opts != NULL) {
+    av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_dict_free mux_opts\n");
+    av_dict_free(&mux_opts);
+  }
 
   return ret;
 }
