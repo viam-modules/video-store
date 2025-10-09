@@ -377,7 +377,7 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		"",
 		tempPath)
 	if r.Container == "" {
-		r.Container = "mp4"
+		r.Container = videoFormat
 	}
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
@@ -417,7 +417,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		"",
 		tempPath)
 	if r.Container == "" {
-		r.Container = "mp4"
+		r.Container = videoFormat
 	}
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
@@ -496,7 +496,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	}
 
 	// TODO(seanp): Currently forcing mp4 on save. Add support for other containers?
-	if err := vs.concater.Concat(r.From, r.To, uploadFilePath, "mp4"); err != nil {
+	if err := vs.concater.Concat(r.From, r.To, uploadFilePath, videoFormat); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err
 	}
