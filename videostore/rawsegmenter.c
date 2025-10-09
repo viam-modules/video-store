@@ -53,12 +53,6 @@ int make_avcC_from_sps_pps(const uint8_t *sps_in, int sps_len_in,
     AV_WB16(p + i, pps_len); i += 2;
     memcpy(p + i, pps, pps_len); i += pps_len;
 
-    // add in hex fd f8 f8 00
-    p[i++] = 0xFD;   // chromaFormat(2)=1 (4:2:0) + reserved
-    p[i++] = 0xF8;   // bitDepthLumaMinus8(3)=0 + reserved
-    p[i++] = 0xF8;   // bitDepthChromaMinus8(3)=0 + reserved
-    p[i++] = 0x00; // numOfSequenceParameterSetExt (0)
-
     *extradata = p;
     *extradata_size = i;
     return 0;
