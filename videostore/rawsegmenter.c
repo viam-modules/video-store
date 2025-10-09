@@ -10,32 +10,17 @@
 #include <stdio.h>
 #include <string.h>
 
-// Trim one Annex-B start code if present
-static void skip_annexb_start_code(const uint8_t **p, int *len) {
-    if (!p || !*p || !len || *len < 4) return;
-    const uint8_t *b = *p;
-    if (b[0]==0 && b[1]==0 && b[2]==1) { *p = b+3; *len -= 3; return; }
-    if (b[0]==0 && b[1]==0 && b[2]==0 && b[3]==1) { *p = b+4; *len -= 4; return; }
-}
-
 // Minimal avcC builder for 1 SPS + 1 PPS. (lengthSizeMinusOne = 3 => 4-byte lengths)
 int make_avcC_from_sps_pps(const uint8_t *sps_in, int sps_len_in,
                                   const uint8_t *pps_in, int pps_len_in,
                                   uint8_t **extradata, int *extradata_size) {
     if (!sps_in || sps_len_in < 4 || !pps_in || pps_len_in < 1) return AVERROR_INVALIDDATA;
 
-    // If caller accidentally passed Annex-B, trim a single start code.
-    const uint8_t *sps = sps_in, *pps = pps_in;
-    int sps_len = sps_len_in, pps_len = pps_len_in;
-    skip_annexb_start_code(&sps, &sps_len);
-    skip_annexb_start_code(&pps, &pps_len);
-    if (sps_len < 4) return AVERROR_INVALIDDATA;
+    uint8_t profile = sps_in[1];
+    uint8_t compat  = sps_in[2];
+    uint8_t level   = sps_in[3];
 
-    uint8_t profile = sps[1];
-    uint8_t compat  = sps[2];
-    uint8_t level   = sps[3];
-
-    int size = 7 + 2 + sps_len + 1 + 2 + pps_len;
+    int size = 7 + 2 + sps_len_in + 1 + 2 + pps_len_in;
     uint8_t *p = av_malloc(size + AV_INPUT_BUFFER_PADDING_SIZE);
     if (!p) return AVERROR(ENOMEM);
     memset(p + size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
@@ -47,11 +32,11 @@ int make_avcC_from_sps_pps(const uint8_t *sps_in, int sps_len_in,
     p[i++] = level;        // AVCLevelIndication
     p[i++] = 0xFF;         // lengthSizeMinusOne (..0011 => 4-byte NALU lengths)
     p[i++] = 0xE1;         // numOfSPS (1)
-    AV_WB16(p + i, sps_len); i += 2;
-    memcpy(p + i, sps, sps_len); i += sps_len;
+    AV_WB16(p + i, sps_len_in); i += 2;
+    memcpy(p + i, sps_in, sps_len_in); i += sps_len_in;
     p[i++] = 1;            // numOfPPS (1)
-    AV_WB16(p + i, pps_len); i += 2;
-    memcpy(p + i, pps, pps_len); i += pps_len;
+    AV_WB16(p + i, pps_len_in); i += 2;
+    memcpy(p + i, pps_in, pps_len_in); i += pps_len_in;
 
     *extradata = p;
     *extradata_size = i;
@@ -83,9 +68,9 @@ static int make_hvcC_from_vps_sps_pps(const uint8_t *vps_in, int vps_len_in,
     // TODO: remove Annex-B skip since we now pack with avcC
     const uint8_t *vps = vps_in, *sps = sps_in, *pps = pps_in;
     int vps_len = vps_len_in, sps_len = sps_len_in, pps_len = pps_len_in;
-    if (vps) skip_annexb_start_code(&vps, &vps_len);
-    skip_annexb_start_code(&sps, &sps_len);
-    skip_annexb_start_code(&pps, &pps_len);
+    // if (vps) skip_annexb_start_code(&vps, &vps_len);
+    // skip_annexb_start_code(&sps, &sps_len);
+    // skip_annexb_start_code(&pps, &pps_len);
 
     // hvcC size estimate: 23 header + arrays (each: 3 + 2 + len)
     int arrays = (vps && vps_len>0 ? 1 : 0) + 1 + 1; // VPS? + SPS + PPS
