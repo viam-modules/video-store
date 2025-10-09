@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 	"unsafe"
 
@@ -89,13 +90,21 @@ func (c *concater) Concat(from, to time.Time, path, container string) error {
 
 	concatFilePathCStr := C.CString(concatFilePath)
 	outputPathCStr := C.CString(path)
-	containerCStr := C.CString(container)
 	defer func() {
 		C.free(unsafe.Pointer(concatFilePathCStr))
 		C.free(unsafe.Pointer(outputPathCStr))
 	}()
 
-	ret := C.video_store_concat(concatFilePathCStr, outputPathCStr, containerCStr)
+	var cContainer C.container_t
+	switch strings.ToLower(strings.TrimSpace(container)) {
+	case "fmp4":
+		cContainer = C.CONTAINER_FMP4
+	case "", "mp4":
+		cContainer = C.CONTAINER_MP4
+	default:
+		cContainer = C.CONTAINER_DEFAULT
+	}
+	ret := C.video_store_concat(concatFilePathCStr, outputPathCStr, cContainer)
 	switch ret {
 	case C.VIDEO_STORE_CONCAT_RESP_OK:
 		return nil

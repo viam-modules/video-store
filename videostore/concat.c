@@ -7,7 +7,7 @@
 #include <libavformat/avformat.h>
 #include <string.h>
 
-int video_store_concat(const char *concat_filepath, const char *output_path, const char *container) {
+int video_store_concat(const char *concat_filepath, const char *output_path, container_t container) {
   int ret = VIDEO_STORE_CONCAT_RESP_ERROR;
   AVPacket *packet = av_packet_alloc();
   AVDictionary *options = NULL;
@@ -97,10 +97,15 @@ int video_store_concat(const char *concat_filepath, const char *output_path, con
   outputPathOpened = 1;
 
   AVDictionary *mux_opts = NULL;
-  if (container != NULL && strcmp(container, "fmp4") == 0) {
+  switch (container) {
+    case CONTAINER_FMP4:
       av_dict_set(&mux_opts, "movflags", "frag_keyframe+empty_moov+default_base_moof", 0);
-  } else {
+      break;
+    case CONTAINER_MP4:
+    case CONTAINER_DEFAULT:
+    default:
       av_dict_set(&mux_opts, "movflags", "faststart", 0);
+      break;
   }
 
   ret = avformat_write_header(outputCtx, &mux_opts);
