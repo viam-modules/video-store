@@ -68,9 +68,6 @@ static int make_hvcC_from_vps_sps_pps(const uint8_t *vps_in, int vps_len_in,
     // TODO: remove Annex-B skip since we now pack with avcC
     const uint8_t *vps = vps_in, *sps = sps_in, *pps = pps_in;
     int vps_len = vps_len_in, sps_len = sps_len_in, pps_len = pps_len_in;
-    // if (vps) skip_annexb_start_code(&vps, &vps_len);
-    // skip_annexb_start_code(&sps, &sps_len);
-    // skip_annexb_start_code(&pps, &pps_len);
 
     // hvcC size estimate: 23 header + arrays (each: 3 + 2 + len)
     int arrays = (vps && vps_len>0 ? 1 : 0) + 1 + 1; // VPS? + SPS + PPS
