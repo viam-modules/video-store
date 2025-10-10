@@ -95,15 +95,7 @@ func (c *concater) Concat(from, to time.Time, path, container string) error {
 		C.free(unsafe.Pointer(outputPathCStr))
 	}()
 
-	var cContainer C.container_t
-	switch strings.ToLower(strings.TrimSpace(container)) {
-	case "fmp4":
-		cContainer = C.CONTAINER_FMP4
-	case "", "mp4":
-		cContainer = C.CONTAINER_MP4
-	default:
-		cContainer = C.CONTAINER_DEFAULT
-	}
+	cContainer := containerStrToEnum(container)
 	ret := C.video_store_concat(concatFilePathCStr, outputPathCStr, cContainer)
 	switch ret {
 	case C.VIDEO_STORE_CONCAT_RESP_OK:
@@ -160,4 +152,16 @@ func generateConcatFilePath() string {
 	fileName := fmt.Sprintf(conactTxtFilePattern, uniqueID)
 	filePath := filepath.Join(concatTxtDir, fileName)
 	return filePath
+}
+
+// containerStringToEnum converts a container string name into a C enum value.
+func containerStrToEnum(container string) C.container_t {
+	switch strings.ToLower(strings.TrimSpace(container)) {
+	case "fmp4":
+		return C.CONTAINER_FMP4
+	case "", "mp4":
+		return C.CONTAINER_MP4
+	default:
+		return C.CONTAINER_DEFAULT
+	}
 }
