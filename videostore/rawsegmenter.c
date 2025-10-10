@@ -78,8 +78,7 @@ int make_avcC_from_sps_pps(const uint8_t *sps_in, int sps_len_in,
 // append one array entry into hvcC (array_completeness=1, numNalus=1)
 static void append_hvcc_array(uint8_t *p, int *idx,
                               uint8_t nal_type,
-                              const uint8_t *buf, int len)
-{
+                              const uint8_t *buf, int len) {
     if (!buf || len <= 0) return;
     p[(*idx)++] = 0x80 | (nal_type & 0x3F);    // array_completeness=1, nal_unit_type
     AV_WB16(p + *idx, 1);  *idx += 2;          // numNalus = 1
