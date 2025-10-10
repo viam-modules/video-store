@@ -86,7 +86,49 @@ static void append_hvcc_array(uint8_t *p, int *idx,
     memcpy(p + *idx, buf, len); *idx += len;   // nalUnit
 }
 
-// Very small hvcC builder for 1 VPS + 1 SPS + 1 PPS with nal_unit_length=4.
+// Minimal hvcC builder from VPS, SPS and PPS. Assumes 1 of each.
+// For packing details, see the following reference in the HEVC spec
+// https://www.iso.org/standard/65216.html
+/*
+aligned(8) class HEVCDecoderConfigurationRecord
+{
+    unsigned int(8)  configurationVersion = 1;
+    unsigned int(2)  general_profile_space;
+    unsigned int(1)  general_tier_flag;
+    unsigned int(5)  general_profile_idc;
+    unsigned int(32) general_profile_compatibility_flags;
+    unsigned int(48) general_constraint_indicator_flags;
+    unsigned int(8)  general_level_idc;
+    bit(4)           reserved = ‘1111’b;
+    unsigned int(12) min_spatial_segmentation_idc;
+    bit(6)           reserved = ‘111111’b;
+    unsigned int(2)  parallelismType;
+    bit(6)           reserved = ‘111111’b;
+    unsigned int(2)  chroma_format_idc;
+    bit(5)           reserved = ‘11111’b;
+    unsigned int(3)  bit_depth_luma_minus8;
+    bit(5)           reserved = ‘11111’b;
+    unsigned int(3)  bit_depth_chroma_minus8;
+    bit(16)          avgFrameRate;
+    bit(2)           constantFrameRate;
+    bit(3)           numTemporalLayers;
+    bit(1)           temporalIdNested;
+    unsigned int(2)  lengthSizeMinusOne;
+    unsigned int(8)  numOfArrays;
+    for (j=0; j < numOfArrays; j++)
+    {
+        bit(1)         array_completeness;
+        unsigned int(1) reserved = 0;
+        unsigned int(6) NAL_unit_type;
+        unsigned int(16) numNalus;
+        for (i=0; i< numNalus; i++)
+        {
+            unsigned int(16) nalUnitLength;
+            bit(8*nalUnitLength) nalUnit;
+        }
+    }
+}
+*/
 static int make_hvcC_from_vps_sps_pps(const uint8_t *vps_in, int vps_len_in,
                                       const uint8_t *sps_in, int sps_len_in,
                                       const uint8_t *pps_in, int pps_len_in,
@@ -99,6 +141,8 @@ static int make_hvcC_from_vps_sps_pps(const uint8_t *vps_in, int vps_len_in,
     int arrays = (vps_in && vps_len_in>0 ? 1 : 0) + 1 + 1; // VPS? + SPS + PPS
     int size = 23 + arrays * 3 + (vps_in ? (2+vps_len_in) : 0) + (2+sps_len_in) + (2+pps_len_in);
 
+    // Also allocate AV_INPUT_BUFFER_PADDING_SIZE zeroed bytes at the end, as
+    // required by FFmpeg bitstream readers to allow safe overreads.
     uint8_t *p = av_malloc(size + AV_INPUT_BUFFER_PADDING_SIZE);
     if (!p) return AVERROR(ENOMEM);
     memset(p + size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
@@ -306,8 +350,10 @@ int video_store_raw_seg_init_h264(struct raw_seg **ppRS,     // OUT
             "video_store_raw_seg_init_h264 failed to create extradata from sps and pps\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
-  return video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
+  ret = video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
                                   height, codec, extradata, extradata_size);
+  av_freep(&extradata);
+  return ret;
 }
 
 int video_store_raw_seg_init_h265(struct raw_seg **ppRS,     // OUT
@@ -335,8 +381,10 @@ int video_store_raw_seg_init_h265(struct raw_seg **ppRS,     // OUT
             "video_store_raw_seg_init_h265 failed to create extradata from sps and pps\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
-  return video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
+  ret = video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
                                   height, codec, extradata, extradata_size);
+  av_freep(&extradata);
+  return ret;
 }
 
 int video_store_raw_seg_write_packet(struct raw_seg *rs,       // IN
