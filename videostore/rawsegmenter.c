@@ -10,36 +10,68 @@
 #include <stdio.h>
 #include <string.h>
 
-// Minimal avcC builder for 1 SPS + 1 PPS. (lengthSizeMinusOne = 3 => 4-byte lengths)
+// Minimal avcC builder from SPS and PPS. Assmes 1 SPS + 1 PPS configuration
+// For packing details, see the following reference in the AVC spec
+// https://ossrs.net/lts/zh-cn/assets/files/ISO_IEC_14496-15-AVC-format-2012-345a5b466cc73e978fd9dd0840361e8b.pdf
+/*
+aligned(8) class AVCDecoderConfigurationRecord { 
+    unsigned int(8) configurationVersion = 1; 
+    unsigned int(8) AVCProfileIndication; 
+    unsigned int(8) profile_compatibility; 
+    unsigned int(8) AVCLevelIndication; 
+    bit(6) reserved = '111111'b; 
+    unsigned int(2) lengthSizeMinusOne; 
+    bit(3) reserved = '111'b; 
+    unsigned int(5) numOfSequenceParameterSets; 
+    for (i=0; i< numOfSequenceParameterSets; i++) { 
+        unsigned int(16) sequenceParameterSetLength;          
+        bit(8*sequenceParameterSetLength) sequenceParameterSetNALUnit; 
+    } 
+    unsigned int(8) numOfPictureParameterSets; 
+    for (i=0; i< numOfPictureParameterSets; i++) { 
+        unsigned int(16) pictureParameterSetLength; 
+        bit(8*pictureParameterSetLength) pictureParameterSetNALUnit; 
+    }
+}
+*/
 int make_avcC_from_sps_pps(const uint8_t *sps_in, int sps_len_in,
                                   const uint8_t *pps_in, int pps_len_in,
                                   uint8_t **extradata, int *extradata_size) {
     if (!sps_in || sps_len_in < 4 || !pps_in || pps_len_in < 1) return AVERROR_INVALIDDATA;
 
-    uint8_t profile = sps_in[1];
-    uint8_t compat  = sps_in[2];
-    uint8_t level   = sps_in[3];
-
+    // Allocate extradata for AVCDecoderConfigurationRecord (avcC):
+    // size = fixed header + SPS length field + SPS data + numOfPPS byte +
+    //        PPS length field + PPS data
+    // Also allocate AV_INPUT_BUFFER_PADDING_SIZE zeroed bytes at the end, as
+    // required by FFmpeg bitstream readers to allow safe overreads.
     int size = 7 + 2 + sps_len_in + 1 + 2 + pps_len_in;
     uint8_t *p = av_malloc(size + AV_INPUT_BUFFER_PADDING_SIZE);
     if (!p) return AVERROR(ENOMEM);
     memset(p + size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
 
+    // Fill out the avcC header
+    uint8_t profile = sps_in[1];
+    uint8_t compat  = sps_in[2];
+    uint8_t level   = sps_in[3];
     int i = 0;
     p[i++] = 1;            // configurationVersion
     p[i++] = profile;      // AVCProfileIndication
     p[i++] = compat;       // profile_compatibility
     p[i++] = level;        // AVCLevelIndication
-    p[i++] = 0xFF;         // lengthSizeMinusOne (..0011 => 4-byte NALU lengths)
-    p[i++] = 0xE1;         // numOfSPS (1)
+    p[i++] = 0xFF;         // lengthSizeMinusOne
+    p[i++] = 0xE1;         // numOfSequenceParameterSets
+                                    
+    // SPS (big-endian length + bytes)
     AV_WB16(p + i, sps_len_in); i += 2;
     memcpy(p + i, sps_in, sps_len_in); i += sps_len_in;
-    p[i++] = 1;            // numOfPPS (1)
+    p[i++] = 1;
+    // PPS
     AV_WB16(p + i, pps_len_in); i += 2;
     memcpy(p + i, pps_in, pps_len_in); i += pps_len_in;
 
     *extradata = p;
     *extradata_size = i;
+  
     return 0;
 }
 
