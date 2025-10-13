@@ -6,5 +6,5 @@ int main(int argc, char *argv[]) {
     printf("usage: %s <concat file> <output file>\n", argv[0]);
     return 1;
   }
-  return video_store_concat(argv[1], argv[2]);
+  return video_store_concat(argv[1], argv[2], CONTAINER_MP4);
 }
