@@ -79,12 +79,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path, con
              i, av_err2str(ret));
       goto cleanup;
     }
-    outStream->codecpar->codec_tag = 0;
-    outStream->time_base = inStream->time_base;
     av_log(NULL, AV_LOG_DEBUG, "Stream %d type: %d\n", i, outStream->codecpar->codec_type);
-    if (outStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-        av_log(NULL, AV_LOG_DEBUG, "Stream %d extradata size: %d\n", i, outStream->codecpar->extradata_size);
-    }
   }
 
   ret = avio_open(&outputCtx->pb, output_path, AVIO_FLAG_WRITE);
