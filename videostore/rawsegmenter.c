@@ -103,6 +103,9 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,      // OUT
     goto cleanup;
   }
 
+  // fmp4 specific options. We do not include empty_moov option because
+  // we want the params lookup to be fast for the indexer and matcher.
+  // We still enforce that each segment file has consistent video params.
   ret = av_dict_set(&opts, "segment_format_options", "movflags=frag_keyframe+default_base_moof", 0);
 
   if (ret < 0) {
