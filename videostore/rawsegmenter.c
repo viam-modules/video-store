@@ -144,9 +144,7 @@ int video_store_raw_seg_init_h264(struct raw_seg **ppRS,     // OUT
                                   const int segmentSeconds,  // IN
                                   const char *outputPattern, // IN
                                   const int width,           // IN
-                                  const int height,          // IN
-                                  const uint8_t *sps, size_t sps_len,
-                                  const uint8_t *pps, size_t pps_len
+                                  const int height          // IN
 ) {
   const struct AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H264);
   if (codec == NULL) {
@@ -164,10 +162,7 @@ int video_store_raw_seg_init_h265(struct raw_seg **ppRS,     // OUT
                                   const int segmentSeconds,  // IN
                                   const char *outputPattern, // IN
                                   const int width,           // IN
-                                  const int height,          // IN
-                                  const uint8_t *sps, size_t sps_len,
-                                  const uint8_t *pps, size_t pps_len,
-                                  const uint8_t *vps, size_t vps_len
+                                  const int height          // IN
 ) {
   const struct AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H265);
   if (codec == NULL) {
