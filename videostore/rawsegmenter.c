@@ -10,187 +10,12 @@
 #include <stdio.h>
 #include <string.h>
 
-// Minimal avcC builder from SPS and PPS. Assmes 1 SPS + 1 PPS configuration
-// For packing details, see the following reference in the AVC spec
-// https://ossrs.net/lts/zh-cn/assets/files/ISO_IEC_14496-15-AVC-format-2012-345a5b466cc73e978fd9dd0840361e8b.pdf
-/*
-aligned(8) class AVCDecoderConfigurationRecord { 
-    unsigned int(8) configurationVersion = 1; 
-    unsigned int(8) AVCProfileIndication; 
-    unsigned int(8) profile_compatibility; 
-    unsigned int(8) AVCLevelIndication; 
-    bit(6) reserved = '111111'b; 
-    unsigned int(2) lengthSizeMinusOne; 
-    bit(3) reserved = '111'b; 
-    unsigned int(5) numOfSequenceParameterSets; 
-    for (i=0; i< numOfSequenceParameterSets; i++) { 
-        unsigned int(16) sequenceParameterSetLength;          
-        bit(8*sequenceParameterSetLength) sequenceParameterSetNALUnit; 
-    } 
-    unsigned int(8) numOfPictureParameterSets; 
-    for (i=0; i< numOfPictureParameterSets; i++) { 
-        unsigned int(16) pictureParameterSetLength; 
-        bit(8*pictureParameterSetLength) pictureParameterSetNALUnit; 
-    }
-}
-*/
-int make_avcC_from_sps_pps(const uint8_t *sps_in, int sps_len_in,
-                                  const uint8_t *pps_in, int pps_len_in,
-                                  uint8_t **extradata, int *extradata_size) {
-    if (!sps_in || sps_len_in < 4 || !pps_in || pps_len_in < 1) return AVERROR_INVALIDDATA;
-
-    // Allocate extradata for AVCDecoderConfigurationRecord (avcC):
-    // size = fixed header + SPS length field + SPS data + numOfPPS byte +
-    //        PPS length field + PPS data
-    // Also allocate AV_INPUT_BUFFER_PADDING_SIZE zeroed bytes at the end, as
-    // required by FFmpeg bitstream readers to allow safe overreads.
-    int size = 7 + 2 + sps_len_in + 1 + 2 + pps_len_in;
-    uint8_t *p = av_malloc(size + AV_INPUT_BUFFER_PADDING_SIZE);
-    if (!p) return AVERROR(ENOMEM);
-    memset(p + size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
-
-    // Fill out the avcC header
-    uint8_t profile = sps_in[1];
-    uint8_t compat  = sps_in[2];
-    uint8_t level   = sps_in[3];
-    int i = 0;
-    p[i++] = 1;            // configurationVersion
-    p[i++] = profile;      // AVCProfileIndication
-    p[i++] = compat;       // profile_compatibility
-    p[i++] = level;        // AVCLevelIndication
-    p[i++] = 0xFF;         // lengthSizeMinusOne
-    p[i++] = 0xE1;         // numOfSequenceParameterSets
-                                    
-    // SPS (big-endian length + bytes)
-    AV_WB16(p + i, sps_len_in); i += 2;
-    memcpy(p + i, sps_in, sps_len_in); i += sps_len_in;
-    p[i++] = 1;
-    // PPS
-    AV_WB16(p + i, pps_len_in); i += 2;
-    memcpy(p + i, pps_in, pps_len_in); i += pps_len_in;
-
-    *extradata = p;
-    *extradata_size = i;
-  
-    return 0;
-}
-
-// append one array entry into hvcC (array_completeness=1, numNalus=1)
-static void append_hvcc_array(uint8_t *p, int *idx,
-                              uint8_t nal_type,
-                              const uint8_t *buf, int len) {
-    if (!buf || len <= 0) return;
-    p[(*idx)++] = 0x80 | (nal_type & 0x3F);    // array_completeness=1, nal_unit_type
-    AV_WB16(p + *idx, 1);  *idx += 2;          // numNalus = 1
-    AV_WB16(p + *idx, len); *idx += 2;         // nalUnitLength
-    memcpy(p + *idx, buf, len); *idx += len;   // nalUnit
-}
-
-// Minimal hvcC builder from VPS, SPS and PPS. Assumes 1 of each.
-// For packing details, see the following reference in the HEVC spec
-// https://www.iso.org/standard/65216.html
-/*
-aligned(8) class HEVCDecoderConfigurationRecord
-{
-    unsigned int(8)  configurationVersion = 1;
-    unsigned int(2)  general_profile_space;
-    unsigned int(1)  general_tier_flag;
-    unsigned int(5)  general_profile_idc;
-    unsigned int(32) general_profile_compatibility_flags;
-    unsigned int(48) general_constraint_indicator_flags;
-    unsigned int(8)  general_level_idc;
-    bit(4)           reserved = ‘1111’b;
-    unsigned int(12) min_spatial_segmentation_idc;
-    bit(6)           reserved = ‘111111’b;
-    unsigned int(2)  parallelismType;
-    bit(6)           reserved = ‘111111’b;
-    unsigned int(2)  chroma_format_idc;
-    bit(5)           reserved = ‘11111’b;
-    unsigned int(3)  bit_depth_luma_minus8;
-    bit(5)           reserved = ‘11111’b;
-    unsigned int(3)  bit_depth_chroma_minus8;
-    bit(16)          avgFrameRate;
-    bit(2)           constantFrameRate;
-    bit(3)           numTemporalLayers;
-    bit(1)           temporalIdNested;
-    unsigned int(2)  lengthSizeMinusOne;
-    unsigned int(8)  numOfArrays;
-    for (j=0; j < numOfArrays; j++)
-    {
-        bit(1)         array_completeness;
-        unsigned int(1) reserved = 0;
-        unsigned int(6) NAL_unit_type;
-        unsigned int(16) numNalus;
-        for (i=0; i< numNalus; i++)
-        {
-            unsigned int(16) nalUnitLength;
-            bit(8*nalUnitLength) nalUnit;
-        }
-    }
-}
-*/
-static int make_hvcC_from_vps_sps_pps(const uint8_t *vps_in, int vps_len_in,
-                                      const uint8_t *sps_in, int sps_len_in,
-                                      const uint8_t *pps_in, int pps_len_in,
-                                      uint8_t **extradata, int *extradata_size)
-{
-    if (!sps_in || sps_len_in < 4 || !pps_in || pps_len_in < 1)
-        return AVERROR_INVALIDDATA;
-
-    // hvcC size estimate: 23 header + arrays (each: 3 + 2 + len)
-    int arrays = (vps_in && vps_len_in>0 ? 1 : 0) + 1 + 1; // VPS? + SPS + PPS
-    int size = 23 + arrays * 3 + (vps_in ? (2+vps_len_in) : 0) + (2+sps_len_in) + (2+pps_len_in);
-
-    // Also allocate AV_INPUT_BUFFER_PADDING_SIZE zeroed bytes at the end, as
-    // required by FFmpeg bitstream readers to allow safe overreads.
-    uint8_t *p = av_malloc(size + AV_INPUT_BUFFER_PADDING_SIZE);
-    if (!p) return AVERROR(ENOMEM);
-    memset(p + size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
-
-    int i = 0;
-    p[i++] = 1; // configurationVersion
-
-    // general_profile_space(2) general_tier_flag(1) general_profile_idc(5)
-    p[i++] = 0x01; // profile_idc = Main
-    // general_profile_compatibility_flags (32)
-    AV_WB32(p + i, 0); i += 4;
-    // general_constraint_indicator_flags (48)
-    AV_WB32(p + i, 0); i += 4;
-    AV_WB16(p + i, 0); i += 2;
-
-    p[i++] = 0x1E;
-
-    // min_spatial_segmentation_idc (12) + reserved(4)
-    AV_WB16(p + i, 0xF000); i += 2;
-
-    p[i++] = 0xFC;   // parallelismType(2)=0
-    p[i++] = 0xFD;   // chromaFormat(2)=1 (4:2:0)
-    p[i++] = 0xF8;   // bitDepthLumaMinus8(3)=0
-    p[i++] = 0xF8;   // bitDepthChromaMinus8(3)=0
-
-    AV_WB16(p + i, 0); i += 2; // avgFrameRate = 0 (unknown)
-
-    // constantFrameRate(2)=0, numTemporalLayers(3)=0, temporalIdNested(1)=1, lengthSizeMinusOne(2)=3 (=> 4 bytes)
-    p[i++] = (0 << 6) | (0 << 3) | (1 << 2) | 3;
-
-    p[i++] = (uint8_t)arrays; // numOfArrays
-
-    if (vps_in && vps_len_in > 0) append_hvcc_array(p, &i, 32, vps_in, vps_len_in); // VPS
-    append_hvcc_array(p, &i, 33, sps_in, sps_len_in);                               // SPS
-    append_hvcc_array(p, &i, 34, pps_in, pps_len_in);                               // PPS
-
-    *extradata = p;
-    *extradata_size = i;
-    return 0;
-}
-
-int video_store_raw_seg_init(struct raw_seg **ppRS,                 // OUT
-                             const int segmentSeconds,              // IN
-                             const char *outputPattern,             // IN
-                             const int width,                       // IN
-                             const int height,                      // IN
-                             const AVCodec *codec,                  // IN
-                             uint8_t *extradata, int extradata_size // IN
+int video_store_raw_seg_init(struct raw_seg **ppRS,      // OUT
+                             const int segmentSeconds,   // IN
+                             const char *outputPattern,  // IN
+                             const int width,            // IN
+                             const int height,           // IN
+                             const AVCodec *codec        // IN
 ) {
   struct raw_seg *rs = (struct raw_seg *)malloc(sizeof(struct raw_seg));
   if (rs == NULL) {
@@ -278,26 +103,15 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,                 // OUT
     goto cleanup;
   }
 
-  ret = av_dict_set(&opts, "segment_format_options", "movflags=frag_keyframe+empty_moov+default_base_moof", 0);
+  ret = av_dict_set(&opts, "segment_format_options", "movflags=frag_keyframe+default_base_moof", 0);
+
   if (ret < 0) {
       av_log(NULL, AV_LOG_ERROR,
             "video_store_raw_seg_init failed to set segment_format_options for fmp4\n");
       goto cleanup;
   }
 
-  // set extradata
-  if (extradata && extradata_size > 0) {
-    // ensure padding for safety
-    uint8_t *ed = av_malloc(extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
-    if (!ed) { ret = AVERROR(ENOMEM); goto cleanup; }
-    memcpy(ed, extradata, extradata_size);
-    memset(ed + extradata_size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
-
-    stream->codecpar->extradata = ed;
-    stream->codecpar->extradata_size = extradata_size;
-  }
-
-  /* // Open the output file for writing */
+  // Open the output file for writing
   ret = avformat_write_header(fmtCtx, &opts);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
@@ -340,19 +154,9 @@ int video_store_raw_seg_init_h264(struct raw_seg **ppRS,     // OUT
            "video_store_raw_seg_init_h264 failed to find codec\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
-  // create extradata from sps and pps
-  uint8_t *extradata = NULL;
-  int extradata_size = 0;
-  int ret = make_avcC_from_sps_pps(sps, (int)sps_len, pps, (int)pps_len,
-                                   &extradata, &extradata_size);
-  if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR,
-            "video_store_raw_seg_init_h264 failed to create extradata from sps and pps\n");
-    return VIDEO_STORE_RAW_SEG_RESP_ERROR;
-  }
-  ret = video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
-                                  height, codec, extradata, extradata_size);
-  av_freep(&extradata);
+  int ret = video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
+                                  height, codec);
+
   return ret;
 }
 
@@ -371,19 +175,9 @@ int video_store_raw_seg_init_h265(struct raw_seg **ppRS,     // OUT
            "video_store_raw_seg_init_h265 failed to find codec\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
-  // create extradata from sps, pps, and vps
-  uint8_t *extradata = NULL;
-  int extradata_size = 0;
-  int ret = make_hvcC_from_vps_sps_pps(vps, (int)vps_len, sps, (int)sps_len, pps, (int)pps_len,
-                                      &extradata, &extradata_size);
-  if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR,
-            "video_store_raw_seg_init_h265 failed to create extradata from sps and pps\n");
-    return VIDEO_STORE_RAW_SEG_RESP_ERROR;
-  }
-  ret = video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
-                                  height, codec, extradata, extradata_size);
-  av_freep(&extradata);
+  int ret = video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
+                                  height, codec);
+
   return ret;
 }
 
