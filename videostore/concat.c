@@ -56,8 +56,6 @@ int video_store_concat(const char *concat_filepath, const char *output_path, con
            av_err2str(ret));
     goto cleanup;
   }
-  // TODO(seanp): add comment why we need this
-  outputCtx->flags |= AVFMT_GLOBALHEADER;
 
   for (unsigned int i = 0; i < inputCtx->nb_streams; i++) {
     AVStream *inStream = inputCtx->streams[i];
