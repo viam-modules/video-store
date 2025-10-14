@@ -408,7 +408,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 	r.From = r.From.UTC()
 	r.To = r.To.UTC()
 	if err := r.Validate(); err != nil {
-		return nil
+		return err
 	}
 	vs.logger.Debug("fetch command received and validated")
 	fetchFilePath := vsutils.GenerateOutputFilePath(
@@ -433,7 +433,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 	}()
 	if err := vs.concater.Concat(r.From, r.To, fetchFilePath, r.Container); err != nil {
 		vs.logger.Error("failed to concat files ", err)
-		return nil
+		return err
 	}
 
 	// #nosec G304: path is internally generated, not user supplied
@@ -449,22 +449,23 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 	// which is important for large video files.
 	buf := make([]byte, streamingChunkSize)
 	for {
+		select {
+		case <-ctx.Done():
+			vs.logger.Debugf("context done during streaming: %v", ctx.Err())
+			return ctx.Err()
+		default:
+		}
 		n, err := file.Read(buf)
 		if err != nil && err != io.EOF {
 			vs.logger.Error("failed to read file for streaming: ", err)
-			return nil
+			return err
 		}
 		if n == 0 {
 			break
 		}
 		if err := emit(buf[:n]); err != nil {
 			vs.logger.Error("failed to emit chunk: ", err)
-			return nil
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
+			return err
 		}
 	}
 
