@@ -651,7 +651,7 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 	select {
 	case <-timer.C:
 		vs.logger.Debugf("executing concat for %s", path)
-		err := vs.concater.Concat(from, to, path, "mp4")
+		err := vs.concater.Concat(from, to, path, defaultContainer)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 		}
