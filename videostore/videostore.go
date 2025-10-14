@@ -436,7 +436,6 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		return nil
 	}
 
-	// which is important for large video files.
 	// #nosec G304: path is internally generated, not user supplied
 	file, err := os.Open(fetchFilePath)
 	if err != nil {
@@ -446,6 +445,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 
 	// Read video file in 64KB chunks from disk and emit each chunk.
 	// This avoids loading the entire file into memory at once
+	// which is important for large video files.
 	buf := make([]byte, streamingChunkSize)
 	for {
 		n, err := file.Read(buf)
