@@ -155,10 +155,8 @@ int video_store_raw_seg_init_h264(struct raw_seg **ppRS,     // OUT
            "video_store_raw_seg_init_h264 failed to find codec\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
-  int ret = video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
+  return video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
                                   height, codec);
-
-  return ret;
 }
 
 int video_store_raw_seg_init_h265(struct raw_seg **ppRS,     // OUT
@@ -173,10 +171,8 @@ int video_store_raw_seg_init_h265(struct raw_seg **ppRS,     // OUT
            "video_store_raw_seg_init_h265 failed to find codec\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
-  int ret = video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
+  return video_store_raw_seg_init(ppRS, segmentSeconds, outputPattern, width,
                                   height, codec);
-
-  return ret;
 }
 
 int video_store_raw_seg_write_packet(struct raw_seg *rs,       // IN
