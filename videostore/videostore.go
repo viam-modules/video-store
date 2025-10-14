@@ -440,6 +440,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 	file, err := os.Open(fetchFilePath)
 	if err != nil {
 		vs.logger.Error("failed to open file for streaming: ", err)
+		return err
 	}
 	defer file.Close()
 
