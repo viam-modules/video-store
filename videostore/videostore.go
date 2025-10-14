@@ -31,9 +31,9 @@ const (
 	fallbackDeleterIntervalMinutes  = 10 // minutes
 	segmentSeconds                  = 30 // seconds
 	videoFormat                     = "mp4"
-
-	retryIntervalSeconds = 1  // seconds
-	asyncTimeoutSeconds  = 60 // seconds
+	retryIntervalSeconds            = 1         // seconds
+	asyncTimeoutSeconds             = 60        // seconds
+	streamingChunkSize              = 64 * 1024 // bytes (64KB)
 )
 
 var (
@@ -436,10 +436,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		return nil
 	}
 
-	// Read video file in 64KB chunks from disk and emit each chunk.
-	// This avoids loading the entire file into memory at once
 	// which is important for large video files.
-	const chunkSize = 64 * 1024
 	// #nosec G304: path is internally generated, not user supplied
 	file, err := os.Open(fetchFilePath)
 	if err != nil {
@@ -447,7 +444,9 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 	}
 	defer file.Close()
 
-	buf := make([]byte, chunkSize)
+	// Read video file in 64KB chunks from disk and emit each chunk.
+	// This avoids loading the entire file into memory at once
+	buf := make([]byte, streamingChunkSize)
 	for {
 		n, err := file.Read(buf)
 		if err != nil && err != io.EOF {
