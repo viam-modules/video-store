@@ -30,7 +30,7 @@ const (
 	fallbackDeletionLimitMultiplier = 1.1
 	fallbackDeleterIntervalMinutes  = 10 // minutes
 	segmentSeconds                  = 30 // seconds
-	videoFormat                     = "mp4"
+	defaultContainer                = "mp4"
 	retryIntervalSeconds            = 1         // seconds
 	asyncTimeoutSeconds             = 60        // seconds
 	streamingChunkSize              = 64 * 1024 // bytes (64KB)
@@ -377,7 +377,7 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		"",
 		tempPath)
 	if r.Container == "" {
-		r.Container = videoFormat
+		r.Container = defaultContainer
 	}
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
@@ -417,7 +417,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		"",
 		tempPath)
 	if r.Container == "" {
-		r.Container = videoFormat
+		r.Container = defaultContainer
 	}
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
@@ -494,8 +494,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 		return &SaveResponse{Filename: uploadFileName}, nil
 	}
 
-	// TODO(seanp): Currently forcing mp4 on save. Add support for other containers?
-	if err := vs.concater.Concat(r.From, r.To, uploadFilePath, videoFormat); err != nil {
+	if err := vs.concater.Concat(r.From, r.To, uploadFilePath, defaultContainer); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err
 	}
