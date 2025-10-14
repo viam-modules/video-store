@@ -10,12 +10,12 @@
 #include <stdio.h>
 #include <string.h>
 
-int video_store_raw_seg_init(struct raw_seg **ppRS,      // OUT
-                             const int segmentSeconds,   // IN
-                             const char *outputPattern,  // IN
-                             const int width,            // IN
-                             const int height,           // IN
-                             const AVCodec *codec        // IN
+int video_store_raw_seg_init(struct raw_seg **ppRS,     // OUT
+                             const int segmentSeconds,  // IN
+                             const char *outputPattern, // IN
+                             const int width,           // IN
+                             const int height,          // IN
+                             const AVCodec *codec       // IN
 ) {
   struct raw_seg *rs = (struct raw_seg *)malloc(sizeof(struct raw_seg));
   if (rs == NULL) {
