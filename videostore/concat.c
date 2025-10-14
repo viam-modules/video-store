@@ -92,11 +92,21 @@ int video_store_concat(const char *concat_filepath, const char *output_path, con
   AVDictionary *mux_opts = NULL;
   switch (container) {
     case CONTAINER_FMP4:
+      // For fragmented MP4 (fMP4):
+      // - frag_keyframe: start a new fragment (moof+mdat) at each keyframe to create
+      //   random-access points.
+      // - empty_moov: write an initial 'moov' atom at the start with no sample data;
+      //   actual media lives in following fragments. Useful for streaming/non‑seekable outputs.
+      // - default_base_moof: set the 'default-base-is-moof' flag (tfhd) so sample data
+      //   offsets are relative to the start of each moof, enabling byte‑range streaming
+      //   without rewriting offsets.
       av_dict_set(&mux_opts, "movflags", "frag_keyframe+empty_moov+default_base_moof", 0);
       break;
     case CONTAINER_MP4:
     case CONTAINER_DEFAULT:
     default:
+      // This moves the moov atom to the beginning of the file which allows
+      // playback to start before the file is completely downloaded.
       av_dict_set(&mux_opts, "movflags", "faststart", 0);
       break;
   }
