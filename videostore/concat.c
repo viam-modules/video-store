@@ -2,7 +2,6 @@
 #include "libavcodec/packet.h"
 #include "libavutil/dict.h"
 #include "libavutil/log.h"
-#include <libavcodec/bsf.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <string.h>
