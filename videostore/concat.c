@@ -57,7 +57,6 @@ int video_store_concat(const char *concat_filepath, const char *output_path, con
   }
 
   for (unsigned int i = 0; i < inputCtx->nb_streams; i++) {
-    AVStream *inStream = inputCtx->streams[i];
     AVStream *outStream = avformat_new_stream(outputCtx, NULL);
     if (outStream == NULL) {
       av_log(NULL, AV_LOG_ERROR,
