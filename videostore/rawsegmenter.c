@@ -68,8 +68,6 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,     // OUT
     // https://trac.ffmpeg.org/wiki/Encode/H.265#FinalCutandApplestuffcompatibility
     // https://stackoverflow.com/questions/50565912/h265-codec-changes-from-hvc1-to-hev1
     stream->codecpar->codec_tag = MKTAG('h', 'v', 'c', '1');
-  } else if (codec->id == AV_CODEC_ID_H264) {
-    stream->codecpar->codec_tag = MKTAG('a', 'v', 'c', '1');
   }
 
   char stackSegmentSecondsStr[30];
