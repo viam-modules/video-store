@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -51,6 +52,11 @@ var presets = map[string]struct{}{
 	"slow":      {},
 	"slower":    {},
 	"veryslow":  {},
+}
+
+var allowedContainers = map[string]struct{}{
+	"mp4":  {},
+	"fmp4": {},
 }
 
 type videostore struct {
@@ -122,6 +128,19 @@ type SaveResponse struct {
 	Filename string
 }
 
+// normalizeContainer returns a normalized container ("mp4" or "fmp4"),
+// defaulting to defaultContainer when empty, or an error if unsupported.
+func normalizeContainer(c string) (string, error) {
+	if c == "" {
+		return defaultContainer, nil
+	}
+	lc := strings.ToLower(c)
+	if _, ok := allowedContainers[lc]; !ok {
+		return "", fmt.Errorf("invalid container type: %s", c)
+	}
+	return lc, nil
+}
+
 // Validate returns an error if the SaveRequest is invalid.
 func (r *SaveRequest) Validate() error {
 	if r.From.After(r.To) {
@@ -130,6 +149,11 @@ func (r *SaveRequest) Validate() error {
 	if r.To.After(time.Now()) {
 		return errors.New("'to' timestamp is in the future")
 	}
+	c, err := normalizeContainer(r.Container)
+	if err != nil {
+		return err
+	}
+	r.Container = c
 	return nil
 }
 
@@ -150,6 +174,11 @@ func (r *FetchRequest) Validate() error {
 	if r.From.After(r.To) {
 		return errors.New("'from' timestamp is after 'to' timestamp")
 	}
+	c, err := normalizeContainer(r.Container)
+	if err != nil {
+		return err
+	}
+	r.Container = c
 	return nil
 }
 
@@ -376,9 +405,7 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		r.From,
 		"",
 		tempPath)
-	if r.Container == "" {
-		r.Container = defaultContainer
-	}
+
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
 	// of writing.
@@ -416,9 +443,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		r.From,
 		"",
 		tempPath)
-	if r.Container == "" {
-		r.Container = defaultContainer
-	}
+
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
 	// of writing.
@@ -496,7 +521,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 		return &SaveResponse{Filename: uploadFileName}, nil
 	}
 
-	if err := vs.concater.Concat(r.From, r.To, uploadFilePath, defaultContainer); err != nil {
+	if err := vs.concater.Concat(r.From, r.To, uploadFilePath, r.Container); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err
 	}
