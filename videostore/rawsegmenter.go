@@ -86,14 +86,16 @@ func (rs *RawSegmenter) Init(codec CodecType, width, height int) error {
 			C.int(rs.segmentSeconds),
 			outputPatternCStr,
 			C.int(width),
-			C.int(height))
+			C.int(height),
+		)
 	case CodecTypeH265:
 		ret = C.video_store_raw_seg_init_h265(
 			&cRS,
 			C.int(rs.segmentSeconds),
 			outputPatternCStr,
 			C.int(width),
-			C.int(height))
+			C.int(height),
+		)
 	default:
 		return fmt.Errorf("rawSegmenter.Init called on invalid codec %s", codec)
 	}

@@ -3,11 +3,13 @@
 #include "libavutil/dict.h"
 #include "libavutil/log.h"
 #include "libavutil/mem.h"
+#include "libavutil/intreadwrite.h"
 #include <libavcodec/avcodec.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
 int video_store_raw_seg_init(struct raw_seg **ppRS,     // OUT
                              const int segmentSeconds,  // IN
                              const char *outputPattern, // IN
@@ -99,7 +101,29 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,     // OUT
     goto cleanup;
   }
 
-  /* // Open the output file for writing */
+  // fMP4 (fragmented MP4) options
+  //
+  // [moov(init)] [moof][mdat] [moof][mdat] ...
+  //
+  // - frag_keyframe: start a new fragment (moof+mdat) at each keyframe so segments
+  //   align with keyframe boundaries.
+  // - default_base_moof: set the base_data_offset in the moof box to 0
+  //
+  // NOTE: We do NOT include empty_moov option because
+  // we want the params lookup to be fast for the indexer and matcher.
+  //
+  // - We still enforce that each segment file has consistent video params.
+  // - The indexer and matcher can use avformat_find_stream_info
+  //   to simply read the 'moov' box at the start of each segment.
+  ret = av_dict_set(&opts, "segment_format_options", "movflags=frag_keyframe+default_base_moof", 0);
+
+  if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR,
+            "video_store_raw_seg_init failed to set segment_format_options for fmp4\n");
+      goto cleanup;
+  }
+
+  // Open the output file for writing
   ret = avformat_write_header(fmtCtx, &opts);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
@@ -132,7 +156,7 @@ int video_store_raw_seg_init_h264(struct raw_seg **ppRS,     // OUT
                                   const int segmentSeconds,  // IN
                                   const char *outputPattern, // IN
                                   const int width,           // IN
-                                  const int height           // IN
+                                  const int height          // IN
 ) {
   const struct AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H264);
   if (codec == NULL) {
@@ -148,7 +172,7 @@ int video_store_raw_seg_init_h265(struct raw_seg **ppRS,     // OUT
                                   const int segmentSeconds,  // IN
                                   const char *outputPattern, // IN
                                   const int width,           // IN
-                                  const int height           // IN
+                                  const int height          // IN
 ) {
   const struct AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H265);
   if (codec == NULL) {

@@ -6,7 +6,7 @@
 #include <libavformat/avformat.h>
 #include <string.h>
 
-int video_store_concat(const char *concat_filepath, const char *output_path) {
+int video_store_concat(const char *concat_filepath, const char *output_path, container_t container) {
   int ret = VIDEO_STORE_CONCAT_RESP_ERROR;
   AVPacket *packet = av_packet_alloc();
   AVDictionary *options = NULL;
@@ -48,7 +48,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
     goto cleanup;
   }
 
-  ret = avformat_alloc_output_context2(&outputCtx, NULL, NULL, output_path);
+  ret = avformat_alloc_output_context2(&outputCtx, NULL, "mp4", output_path);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_concat failed to allocate output context: %s\n",
@@ -75,6 +75,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
              i, av_err2str(ret));
       goto cleanup;
     }
+    av_log(NULL, AV_LOG_DEBUG, "Stream %d type: %d\n", i, outStream->codecpar->codec_type);
   }
 
   ret = avio_open(&outputCtx->pb, output_path, AVIO_FLAG_WRITE);
@@ -86,7 +87,29 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
   }
   outputPathOpened = 1;
 
-  ret = avformat_write_header(outputCtx, NULL);
+  AVDictionary *mux_opts = NULL;
+  switch (container) {
+    case CONTAINER_FMP4:
+      // For fragmented MP4 (fMP4):
+      // - frag_keyframe: start a new fragment (moof+mdat) at each keyframe to create
+      //   random-access points.
+      // - empty_moov: write an initial 'moov' atom at the start with no sample data;
+      //   actual media lives in following fragments. Useful for streaming/non‑seekable outputs.
+      // - default_base_moof: set the 'default-base-is-moof' flag (tfhd) so sample data
+      //   offsets are relative to the start of each moof, enabling byte‑range streaming
+      //   without rewriting offsets.
+      av_dict_set(&mux_opts, "movflags", "frag_keyframe+empty_moov+default_base_moof", 0);
+      break;
+    case CONTAINER_MP4:
+    case CONTAINER_DEFAULT:
+    default:
+      // This moves the moov atom to the beginning of the file which allows
+      // playback to start before the file is completely downloaded.
+      av_dict_set(&mux_opts, "movflags", "faststart", 0);
+      break;
+  }
+
+  ret = avformat_write_header(outputCtx, &mux_opts);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_concat failed to write header: %s\n", av_err2str(ret));
@@ -147,11 +170,15 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
     av_packet_unref(packet);
   }
 
-  if ((ret = av_write_trailer(outputCtx))) {
-    av_log(NULL, AV_LOG_ERROR,
-           "video_store_concat failed to write trailer: %s\n", av_err2str(ret));
-    goto cleanup;
-  }
+  ret = av_write_trailer(outputCtx);
+  if (ret < 0)
+    av_log(NULL, AV_LOG_ERROR, "write_trailer: %s (%d)\n", av_err2str(ret), ret);
+
+  if (outputCtx && outputCtx->pb && outputCtx->pb->error < 0)
+    av_log(NULL, AV_LOG_ERROR, "avio error: %s (%d)\n",
+           av_err2str(outputCtx->pb->error), outputCtx->pb->error);
+
+
   ret = VIDEO_STORE_CONCAT_RESP_OK;
 
 cleanup:
@@ -182,6 +209,10 @@ cleanup:
   if (packet != NULL) {
     av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_packet_free\n");
     av_packet_free(&packet);
+  }
+  if (mux_opts != NULL) {
+    av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_dict_free mux_opts\n");
+    av_dict_free(&mux_opts);
   }
 
   return ret;

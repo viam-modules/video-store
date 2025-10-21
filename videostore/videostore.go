@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -29,10 +31,10 @@ const (
 	fallbackDeletionLimitMultiplier = 1.1
 	fallbackDeleterIntervalMinutes  = 10 // minutes
 	segmentSeconds                  = 30 // seconds
-	videoFormat                     = "mp4"
-
-	retryIntervalSeconds = 1  // seconds
-	asyncTimeoutSeconds  = 60 // seconds
+	defaultContainer                = "mp4"
+	retryIntervalSeconds            = 1         // seconds
+	asyncTimeoutSeconds             = 60        // seconds
+	streamingChunkSize              = 64 * 1024 // bytes (64KB)
 )
 
 var (
@@ -50,6 +52,11 @@ var presets = map[string]struct{}{
 	"slow":      {},
 	"slower":    {},
 	"veryslow":  {},
+}
+
+var allowedContainers = map[string]struct{}{
+	"mp4":  {},
+	"fmp4": {},
 }
 
 type videostore struct {
@@ -71,6 +78,7 @@ type videostore struct {
 type VideoStore interface {
 	Fetch(ctx context.Context, r *FetchRequest) (*FetchResponse, error)
 	Save(ctx context.Context, r *SaveRequest) (*SaveResponse, error)
+	FetchStream(ctx context.Context, r *FetchRequest, emit func([]byte) error) error
 	Close()
 	GetStorageState(ctx context.Context) (*StorageState, error)
 }
@@ -108,15 +116,29 @@ type RTPVideoStore interface {
 
 // SaveRequest is the request to the Save method.
 type SaveRequest struct {
-	From     time.Time
-	To       time.Time
-	Metadata string
-	Async    bool
+	From      time.Time
+	To        time.Time
+	Metadata  string // String added to the saved filename (<vs_name>_<from>_<metadata>.mp4)
+	Container string // Video container format (e.g. "mp4", "fmp4")
+	Async     bool
 }
 
 // SaveResponse is the response to the Save method.
 type SaveResponse struct {
 	Filename string
+}
+
+// normalizeContainer returns a normalized container ("mp4" or "fmp4"),
+// defaulting to defaultContainer when empty, or an error if unsupported.
+func normalizeContainer(c string) (string, error) {
+	if c == "" {
+		return defaultContainer, nil
+	}
+	lc := strings.ToLower(c)
+	if _, ok := allowedContainers[lc]; !ok {
+		return "", fmt.Errorf("invalid container type: %s", c)
+	}
+	return lc, nil
 }
 
 // Validate returns an error if the SaveRequest is invalid.
@@ -127,13 +149,19 @@ func (r *SaveRequest) Validate() error {
 	if r.To.After(time.Now()) {
 		return errors.New("'to' timestamp is in the future")
 	}
+	c, err := normalizeContainer(r.Container)
+	if err != nil {
+		return err
+	}
+	r.Container = c
 	return nil
 }
 
 // FetchRequest is the request to the Fetch method.
 type FetchRequest struct {
-	From time.Time
-	To   time.Time
+	From      time.Time
+	To        time.Time
+	Container string
 }
 
 // FetchResponse is the resonse to the Fetch method.
@@ -146,6 +174,11 @@ func (r *FetchRequest) Validate() error {
 	if r.From.After(r.To) {
 		return errors.New("'from' timestamp is after 'to' timestamp")
 	}
+	c, err := normalizeContainer(r.Container)
+	if err != nil {
+		return err
+	}
+	r.Container = c
 	return nil
 }
 
@@ -385,7 +418,7 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 			vs.logger.Warnf("failed to delete temporary file (%s): %v", fetchFilePath, err)
 		}
 	}()
-	if err := vs.concater.Concat(r.From, r.To, fetchFilePath); err != nil {
+	if err := vs.concater.Concat(r.From, r.To, fetchFilePath, r.Container); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err
 	}
@@ -394,6 +427,74 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		return nil, err
 	}
 	return &FetchResponse{Video: videoBytes}, nil
+}
+
+func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit func([]byte) error) error {
+	// Convert incoming local times to UTC for consistent timestamp handling
+	// All internal operations and segmenter timestamps are in UTC
+	r.From = r.From.UTC()
+	r.To = r.To.UTC()
+	if err := r.Validate(); err != nil {
+		return err
+	}
+	vs.logger.Debug("fetch stream command received and validated")
+	fetchFilePath := vsutils.GenerateOutputFilePath(
+		vs.config.Storage.OutputFileNamePrefix,
+		r.From,
+		"",
+		tempPath)
+
+	// Always attempt to remove the concat file after the operation.
+	// This handles error cases in Concat where it fails in the middle
+	// of writing.
+	defer func() {
+		if _, statErr := os.Stat(fetchFilePath); os.IsNotExist(statErr) {
+			vs.logger.Debugf("temporary file (%s) does not exist, skipping removal", fetchFilePath)
+			return
+		}
+		if err := os.Remove(fetchFilePath); err != nil {
+			vs.logger.Warnf("failed to delete temporary file (%s): %v", fetchFilePath, err)
+		}
+	}()
+	if err := vs.concater.Concat(r.From, r.To, fetchFilePath, r.Container); err != nil {
+		vs.logger.Error("failed to concat files ", err)
+		return err
+	}
+
+	// #nosec G304: path is internally generated, not user supplied
+	file, err := os.Open(fetchFilePath)
+	if err != nil {
+		vs.logger.Error("failed to open file for streaming: ", err)
+		return err
+	}
+	defer file.Close()
+
+	// Read video file in 64KB chunks from disk and emit each chunk.
+	// This avoids loading the entire file into memory at once
+	// which is important for large video files.
+	buf := make([]byte, streamingChunkSize)
+	for {
+		select {
+		case <-ctx.Done():
+			vs.logger.Debugf("context done during streaming: %v", ctx.Err())
+			return ctx.Err()
+		default:
+		}
+		n, err := file.Read(buf)
+		if err != nil && err != io.EOF {
+			vs.logger.Error("failed to read file for streaming: ", err)
+			return err
+		}
+		if n == 0 {
+			break
+		}
+		if err := emit(buf[:n]); err != nil {
+			vs.logger.Error("failed to emit chunk: ", err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, error) {
@@ -420,7 +521,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 		return &SaveResponse{Filename: uploadFileName}, nil
 	}
 
-	if err := vs.concater.Concat(r.From, r.To, uploadFilePath); err != nil {
+	if err := vs.concater.Concat(r.From, r.To, uploadFilePath, r.Container); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err
 	}
@@ -575,7 +676,7 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 	select {
 	case <-timer.C:
 		vs.logger.Debugf("executing concat for %s", path)
-		err := vs.concater.Concat(from, to, path)
+		err := vs.concater.Concat(from, to, path, defaultContainer)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
 		}

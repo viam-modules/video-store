@@ -9,7 +9,7 @@ int video_store_raw_seg_init_h264(struct raw_seg **ppRS,     // OUT
                                   const int segmentSeconds,  // IN
                                   const char *outputPattern, // IN
                                   const int width,           // IN
-                                  const int height           // IN
+                                  const int height          // IN
 );
 
 int video_store_raw_seg_init_h265(struct raw_seg **ppRS,     // OUT

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 	"unsafe"
 
@@ -51,7 +52,7 @@ func newConcater(
 
 // concat takes in from and to timestamps and concates the video files between them.
 // returns the path to the concated video file.
-func (c *concater) Concat(from, to time.Time, path string) error {
+func (c *concater) Concat(from, to time.Time, path, container string) error {
 	// Find the storage files that match the concat query.
 	storageFiles, err := vsutils.GetSortedFiles(c.storagePath)
 	if err != nil {
@@ -94,7 +95,8 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 		C.free(unsafe.Pointer(outputPathCStr))
 	}()
 
-	ret := C.video_store_concat(concatFilePathCStr, outputPathCStr)
+	cContainer := containerStrToEnum(container)
+	ret := C.video_store_concat(concatFilePathCStr, outputPathCStr, cContainer)
 	switch ret {
 	case C.VIDEO_STORE_CONCAT_RESP_OK:
 		return nil
@@ -150,4 +152,16 @@ func generateConcatFilePath() string {
 	fileName := fmt.Sprintf(conactTxtFilePattern, uniqueID)
 	filePath := filepath.Join(concatTxtDir, fileName)
 	return filePath
+}
+
+// containerStringToEnum converts a container string name into a C enum value.
+func containerStrToEnum(container string) C.container_t {
+	switch strings.ToLower(strings.TrimSpace(container)) {
+	case "fmp4":
+		return C.CONTAINER_FMP4
+	case "", "mp4":
+		return C.CONTAINER_MP4
+	default:
+		return C.CONTAINER_DEFAULT
+	}
 }
