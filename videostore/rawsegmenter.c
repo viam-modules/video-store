@@ -101,9 +101,20 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,     // OUT
     goto cleanup;
   }
 
-  // fmp4 specific options. We do not include empty_moov option because
+  // fMP4 (fragmented MP4) options
+  //
+  // [moov(init)] [moof][mdat] [moof][mdat] ...
+  //
+  // - frag_keyframe: start a new fragment (moof+mdat) at each keyframe so segments
+  //   align with keyframe boundaries.
+  // - default_base_moof: set the base_data_offset in the moof box to 0
+  //
+  // NOTE: We do NOT include empty_moov option because
   // we want the params lookup to be fast for the indexer and matcher.
-  // We still enforce that each segment file has consistent video params.
+  //
+  // - We still enforce that each segment file has consistent video params.
+  // - The indexer and matcher can use av_find_stream_info
+  //   to simply read the 'moov' box at the start of each segment.
   ret = av_dict_set(&opts, "segment_format_options", "movflags=frag_keyframe+default_base_moof", 0);
 
   if (ret < 0) {
