@@ -113,7 +113,7 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,     // OUT
   // we want the params lookup to be fast for the indexer and matcher.
   //
   // - We still enforce that each segment file has consistent video params.
-  // - The indexer and matcher can use av_find_stream_info
+  // - The indexer and matcher can use avformat_find_stream_info
   //   to simply read the 'moov' box at the start of each segment.
   ret = av_dict_set(&opts, "segment_format_options", "movflags=frag_keyframe+default_base_moof", 0);
 
