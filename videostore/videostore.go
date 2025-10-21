@@ -112,8 +112,8 @@ type RTPVideoStore interface {
 type SaveRequest struct {
 	From      time.Time
 	To        time.Time
-	Metadata  string
-	Container string
+	Metadata  string // String added to the saved filename (<vs_name>_<from>_<metadata>.mp4)
+	Container string // Video container format (e.g. "mp4", "fmp4")
 	Async     bool
 }
 
