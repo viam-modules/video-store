@@ -186,8 +186,8 @@ func (c *component) Images(
 	return nil, resource.ResponseMetadata{}, errors.New("camera.Images not implemented")
 }
 
-func (c *component) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
-	return nil, errors.New("camera.NextPointCloud not implemented")
+func (c *component) NextPointCloud(_ context.Context, _ map[string]interface{}) (pointcloud.PointCloud, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (c *component) Geometries(_ context.Context, _ map[string]interface{}) ([]spatialmath.Geometry, error) {
