@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -70,6 +71,7 @@ type videostore struct {
 // VideoStore stores video and provides APIs to request the stored video.
 type VideoStore interface {
 	Fetch(ctx context.Context, r *FetchRequest) (*FetchResponse, error)
+	FetchStream(ctx context.Context, r *FetchRequest, emit func([]byte) error) error
 	Save(ctx context.Context, r *SaveRequest) (*SaveResponse, error)
 	Close()
 	GetStorageState(ctx context.Context) (*StorageState, error)
@@ -394,6 +396,65 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		return nil, err
 	}
 	return &FetchResponse{Video: videoBytes}, nil
+}
+
+func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit func([]byte) error) error {
+	// Convert incoming local times to UTC for consistent timestamp handling
+	// All internal operations and segmenter timestamps are in UTC
+	r.From = r.From.UTC()
+	r.To = r.To.UTC()
+	if err := r.Validate(); err != nil {
+		return err
+	}
+	vs.logger.Debug("fetch stream command received and validated")
+
+	fetchFilePath := vsutils.GenerateOutputFilePath(
+		vs.config.Storage.OutputFileNamePrefix,
+		r.From,
+		"",
+		tempPath)
+
+	// Always attempt to remove the concat file after the operation.
+	// This handles error cases in Concat where it fails in the middle
+	// of writing.
+	defer func() {
+		if _, statErr := os.Stat(fetchFilePath); os.IsNotExist(statErr) {
+			vs.logger.Debugf("temporary file (%s) does not exist, skipping removal", fetchFilePath)
+			return
+		}
+		if err := os.Remove(fetchFilePath); err != nil {
+			vs.logger.Warnf("failed to delete temporary file (%s): %v", fetchFilePath, err)
+		}
+	}()
+	if err := vs.concater.Concat(r.From, r.To, fetchFilePath); err != nil {
+		vs.logger.Error("failed to concat files ", err)
+		return err
+	}
+
+	file, err := os.Open(fetchFilePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	const chunkSize = 1024 * 64
+	buf := make([]byte, chunkSize)
+	for {
+		n, readErr := file.Read(buf)
+		if n > 0 {
+			if emitErr := emit(buf[:n]); emitErr != nil {
+				return emitErr
+			}
+		}
+		if readErr != nil {
+			if errors.Is(readErr, io.EOF) {
+				vs.logger.Debug("completed streaming video file")
+				break
+			}
+			return readErr
+		}
+	}
+	return nil
 }
 
 func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, error) {
