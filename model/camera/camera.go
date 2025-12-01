@@ -66,7 +66,7 @@ func newComponent(
 	// Source camera that provides the frames to be processed.
 	// If camera is not available, the component will start
 	// without processing frames.
-	c, err := camera.FromDependencies(deps, config.Camera)
+	c, err := camera.FromProvider(deps, config.Camera)
 	if err != nil {
 		logger.Errorf("failed to get camera from dependencies, video-store will not be storing video: %s", err)
 		c = nil

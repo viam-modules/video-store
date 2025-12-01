@@ -83,7 +83,7 @@ func main() {
 
 	defer machine.Close(ctx)
 	logger.Info(machine.ResourceNames())
-	c, err := camera.FromRobot(machine, os.Args[1])
+	c, err := camera.FromProvider(machine, os.Args[1])
 	if err != nil {
 		logger.Error(err)
 		return
