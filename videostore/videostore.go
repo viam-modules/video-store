@@ -430,7 +430,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		vs.logger.Error("failed to concat files ", err)
 		return err
 	}
-
+	// #nosec G304 - fetchFilePath is generated internally and not user-controlled.
 	file, err := os.Open(fetchFilePath)
 	if err != nil {
 		return err
@@ -440,6 +440,14 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 	const chunkSize = 1024 * 64
 	buf := make([]byte, chunkSize)
 	for {
+		select {
+		case <-ctx.Done():
+			vs.logger.Debug("FetchStream cancelled via context")
+			return ctx.Err()
+		default:
+		}
+		// Read uses an internal file offset that the OS/kernel maintains
+		// for that open file descriptor. We don't need to manage it ourselves.
 		n, readErr := file.Read(buf)
 		if n > 0 {
 			if emitErr := emit(buf[:n]); emitErr != nil {
@@ -447,6 +455,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 			}
 		}
 		if readErr != nil {
+			// EOF is expected when we finish reading the file.
 			if errors.Is(readErr, io.EOF) {
 				vs.logger.Debug("completed streaming video file")
 				break
