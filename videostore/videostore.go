@@ -407,7 +407,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 	if err := r.Validate(); err != nil {
 		return err
 	}
-	vs.logger.Debug("fetch stream command received and validated")
+	vs.logger.Debugf("fetch stream request validated: from=%s to=%s", r.From.Format(time.RFC3339), r.To.Format(time.RFC3339))
 
 	fetchFilePath := vsutils.GenerateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
