@@ -17,8 +17,10 @@ import (
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/rdk/services/video"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/rdk/utils/diskusage"
+
 	"go.viam.com/utils"
 )
 
@@ -72,7 +74,7 @@ type videostore struct {
 // VideoStore stores video and provides APIs to request the stored video.
 type VideoStore interface {
 	Fetch(ctx context.Context, r *FetchRequest) (*FetchResponse, error)
-	FetchStream(ctx context.Context, r *FetchRequest, emit func([]byte) error) error
+	FetchStream(ctx context.Context, r *FetchRequest, emit func(video.Chunk) error) error
 	Save(ctx context.Context, r *SaveRequest) (*SaveResponse, error)
 	Close()
 	GetStorageState(ctx context.Context) (*StorageState, error)
@@ -399,7 +401,7 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 	return &FetchResponse{Video: videoBytes}, nil
 }
 
-func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit func([]byte) error) error {
+func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit func(video.Chunk) error) error {
 	// Convert incoming local times to UTC for consistent timestamp handling
 	// All internal operations and segmenter timestamps are in UTC
 	r.From = r.From.UTC()
@@ -450,7 +452,11 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		// for that open file descriptor. We don't need to manage it ourselves.
 		n, readErr := file.Read(buf)
 		if n > 0 {
-			if emitErr := emit(buf[:n]); emitErr != nil {
+			if emitErr := emit(
+				video.Chunk{
+					Data:      buf[:n],
+					Container: videoFormat,
+				}); emitErr != nil {
 				return emitErr
 			}
 		}
