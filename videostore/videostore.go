@@ -32,8 +32,9 @@ const (
 	segmentSeconds                  = 30 // seconds
 	videoFormat                     = "mp4"
 
-	retryIntervalSeconds = 1  // seconds
-	asyncTimeoutSeconds  = 60 // seconds
+	retryIntervalSeconds = 1         // seconds
+	asyncTimeoutSeconds  = 60        // seconds
+	streamingChunkSize   = 1024 * 64 // bytes
 )
 
 var (
@@ -437,8 +438,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 	}
 	defer file.Close()
 
-	const chunkSize = 1024 * 64
-	buf := make([]byte, chunkSize)
+	buf := make([]byte, streamingChunkSize)
 	for {
 		select {
 		case <-ctx.Done():
