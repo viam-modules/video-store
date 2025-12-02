@@ -147,6 +147,7 @@ $(BIN_VIDEO_INFO_C): $(FFMPEG_BUILD) $(OBJS) | $(BUILD_DIR) $(BIN_OUTPUT_PATH)
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	@echo "-------- Make $(@) --------"
 	rm -f $@
+	mkdir -p $(@D)
 	$(CC) $(CGO_LDFLAGS) $(CGO_CFLAGS) -g -c -o $@ $<
 
 $(BUILD_DIR):
@@ -182,8 +183,8 @@ endif
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
 		github.com/edaniels/golinters/cmd/combined \
-		github.com/golangci/golangci-lint/cmd/golangci-lint \
 		github.com/rhysd/actionlint/cmd/actionlint
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TOOL_BIN) v2.6.2
 
 lint: tool-install $(FFMPEG_BUILD)
 	go mod tidy
