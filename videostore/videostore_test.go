@@ -105,7 +105,7 @@ func TestFetchStreamContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var chunksReceived int
 
-	err := vs.FetchStream(ctx, req, func(chunk video.Chunk) error {
+	err := vs.FetchStream(ctx, req, func(_ video.Chunk) error {
 		chunksReceived++
 		// Cancel after receiving a few chunks
 		if chunksReceived >= 2 {
@@ -135,7 +135,7 @@ func TestFetchStreamEmitError(t *testing.T) {
 	expectedErr := errors.New("emit failed")
 	var chunksReceived int
 
-	err := vs.FetchStream(ctx, req, func(chunk video.Chunk) error {
+	err := vs.FetchStream(ctx, req, func(_ video.Chunk) error {
 		chunksReceived++
 		if chunksReceived >= 2 {
 			return expectedErr
@@ -161,7 +161,7 @@ func TestFetchStreamInvalidTimeRange(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err := vs.FetchStream(ctx, req, func(chunk video.Chunk) error {
+	err := vs.FetchStream(ctx, req, func(_ video.Chunk) error {
 		t.Fatal("emit should not be called for invalid request")
 		return nil
 	})
@@ -184,7 +184,7 @@ func TestFetchStreamNoMatchingData(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err := vs.FetchStream(ctx, req, func(chunk video.Chunk) error {
+	err := vs.FetchStream(ctx, req, func(_ video.Chunk) error {
 		t.Fatal("emit should not be called when no matching data")
 		return nil
 	})
@@ -320,7 +320,7 @@ func TestFetchStreamTemporaryFileCleanup(t *testing.T) {
 	test.That(t, err, test.ShouldBeNil)
 	countBefore := len(entriesBefore)
 
-	err = vs.FetchStream(ctx, req, func(chunk video.Chunk) error {
+	err = vs.FetchStream(ctx, req, func(_ video.Chunk) error {
 		return nil
 	})
 
@@ -444,7 +444,7 @@ func TestFetchStreamContextTimeout(t *testing.T) {
 	// Wait for timeout to trigger
 	time.Sleep(10 * time.Millisecond)
 
-	err := vs.FetchStream(ctx, req, func(chunk video.Chunk) error {
+	err := vs.FetchStream(ctx, req, func(_ video.Chunk) error {
 		return nil
 	})
 
