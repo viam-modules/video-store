@@ -20,7 +20,6 @@ import (
 	"go.viam.com/rdk/services/video"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/rdk/utils/diskusage"
-
 	"go.viam.com/utils"
 )
 
