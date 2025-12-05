@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -16,6 +17,7 @@ import (
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/rdk/services/video"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/rdk/utils/diskusage"
 	"go.viam.com/utils"
@@ -31,8 +33,9 @@ const (
 	segmentSeconds                  = 30 // seconds
 	videoFormat                     = "mp4"
 
-	retryIntervalSeconds = 1  // seconds
-	asyncTimeoutSeconds  = 60 // seconds
+	retryIntervalSeconds = 1         // seconds
+	asyncTimeoutSeconds  = 60        // seconds
+	streamingChunkSize   = 1024 * 64 // bytes
 )
 
 var (
@@ -70,6 +73,7 @@ type videostore struct {
 // VideoStore stores video and provides APIs to request the stored video.
 type VideoStore interface {
 	Fetch(ctx context.Context, r *FetchRequest) (*FetchResponse, error)
+	FetchStream(ctx context.Context, r *FetchRequest, emit func(video.Chunk) error) error
 	Save(ctx context.Context, r *SaveRequest) (*SaveResponse, error)
 	Close()
 	GetStorageState(ctx context.Context) (*StorageState, error)
@@ -394,6 +398,77 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		return nil, err
 	}
 	return &FetchResponse{Video: videoBytes}, nil
+}
+
+func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit func(video.Chunk) error) error {
+	// Convert incoming local times to UTC for consistent timestamp handling
+	// All internal operations and segmenter timestamps are in UTC
+	r.From = r.From.UTC()
+	r.To = r.To.UTC()
+	if err := r.Validate(); err != nil {
+		return err
+	}
+	vs.logger.Debugf("fetch stream request validated: from=%s to=%s", r.From.Format(time.RFC3339), r.To.Format(time.RFC3339))
+
+	fetchFilePath := vsutils.GenerateOutputFilePath(
+		vs.config.Storage.OutputFileNamePrefix,
+		r.From,
+		"",
+		tempPath)
+
+	// Always attempt to remove the concat file after the operation.
+	// This handles error cases in Concat where it fails in the middle
+	// of writing.
+	defer func() {
+		if _, statErr := os.Stat(fetchFilePath); os.IsNotExist(statErr) {
+			vs.logger.Debugf("temporary file (%s) does not exist, skipping removal", fetchFilePath)
+			return
+		}
+		if err := os.Remove(fetchFilePath); err != nil {
+			vs.logger.Warnf("failed to delete temporary file (%s): %v", fetchFilePath, err)
+		}
+	}()
+	if err := vs.concater.Concat(r.From, r.To, fetchFilePath); err != nil {
+		vs.logger.Error("failed to concat files ", err)
+		return err
+	}
+	// #nosec G304 - fetchFilePath is generated internally and not user-controlled.
+	file, err := os.Open(fetchFilePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	buf := make([]byte, streamingChunkSize)
+	for {
+		select {
+		case <-ctx.Done():
+			vs.logger.Debug("FetchStream cancelled via context")
+			return ctx.Err()
+		default:
+		}
+		// Read uses an internal file offset that the OS/kernel maintains
+		// for that open file descriptor. We don't need to manage it ourselves.
+		n, readErr := file.Read(buf)
+		if n > 0 {
+			if emitErr := emit(
+				video.Chunk{
+					Data:      buf[:n],
+					Container: videoFormat,
+				}); emitErr != nil {
+				return emitErr
+			}
+		}
+		if readErr != nil {
+			// EOF is expected when we finish reading the file.
+			if errors.Is(readErr, io.EOF) {
+				vs.logger.Debug("completed streaming video file")
+				break
+			}
+			return readErr
+		}
+	}
+	return nil
 }
 
 func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, error) {

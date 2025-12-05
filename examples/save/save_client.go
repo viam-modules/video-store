@@ -56,7 +56,7 @@ func main() {
 		logger.Fatal("Insufficient arguments. Please provide camera_name.")
 	}
 	cameraName := os.Args[1]
-	videoStore, err := camera.FromRobot(machine, cameraName)
+	videoStore, err := camera.FromProvider(machine, cameraName)
 	if err != nil {
 		logger.Error(err)
 		return

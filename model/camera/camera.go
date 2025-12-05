@@ -66,7 +66,7 @@ func newComponent(
 	// Source camera that provides the frames to be processed.
 	// If camera is not available, the component will start
 	// without processing frames.
-	c, err := camera.FromDependencies(deps, config.Camera)
+	c, err := camera.FromProvider(deps, config.Camera)
 	if err != nil {
 		logger.Errorf("failed to get camera from dependencies, video-store will not be storing video: %s", err)
 		c = nil
@@ -186,8 +186,8 @@ func (c *component) Images(
 	return nil, resource.ResponseMetadata{}, errors.New("camera.Images not implemented")
 }
 
-func (c *component) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
-	return nil, errors.New("camera.NextPointCloud not implemented")
+func (c *component) NextPointCloud(_ context.Context, _ map[string]interface{}) (pointcloud.PointCloud, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (c *component) Geometries(_ context.Context, _ map[string]interface{}) ([]spatialmath.Geometry, error) {

@@ -61,7 +61,7 @@ func main() {
 	startTime := os.Args[2]
 	endTime := os.Args[3]
 
-	c, err := camera.FromRobot(machine, cameraName)
+	c, err := camera.FromProvider(machine, cameraName)
 	if err != nil {
 		logger.Error(err)
 		return

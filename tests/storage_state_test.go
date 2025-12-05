@@ -90,7 +90,7 @@ func TestGetStorageStateDoCommand(t *testing.T) {
 	test.That(t, err, test.ShouldBeNil)
 	defer r.Close(timeoutCtx)
 
-	vs, err := camera.FromRobot(r, videoStoreComponentName)
+	vs, err := camera.FromProvider(r, videoStoreComponentName)
 	test.That(t, err, test.ShouldBeNil)
 
 	// Wait for the indexer to index all segments
