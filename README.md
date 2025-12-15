@@ -59,6 +59,7 @@ Additionally, make sure to add your configured data manager service to the `depe
 | Attribute       | Sub-Attribute     | Type    | Required | Description                                                                                       |
 |-----------------|-------------------|---------|-----------|---------------------------------------------------------------------------------------------------|
 | `camera`        |                   | string  | no  | Name of the source camera to read images from. If not provided, video-store will not save video.  |
+| `source_name`   |                   | string  | no  | Name of the specific image source to use when the camera returns multiple images (e.g., "color", "depth"). If not provided, the assumption is that one image will be returned from the underlying camera. |
 | `sync`          |                   | string  | yes  | Name of the dependency datamanager service.                                                       |
 | `storage`       |                   | object  | yes  |                                                                                                   |
 |                 | `size_gb`         | integer | yes  | Total amount of allocated storage in gigabytes. If you reduce the amound of allocated storage while the storage exceeds the allocated amount, the oldest clips get deleted until the storage size is below the configured max. |

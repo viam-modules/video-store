@@ -538,7 +538,7 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 			}
 			sourceNames := getSourceNamesFromNamedImages(namedImages)
 			if len(namedImages) == 0 {
-				vs.logger.Warnf(
+				vs.logger.Errorf(
 					"no images received from camera: %s, filter source names: %v, source names: %v",
 					framePoller.Camera.Name(),
 					strings.Join(filterSourceNames, ", "),
@@ -548,7 +548,7 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 				continue
 			}
 			if len(namedImages) != 1 {
-				vs.logger.Warnf(
+				vs.logger.Errorf(
 					"expected 1 image, received %d from camera: %s, filter source names: [%s], source names: [%s]",
 					len(namedImages),
 					framePoller.Camera.Name(),
