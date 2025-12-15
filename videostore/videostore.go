@@ -527,7 +527,7 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 			}
 			namedImages, _, err := framePoller.Camera.Images(ctx, filterSourceNames, nil)
 			if err != nil {
-				vs.logger.Warn(
+				vs.logger.Warnf(
 					"failed to get images from camera: %s, filter source names: %v, error: %v",
 					framePoller.Camera.Name(),
 					strings.Join(filterSourceNames, ", "),
@@ -538,7 +538,7 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 			}
 			sourceNames := getSourceNamesFromNamedImages(namedImages)
 			if len(namedImages) == 0 {
-				vs.logger.Warn(
+				vs.logger.Warnf(
 					"no images received from camera: %s, filter source names: %v, source names: %v",
 					framePoller.Camera.Name(),
 					strings.Join(filterSourceNames, ", "),
@@ -564,7 +564,7 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 			namedImage := namedImages[0]
 			data, err := namedImage.Bytes(ctx)
 			if err != nil {
-				vs.logger.Warn("failed to get bytes from image: ", err)
+				vs.logger.Warnf("failed to get bytes from image: %v", err)
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
