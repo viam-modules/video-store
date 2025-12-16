@@ -117,7 +117,7 @@ func main() {
 
 		imageBytes, err := namedImage.Bytes(ctx)
 		if err != nil {
-			logger.Info("ignoring error while getting image bytes: " + err.Error())
+			logger.Warnw("error getting image bytes: %w", err)
 			continue
 		}
 		im, err := jpeg.Decode(bytes.NewReader(imageBytes))
