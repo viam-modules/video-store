@@ -521,6 +521,7 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			// Call GetImages on underlying cam with optional filter source name from config
 			var filterSourceNames []string
 			if vs.config.SourceName != nil {
 				filterSourceNames = []string{*vs.config.SourceName}
@@ -536,17 +537,9 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
+
+			// sourceNames is the list of available source names we received from the GetImages response
 			sourceNames := getSourceNamesFromNamedImages(namedImages)
-			if len(namedImages) == 0 {
-				vs.logger.Errorf(
-					"no images received from camera: %s, filter source names: %v, source names: %v",
-					framePoller.Camera.Name(),
-					strings.Join(filterSourceNames, ", "),
-					strings.Join(sourceNames, ", "),
-				)
-				time.Sleep(retryIntervalSeconds * time.Second)
-				continue
-			}
 			if len(namedImages) != 1 {
 				vs.logger.Errorf(
 					"expected 1 image, received %d from camera: %s, filter source names: [%s], source names: [%s]",
@@ -561,6 +554,8 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
+
+			// Guaranteed to have 1 image now
 			namedImage := namedImages[0]
 			data, err := namedImage.Bytes(ctx)
 			if err != nil {
