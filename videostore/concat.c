@@ -89,9 +89,14 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
 
   // This moves the moov atom to the beginning of the file which allows
   // playback to start before the file is completely downloaded.
-  // 
+  //
   // [ftyp][moov][mdat]
-  av_dict_set(&mux_opts, "movflags", "faststart", 0);
+  ret = av_dict_set(&mux_opts, "movflags", "faststart", 0);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_concat failed to set movflags: %s\n", av_err2str(ret));
+    goto cleanup;
+  }
 
   ret = avformat_write_header(outputCtx, &mux_opts);
   if (ret < 0) {
