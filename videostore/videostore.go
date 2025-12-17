@@ -538,24 +538,19 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 				continue
 			}
 
-			// sourceNames is the list of available source names we received from the GetImages response
-			sourceNames := getSourceNamesFromNamedImages(namedImages)
-			if len(namedImages) != 1 {
+			if len(namedImages) == 0 {
+				sourceNames := getSourceNamesFromNamedImages(namedImages)
 				vs.logger.Errorf(
-					"expected 1 image, received %d from camera: %s, filter source names: [%s], source names: [%s]",
-					len(namedImages),
+					"no images received from camera %s with requested source name [%s], received sources: [%s]",
 					framePoller.Camera.Name(),
 					strings.Join(filterSourceNames, ", "),
 					strings.Join(sourceNames, ", "),
 				)
-				if len(filterSourceNames) == 0 {
-					vs.logger.Warn("no source name was provided. Set a source name in config to receive one image.")
-				}
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
 
-			// Guaranteed to have 1 image now
+			// Choose first image always (primary image). To select a "secondary" image, use source_name config attr
 			namedImage := namedImages[0]
 			data, err := namedImage.Bytes(ctx)
 			if err != nil {

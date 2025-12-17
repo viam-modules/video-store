@@ -183,7 +183,7 @@ func TestFetchFrames(t *testing.T) {
 		test.That(t, len(frameBytes), test.ShouldEqual, 0)
 	})
 
-	t.Run("Fails without source_name and multiple images", func(t *testing.T) {
+	t.Run("Succeeds without source_name and multiple images (picks first image)", func(t *testing.T) {
 		colorImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
 		test.That(t, err, test.ShouldBeNil)
 		depthImage, err := camera.NamedImageFromBytes(jpegData, "depth", rutils.MimeTypeJPEG)
@@ -214,14 +214,15 @@ func TestFetchFrames(t *testing.T) {
 			Camera:    mockCam,
 		})
 
-		// Wait to see if any frame gets fetched (it shouldn't)
+		// Wait for frame to be fetched
 		time.Sleep(200 * time.Millisecond)
 
-		// Verify no frame was stored (should still be empty)
+		// Verify frame was stored
 		frame := vs.latestFrame.Load()
 		frameBytes, ok := frame.([]byte)
 		test.That(t, ok, test.ShouldBeTrue)
-		test.That(t, len(frameBytes), test.ShouldEqual, 0)
+		test.That(t, len(frameBytes), test.ShouldBeGreaterThan, 0)
+		test.That(t, frameBytes, test.ShouldResemble, jpegData)
 	})
 
 	t.Run("Fails with source_name and 0 images", func(t *testing.T) {
@@ -339,7 +340,7 @@ func TestFetchFrames(t *testing.T) {
 		test.That(t, len(frameBytes), test.ShouldEqual, 0)
 	})
 
-	t.Run("Fails with source_name set but multiple images returned", func(t *testing.T) {
+	t.Run("Succeeds with source_name set but multiple images returned (picks first)", func(t *testing.T) {
 		sourceName := "color"
 		// Create images with the SAME source name to simulate a broken camera
 		// that returns duplicates even when filtering
@@ -373,17 +374,15 @@ func TestFetchFrames(t *testing.T) {
 			Camera:    mockCam,
 		})
 
-		// Wait to see if any frame gets fetched (it shouldn't)
+		// Wait for frame to be fetched (should pick first image)
 		time.Sleep(200 * time.Millisecond)
 
-		// Verify no frame was stored (should still be empty)
-		// This tests that even with source_name set, if we get multiple images,
-		// we don't store a frame. The important part is the error message should
-		// NOT suggest setting source_name (since it's already set).
+		// Verify frame was stored (picks first image even with multiple results)
 		frame := vs.latestFrame.Load()
 		frameBytes, ok := frame.([]byte)
 		test.That(t, ok, test.ShouldBeTrue)
-		test.That(t, len(frameBytes), test.ShouldEqual, 0)
+		test.That(t, len(frameBytes), test.ShouldBeGreaterThan, 0)
+		test.That(t, frameBytes, test.ShouldResemble, jpegData)
 	})
 
 	t.Run("Continues on Images error", func(t *testing.T) {
