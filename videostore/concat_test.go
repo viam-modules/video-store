@@ -11,10 +11,6 @@ import (
 	"go.viam.com/test"
 )
 
-const (
-	concatArtifactStoragePath = "../.artifact/data"
-)
-
 // findAtomOffset finds the byte offset of an MP4 atom in a file.
 // Returns -1 if not found.
 func findAtomOffset(data []byte, atomName string) int64 {
@@ -33,9 +29,7 @@ func TestConcatFaststart(t *testing.T) {
 	outputDir := t.TempDir()
 
 	// Get absolute path to artifact storage
-	currentDir, err := os.Getwd()
-	test.That(t, err, test.ShouldBeNil)
-	storagePath := filepath.Join(currentDir, concatArtifactStoragePath)
+	storagePath := getArtifactStoragePath(t)
 
 	c, err := newConcater(storagePath, outputDir, logger)
 	test.That(t, err, test.ShouldBeNil)
