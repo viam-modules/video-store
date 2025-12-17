@@ -10,6 +10,7 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
   int ret = VIDEO_STORE_CONCAT_RESP_ERROR;
   AVPacket *packet = av_packet_alloc();
   AVDictionary *options = NULL;
+  AVDictionary *mux_opts = NULL;
   AVFormatContext *inputCtx = NULL;
   AVFormatContext *outputCtx = NULL;
   int outputPathOpened = 0;
@@ -86,7 +87,18 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
   }
   outputPathOpened = 1;
 
-  ret = avformat_write_header(outputCtx, NULL);
+  // This moves the moov atom to the beginning of the file which allows
+  // playback to start before the file is completely downloaded.
+  //
+  // [ftyp][moov][mdat]
+  ret = av_dict_set(&mux_opts, "movflags", "faststart", 0);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_concat failed to set movflags: %s\n", av_err2str(ret));
+    goto cleanup;
+  }
+
+  ret = avformat_write_header(outputCtx, &mux_opts);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_concat failed to write header: %s\n", av_err2str(ret));
@@ -177,6 +189,11 @@ cleanup:
   if (options != NULL) {
     av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_dict_free\n");
     av_dict_free(&options);
+  }
+
+  if (mux_opts != NULL) {
+    av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_dict_free mux_opts\n");
+    av_dict_free(&mux_opts);
   }
 
   if (packet != NULL) {
