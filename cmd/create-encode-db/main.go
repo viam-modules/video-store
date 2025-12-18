@@ -95,17 +95,14 @@ func main() {
 		time.Sleep(time.Second / time.Duration(fps))
 		resp, _, err := c.Images(ctx, nil, nil)
 		if err != nil {
-			logger.Info("ignoring error : " + err.Error())
+			logger.Errorw("error getting images: %w", err)
 			continue
 		}
 		if len(resp) == 0 {
-			logger.Info("no images found")
+			logger.Error("no images in get images response")
 			continue
 		}
-		if len(resp) != 1 {
-			logger.Info("expected 1 image received " + strconv.Itoa(len(resp)))
-			continue
-		}
+		// Use the first image
 		namedImage := resp[0]
 
 		mimeType := resp[0].MimeType()
@@ -117,7 +114,7 @@ func main() {
 
 		imageBytes, err := namedImage.Bytes(ctx)
 		if err != nil {
-			logger.Warnw("error getting image bytes: %w", err)
+			logger.Errorw("error getting image bytes: %w", err)
 			continue
 		}
 		im, err := jpeg.Decode(bytes.NewReader(imageBytes))

@@ -27,13 +27,12 @@ type Video struct {
 
 // Config is the configuration for the video storage camera component.
 type Config struct {
-	Camera     string  `json:"camera,omitempty"`
-	SourceName string  `json:"source_name,omitempty"`
-	Sync       string  `json:"sync"`
-	Storage    Storage `json:"storage"`
-	Video      Video   `json:"video,omitempty"`
-	Framerate  int     `json:"framerate,omitempty"`
-	YUYV       bool    `json:"yuyv,omitempty"`
+	Camera    string  `json:"camera,omitempty"`
+	Sync      string  `json:"sync"`
+	Storage   Storage `json:"storage"`
+	Video     Video   `json:"video,omitempty"`
+	Framerate int     `json:"framerate,omitempty"`
+	YUYV      bool    `json:"yuyv,omitempty"`
 }
 
 // Validate validates the configuration for the video storage camera component.
@@ -116,11 +115,6 @@ func ToFrameVideoStoreVideoConfig(
 			YUYV:      config.YUYV,
 			Camera:    camera,
 		},
-	}
-
-	// Set down here so it is default nil when not set above.
-	if config.SourceName != "" {
-		fvsc.SourceName = &config.SourceName
 	}
 
 	return fvsc, nil

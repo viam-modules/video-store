@@ -9,13 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/viam-modules/video-store/videostore/indexer"
 	vsutils "github.com/viam-modules/video-store/videostore/utils"
-	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/video"
@@ -503,14 +501,6 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	return &SaveResponse{Filename: uploadFileName}, nil
 }
 
-func getSourceNamesFromNamedImages(namedImages []camera.NamedImage) []string {
-	sourceNames := make([]string, len(namedImages))
-	for i, namedImage := range namedImages {
-		sourceNames[i] = namedImage.SourceName
-	}
-	return sourceNames
-}
-
 func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerConfig,
 ) {
 	frameInterval := time.Second / time.Duration(framePoller.Framerate)
@@ -521,17 +511,11 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// Call GetImages on underlying cam with optional filter source name from config
-			var filterSourceNames []string
-			if vs.config.SourceName != nil {
-				filterSourceNames = []string{*vs.config.SourceName}
-			}
-			namedImages, _, err := framePoller.Camera.Images(ctx, filterSourceNames, nil)
+			namedImages, _, err := framePoller.Camera.Images(ctx, nil, nil)
 			if err != nil {
 				vs.logger.Warnf(
-					"failed to get images from camera: %s, filter source names: %v, error: %v",
+					"failed to get images from camera %s: %v",
 					framePoller.Camera.Name(),
-					strings.Join(filterSourceNames, ", "),
 					err,
 				)
 				time.Sleep(retryIntervalSeconds * time.Second)
@@ -539,18 +523,14 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 			}
 
 			if len(namedImages) == 0 {
-				sourceNames := getSourceNamesFromNamedImages(namedImages)
 				vs.logger.Errorf(
-					"no images received from camera %s with requested source name [%s], received sources: [%s]",
+					"no images received from camera %s",
 					framePoller.Camera.Name(),
-					strings.Join(filterSourceNames, ", "),
-					strings.Join(sourceNames, ", "),
 				)
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
 
-			// Choose first image always (primary image). To select a "secondary" image, use source_name config attr
 			namedImage := namedImages[0]
 			data, err := namedImage.Bytes(ctx)
 			if err != nil {
