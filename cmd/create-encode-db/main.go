@@ -93,18 +93,31 @@ func main() {
 			return
 		}
 		time.Sleep(time.Second / time.Duration(fps))
-		resp, metadata, err := c.Image(ctx, utils.MimeTypeJPEG, nil)
+		resp, _, err := c.Images(ctx, nil, nil)
 		if err != nil {
-			logger.Info("ignoring error : " + err.Error())
+			logger.Errorw("error getting images: %w", err)
 			continue
 		}
+		if len(resp) == 0 {
+			logger.Error("no images in get images response")
+			continue
+		}
+		// Use the first image
+		namedImage := resp[0]
 
-		if metadata.MimeType != utils.MimeTypeJPEG {
-			logger.Errorf("expected %s mime type got %s", utils.MimeTypeJPEG, metadata.MimeType)
+		mimeType := resp[0].MimeType()
+
+		if mimeType != utils.MimeTypeJPEG {
+			logger.Errorf("expected %s mime type got %s", utils.MimeTypeJPEG, mimeType)
 			return
 		}
 
-		im, err := jpeg.Decode(bytes.NewReader(resp))
+		imageBytes, err := namedImage.Bytes(ctx)
+		if err != nil {
+			logger.Errorw("error getting image bytes: %w", err)
+			continue
+		}
+		im, err := jpeg.Decode(bytes.NewReader(imageBytes))
 		if err != nil {
 			panic(err)
 		}
