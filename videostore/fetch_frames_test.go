@@ -124,7 +124,7 @@ func TestFetchFrames(t *testing.T) {
 		test.That(t, len(frameBytes), test.ShouldEqual, 0)
 	})
 
-	t.Run("Succeeds with multiple images (picks first)", func(t *testing.T) {
+	t.Run("Fails with multiple images", func(t *testing.T) {
 		colorImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
 		test.That(t, err, test.ShouldBeNil)
 		depthImage, err := camera.NamedImageFromBytes(jpegData, "depth", rutils.MimeTypeJPEG)
@@ -153,15 +153,14 @@ func TestFetchFrames(t *testing.T) {
 			Camera:    mockCam,
 		})
 
-		// Wait for frame to be fetched
+		// Wait to see if any frame gets fetched (it shouldn't)
 		time.Sleep(200 * time.Millisecond)
 
-		// Verify frame was stored
+		// Verify no frame was stored (should still be empty)
 		frame := vs.latestFrame.Load()
 		frameBytes, ok := frame.([]byte)
 		test.That(t, ok, test.ShouldBeTrue)
-		test.That(t, len(frameBytes), test.ShouldBeGreaterThan, 0)
-		test.That(t, frameBytes, test.ShouldResemble, jpegData)
+		test.That(t, len(frameBytes), test.ShouldEqual, 0)
 	})
 
 	t.Run("Fails with wrong MIME type", func(t *testing.T) {

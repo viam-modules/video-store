@@ -58,7 +58,7 @@ Additionally, make sure to add your configured data manager service to the `depe
 
 | Attribute       | Sub-Attribute     | Type    | Required | Description                                                                                       |
 |-----------------|-------------------|---------|-----------|---------------------------------------------------------------------------------------------------|
-| `camera`        |                   | string  | no  | Name of the source camera to read images from. If not provided, video-store will not save video. If the camera is not an rtp passthrough source, and frames are received via GetImages, video store will always use the first image in the images array returned by the camera. |
+| `camera`        |                   | string  | no  | Name of the source camera to read images from. If not provided, video-store will not save video. If the camera is not an rtp passthrough source and multiple image sources are received via GetImages, video store will return an error, as image source name disambiguation is not supported at the time. |
 | `sync`          |                   | string  | yes  | Name of the dependency datamanager service.                                                       |
 | `storage`       |                   | object  | yes  |                                                                                                   |
 |                 | `size_gb`         | integer | yes  | Total amount of allocated storage in gigabytes. If you reduce the amound of allocated storage while the storage exceeds the allocated amount, the oldest clips get deleted until the storage size is below the configured max. |

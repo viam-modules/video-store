@@ -529,6 +529,14 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 				)
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
+			} else if len(namedImages) > 1 {
+				vs.logger.Errorf(
+					"received %d images from camera %s. Multiple image sources is not supported.",
+					len(namedImages),
+					framePoller.Camera.Name(),
+				)
+				time.Sleep(retryIntervalSeconds * time.Second)
+				continue
 			}
 
 			namedImage := namedImages[0]
