@@ -93,11 +93,17 @@ int video_store_concat(const char *concat_filepath, const char *output_path,
   case CONTAINER_FMP4:
     // For fragmented MP4 (fMP4):
     // - frag_keyframe: start a new fragment (moof+mdat) at each keyframe
-    // - empty_moov: write an initial 'moov' atom with no sample data
-    // - default_base_moof: enable byte-range streaming without rewriting
-    // offsets
+    // - default_base_moof: enable byte-range streaming without rewriting offsets
     ret = av_dict_set(&mux_opts, "movflags",
-                      "frag_keyframe+empty_moov+default_base_moof", 0);
+                      "frag_keyframe+default_base_moof", 0);
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR,
+             "video_store_concat failed to set fmp4 movflags: %s\n",
+             av_err2str(ret));
+      goto cleanup;
+    }
+    // Allow experimental features for fMP4
+    outputCtx->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
     break;
   case CONTAINER_MP4:
   case CONTAINER_DEFAULT:
@@ -176,11 +182,14 @@ int video_store_concat(const char *concat_filepath, const char *output_path,
     av_packet_unref(packet);
   }
 
-  if ((ret = av_write_trailer(outputCtx))) {
+  ret = av_write_trailer(outputCtx);
+  if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_concat failed to write trailer: %s\n", av_err2str(ret));
+           "video_store_concat failed to write trailer: ret=%d, %s\n", ret,
+           av_err2str(ret));
     goto cleanup;
   }
+  // Note: av_write_trailer may return positive values for fMP4 which are not errors
   ret = VIDEO_STORE_CONCAT_RESP_OK;
 
 cleanup:
