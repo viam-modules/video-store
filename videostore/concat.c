@@ -6,10 +6,12 @@
 #include <libavformat/avformat.h>
 #include <string.h>
 
-int video_store_concat(const char *concat_filepath, const char *output_path) {
+int video_store_concat(const char *concat_filepath, const char *output_path,
+                       ContainerFormat container) {
   int ret = VIDEO_STORE_CONCAT_RESP_ERROR;
   AVPacket *packet = av_packet_alloc();
   AVDictionary *options = NULL;
+  AVDictionary *mux_opts = NULL;
   AVFormatContext *inputCtx = NULL;
   AVFormatContext *outputCtx = NULL;
   int outputPathOpened = 0;
@@ -86,7 +88,31 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
   }
   outputPathOpened = 1;
 
-  ret = avformat_write_header(outputCtx, NULL);
+  // Set muxer options based on container format
+  switch (container) {
+  case CONTAINER_FMP4:
+    // For fragmented MP4 (fMP4):
+    // - frag_keyframe: start a new fragment (moof+mdat) at each keyframe
+    // - empty_moov: write an initial 'moov' atom with no sample data
+    // - default_base_moof: enable byte-range streaming without rewriting
+    // offsets
+    ret = av_dict_set(&mux_opts, "movflags",
+                      "frag_keyframe+empty_moov+default_base_moof", 0);
+    break;
+  case CONTAINER_MP4:
+  case CONTAINER_DEFAULT:
+  default:
+    // faststart moves moov atom to beginning for progressive playback
+    ret = av_dict_set(&mux_opts, "movflags", "faststart", 0);
+    break;
+  }
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR,
+           "video_store_concat failed to set movflags: %s\n", av_err2str(ret));
+    goto cleanup;
+  }
+
+  ret = avformat_write_header(outputCtx, &mux_opts);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_concat failed to write header: %s\n", av_err2str(ret));
@@ -175,8 +201,13 @@ cleanup:
   }
 
   if (options != NULL) {
-    av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_dict_free\n");
+    av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_dict_free options\n");
     av_dict_free(&options);
+  }
+
+  if (mux_opts != NULL) {
+    av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_dict_free mux_opts\n");
+    av_dict_free(&mux_opts);
   }
 
   if (packet != NULL) {
