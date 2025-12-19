@@ -106,12 +106,6 @@ func TestConcatFMP4(t *testing.T) {
 
 	outputPath := filepath.Join(outputDir, "fmp4_test.mp4")
 	err = c.ConcatWithFormat(from, to, outputPath, ContainerFMP4)
-	if err != nil {
-		t.Logf("fMP4 concat error: %v", err)
-		if data, readErr := os.ReadFile(outputPath); readErr == nil {
-			t.Logf("Partial file size: %d bytes", len(data))
-		}
-	}
 	test.That(t, err, test.ShouldBeNil)
 
 	data, err := os.ReadFile(outputPath)
