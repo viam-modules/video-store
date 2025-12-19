@@ -60,7 +60,16 @@ func ToFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, e
 	if err != nil {
 		return nil, err
 	}
-	return &videostore.FetchRequest{From: from, To: to}, nil
+	container := videostore.ContainerDefault
+	if containerStr, ok := command["container"].(string); ok {
+		switch containerStr {
+		case "mp4":
+			container = videostore.ContainerMP4
+		case "fmp4":
+			container = videostore.ContainerFMP4
+		}
+	}
+	return &videostore.FetchRequest{From: from, To: to, Container: container}, nil
 }
 
 func checkDeps(deps resource.Dependencies, config *Config, logger logging.Logger) error {
