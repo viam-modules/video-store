@@ -23,11 +23,11 @@ import (
 type ContainerFormat int
 
 const (
-	// ContainerDefault uses standard MP4 with faststart.
+	// ContainerDefault is the default format (currently MP4 with faststart).
 	ContainerDefault ContainerFormat = 0
-	// ContainerMP4 uses standard MP4 with faststart (moov at beginning).
+	// ContainerMP4 produces standard MP4 with moov atom at the beginning for progressive playback.
 	ContainerMP4 ContainerFormat = 1
-	// ContainerFMP4 uses fragmented MP4 for streaming.
+	// ContainerFMP4 produces fragmented MP4 with moof/mdat pairs for streaming.
 	ContainerFMP4 ContainerFormat = 2
 )
 
