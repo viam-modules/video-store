@@ -102,7 +102,10 @@ int video_store_concat(const char *concat_filepath, const char *output_path,
   case CONTAINER_MP4:
   case CONTAINER_DEFAULT:
   default:
-    // faststart moves moov atom to beginning for progressive playback
+    // This moves the moov atom to the beginning of the file which allows
+    // playback to start before the file is completely downloaded.
+    //
+    // [ftyp][moov][mdat]
     ret = av_dict_set(&mux_opts, "movflags", "faststart", 0);
     break;
   }
