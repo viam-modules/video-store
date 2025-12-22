@@ -136,8 +136,9 @@ func (r *SaveRequest) Validate() error {
 
 // FetchRequest is the request to the Fetch method.
 type FetchRequest struct {
-	From time.Time
-	To   time.Time
+	From      time.Time
+	To        time.Time
+	Container ContainerFormat
 }
 
 // FetchResponse is the resonse to the Fetch method.
@@ -389,7 +390,7 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 			vs.logger.Warnf("failed to delete temporary file (%s): %v", fetchFilePath, err)
 		}
 	}()
-	if err := vs.concater.Concat(r.From, r.To, fetchFilePath); err != nil {
+	if err := vs.concater.ConcatWithFormat(r.From, r.To, fetchFilePath, r.Container); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err
 	}
@@ -428,7 +429,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 			vs.logger.Warnf("failed to delete temporary file (%s): %v", fetchFilePath, err)
 		}
 	}()
-	if err := vs.concater.Concat(r.From, r.To, fetchFilePath); err != nil {
+	if err := vs.concater.ConcatWithFormat(r.From, r.To, fetchFilePath, r.Container); err != nil {
 		vs.logger.Error("failed to concat files ", err)
 		return err
 	}

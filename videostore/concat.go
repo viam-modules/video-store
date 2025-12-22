@@ -19,6 +19,18 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
+// ContainerFormat specifies the output container format for concatenation.
+type ContainerFormat int
+
+const (
+	// ContainerDefault is the default format (currently MP4 with faststart).
+	ContainerDefault ContainerFormat = iota
+	// ContainerMP4 produces standard MP4 with moov atom at the beginning for progressive playback.
+	ContainerMP4
+	// ContainerFMP4 produces fragmented MP4 with moof/mdat pairs for streaming.
+	ContainerFMP4
+)
+
 const (
 	conactTxtFilePattern = "concat_%s.txt"
 )
@@ -49,9 +61,15 @@ func newConcater(
 	return c, nil
 }
 
-// concat takes in from and to timestamps and concates the video files between them.
-// returns the path to the concated video file.
+// Concat takes in from and to timestamps and concatenates the video files between them.
+// Uses ContainerDefault (MP4 with faststart) for the output format.
 func (c *concater) Concat(from, to time.Time, path string) error {
+	return c.ConcatWithFormat(from, to, path, ContainerDefault)
+}
+
+// ConcatWithFormat takes in from and to timestamps and concatenates the video files between them
+// using the specified container format.
+func (c *concater) ConcatWithFormat(from, to time.Time, path string, container ContainerFormat) error {
 	// Find the storage files that match the concat query.
 	storageFiles, err := vsutils.GetSortedFiles(c.storagePath)
 	if err != nil {
@@ -94,7 +112,7 @@ func (c *concater) Concat(from, to time.Time, path string) error {
 		C.free(unsafe.Pointer(outputPathCStr))
 	}()
 
-	ret := C.video_store_concat(concatFilePathCStr, outputPathCStr)
+	ret := C.video_store_concat(concatFilePathCStr, outputPathCStr, C.ContainerFormat(container))
 	switch ret {
 	case C.VIDEO_STORE_CONCAT_RESP_OK:
 		return nil

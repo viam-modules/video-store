@@ -6,7 +6,8 @@
 #include <libavformat/avformat.h>
 #include <string.h>
 
-int video_store_concat(const char *concat_filepath, const char *output_path) {
+int video_store_concat(const char *concat_filepath, const char *output_path,
+                       ContainerFormat container) {
   int ret = VIDEO_STORE_CONCAT_RESP_ERROR;
   AVPacket *packet = av_packet_alloc();
   AVDictionary *options = NULL;
@@ -87,11 +88,33 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
   }
   outputPathOpened = 1;
 
-  // This moves the moov atom to the beginning of the file which allows
-  // playback to start before the file is completely downloaded.
-  //
-  // [ftyp][moov][mdat]
-  ret = av_dict_set(&mux_opts, "movflags", "faststart", 0);
+  // Set muxer options based on container format
+  switch (container) {
+  case CONTAINER_FMP4:
+    // For fragmented MP4 (fMP4):
+    // - frag_keyframe: start a new fragment (moof+mdat) at each keyframe
+    // - default_base_moof: enable byte-range streaming without rewriting offsets
+    ret = av_dict_set(&mux_opts, "movflags",
+                      "frag_keyframe+default_base_moof", 0);
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR,
+             "video_store_concat failed to set fmp4 movflags: %s\n",
+             av_err2str(ret));
+      goto cleanup;
+    }
+    // Allow experimental features for fMP4
+    outputCtx->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
+    break;
+  case CONTAINER_MP4:
+  case CONTAINER_DEFAULT:
+  default:
+    // This moves the moov atom to the beginning of the file which allows
+    // playback to start before the file is completely downloaded.
+    //
+    // [ftyp][moov][mdat]
+    ret = av_dict_set(&mux_opts, "movflags", "faststart", 0);
+    break;
+  }
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "video_store_concat failed to set movflags: %s\n", av_err2str(ret));
@@ -159,11 +182,14 @@ int video_store_concat(const char *concat_filepath, const char *output_path) {
     av_packet_unref(packet);
   }
 
-  if ((ret = av_write_trailer(outputCtx))) {
+  ret = av_write_trailer(outputCtx);
+  if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_concat failed to write trailer: %s\n", av_err2str(ret));
+           "video_store_concat failed to write trailer: ret=%d, %s\n", ret,
+           av_err2str(ret));
     goto cleanup;
   }
+  // Note: av_write_trailer may return positive values for fMP4 which are not errors
   ret = VIDEO_STORE_CONCAT_RESP_OK;
 
 cleanup:
@@ -187,7 +213,7 @@ cleanup:
   }
 
   if (options != NULL) {
-    av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_dict_free\n");
+    av_log(NULL, AV_LOG_DEBUG, "video_store_concat av_dict_free options\n");
     av_dict_free(&options);
   }
 
