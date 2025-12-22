@@ -24,11 +24,11 @@ type ContainerFormat int
 
 const (
 	// ContainerDefault is the default format (currently MP4 with faststart).
-	ContainerDefault ContainerFormat = 0
+	ContainerDefault ContainerFormat = iota
 	// ContainerMP4 produces standard MP4 with moov atom at the beginning for progressive playback.
-	ContainerMP4 ContainerFormat = 1
+	ContainerMP4
 	// ContainerFMP4 produces fragmented MP4 with moof/mdat pairs for streaming.
-	ContainerFMP4 ContainerFormat = 2
+	ContainerFMP4
 )
 
 const (
