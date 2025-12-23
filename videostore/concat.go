@@ -31,6 +31,18 @@ const (
 	ContainerFMP4
 )
 
+// String returns the string representation of the container format.
+func (c ContainerFormat) String() string {
+	switch c {
+	case ContainerMP4, ContainerDefault:
+		return "mp4"
+	case ContainerFMP4:
+		return "fmp4"
+	default:
+		return "mp4"
+	}
+}
+
 const (
 	conactTxtFilePattern = "concat_%s.txt"
 )
