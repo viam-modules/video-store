@@ -14,7 +14,6 @@ import (
 
 	"github.com/viam-modules/video-store/videostore/indexer"
 	vsutils "github.com/viam-modules/video-store/videostore/utils"
-	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/video"
@@ -508,24 +507,48 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 	frameInterval := time.Second / time.Duration(framePoller.Framerate)
 	ticker := time.NewTicker(frameInterval)
 	defer ticker.Stop()
-	var (
-		data     []byte
-		metadata camera.ImageMetadata
-		err      error
-	)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			data, metadata, err = framePoller.Camera.Image(ctx, rutils.MimeTypeJPEG, nil)
+			namedImages, _, err := framePoller.Camera.Images(ctx, nil, nil)
 			if err != nil {
-				vs.logger.Warn("failed to get frame from camera: ", err)
+				vs.logger.Warnf(
+					"failed to get images from camera %s: %v",
+					framePoller.Camera.Name(),
+					err,
+				)
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
-			if actualMimeType, _ := rutils.CheckLazyMIMEType(metadata.MimeType); actualMimeType != rutils.MimeTypeJPEG {
-				vs.logger.Warnf("expected image in mime type %s got %s: ", rutils.MimeTypeJPEG, actualMimeType)
+
+			if len(namedImages) == 0 {
+				vs.logger.Errorf(
+					"no images received from camera %s",
+					framePoller.Camera.Name(),
+				)
+				time.Sleep(retryIntervalSeconds * time.Second)
+				continue
+			} else if len(namedImages) > 1 {
+				vs.logger.Errorf(
+					"received %d images from camera %s. Multiple image sources is not supported.",
+					len(namedImages),
+					framePoller.Camera.Name(),
+				)
+				time.Sleep(retryIntervalSeconds * time.Second)
+				continue
+			}
+
+			namedImage := namedImages[0]
+			data, err := namedImage.Bytes(ctx)
+			if err != nil {
+				vs.logger.Warnf("failed to get bytes from image: %v", err)
+				time.Sleep(retryIntervalSeconds * time.Second)
+				continue
+			}
+			if actualMimeType, _ := rutils.CheckLazyMIMEType(namedImage.MimeType()); actualMimeType != rutils.MimeTypeJPEG {
+				vs.logger.Warnf("expected image mime type %s got %s: ", rutils.MimeTypeJPEG, actualMimeType)
 				continue
 			}
 			vs.latestFrame.Store(data)
