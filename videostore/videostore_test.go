@@ -480,3 +480,48 @@ func TestFetchStreamEOFHandling(t *testing.T) {
 	// Last chunk was emitted (non-zero)
 	test.That(t, lastChunkSize, test.ShouldBeGreaterThan, 0)
 }
+
+// TestFetchStreamContainerFormat tests that the correct container format is returned in chunks.
+func TestFetchStreamContainerFormat(t *testing.T) {
+	storagePath := getArtifactStoragePath(t)
+	vs := createTestVideoStore(t, storagePath)
+
+	from := time.Date(2024, 9, 6, 15, 0, 33, 0, time.UTC)
+	to := time.Date(2024, 9, 6, 15, 0, 50, 0, time.UTC)
+
+	testCases := []struct {
+		name              string
+		container         ContainerFormat
+		expectedContainer string
+	}{
+		{"default container", ContainerDefault, "mp4"},
+		{"mp4 container", ContainerMP4, "mp4"},
+		{"fmp4 container", ContainerFMP4, "fmp4"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := &FetchRequest{
+				From:      from,
+				To:        to,
+				Container: tc.container,
+			}
+
+			ctx := context.Background()
+			var receivedContainers []string
+
+			err := vs.FetchStream(ctx, req, func(chunk video.Chunk) error {
+				receivedContainers = append(receivedContainers, chunk.Container)
+				return nil
+			})
+
+			test.That(t, err, test.ShouldBeNil)
+			test.That(t, len(receivedContainers), test.ShouldBeGreaterThan, 0)
+
+			// All chunks should have the expected container format
+			for _, container := range receivedContainers {
+				test.That(t, container, test.ShouldEqual, tc.expectedContainer)
+			}
+		})
+	}
+}

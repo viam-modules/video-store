@@ -454,7 +454,7 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 			if emitErr := emit(
 				video.Chunk{
 					Data:      buf[:n],
-					Container: videoFormat,
+					Container: r.Container.String(),
 				}); emitErr != nil {
 				return emitErr
 			}
