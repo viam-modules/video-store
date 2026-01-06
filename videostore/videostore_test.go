@@ -320,6 +320,28 @@ func countConcatTxtFiles(t *testing.T) int {
 	return countFilesMatchingPattern(t, "concat_*.txt")
 }
 
+// waitForCleanup waits for cleanup to complete by polling condition functions.
+// It checks every 10ms and times out after 1 second if cleanup doesn't complete.
+func waitForCleanup(t *testing.T, videoFilesBefore, concatFilesBefore int) (videoFilesAfter, concatFilesAfter int) {
+	t.Helper()
+	timeout := time.After(1 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("Timeout waiting for cleanup to complete")
+		case <-ticker.C:
+			videoFilesAfter = countVideoStoreOutputFiles(t)
+			concatFilesAfter = countConcatTxtFiles(t)
+			if videoFilesAfter == videoFilesBefore && concatFilesAfter == concatFilesBefore {
+				return videoFilesAfter, concatFilesAfter
+			}
+		}
+	}
+}
+
 func TestFetchStreamTemporaryFileCleanup(t *testing.T) {
 	storagePath := getArtifactStoragePath(t)
 	vs := createTestVideoStore(t, storagePath)
@@ -343,12 +365,10 @@ func TestFetchStreamTemporaryFileCleanup(t *testing.T) {
 	})
 	test.That(t, err, test.ShouldBeNil)
 
-	// Small delay to ensure cleanup completes
-	time.Sleep(10 * time.Millisecond)
+	// Wait for cleanup to complete
+	videoFilesAfter, concatFilesAfter := waitForCleanup(t, videoFilesBefore, concatFilesBefore)
 
 	// Verify both video output file and concat.txt are cleaned up
-	videoFilesAfter := countVideoStoreOutputFiles(t)
-	concatFilesAfter := countConcatTxtFiles(t)
 
 	test.That(t, videoFilesAfter, test.ShouldEqual, videoFilesBefore)
 	test.That(t, concatFilesAfter, test.ShouldEqual, concatFilesBefore)
@@ -383,12 +403,10 @@ func TestFetchStreamCleanupOnEmitError(t *testing.T) {
 	})
 	test.That(t, errors.Is(err, emitErr), test.ShouldBeTrue)
 
-	// Small delay to ensure cleanup completes
-	time.Sleep(10 * time.Millisecond)
+	// Wait for cleanup to complete
+	videoFilesAfter, concatFilesAfter := waitForCleanup(t, videoFilesBefore, concatFilesBefore)
 
 	// Verify both video output file and concat.txt are cleaned up even on error
-	videoFilesAfter := countVideoStoreOutputFiles(t)
-	concatFilesAfter := countConcatTxtFiles(t)
 
 	test.That(t, videoFilesAfter, test.ShouldEqual, videoFilesBefore)
 	test.That(t, concatFilesAfter, test.ShouldEqual, concatFilesBefore)
@@ -422,12 +440,10 @@ func TestFetchStreamCleanupOnContextCancellation(t *testing.T) {
 	})
 	test.That(t, errors.Is(err, context.Canceled), test.ShouldBeTrue)
 
-	// Small delay to ensure cleanup completes
-	time.Sleep(10 * time.Millisecond)
+	// Wait for cleanup to complete
+	videoFilesAfter, concatFilesAfter := waitForCleanup(t, videoFilesBefore, concatFilesBefore)
 
 	// Verify both video output file and concat.txt are cleaned up even on cancellation
-	videoFilesAfter := countVideoStoreOutputFiles(t)
-	concatFilesAfter := countConcatTxtFiles(t)
 
 	test.That(t, videoFilesAfter, test.ShouldEqual, videoFilesBefore)
 	test.That(t, concatFilesAfter, test.ShouldEqual, concatFilesBefore)
@@ -486,12 +502,10 @@ func TestFetchTemporaryFileCleanup(t *testing.T) {
 	_, err := vs.Fetch(ctx, req)
 	test.That(t, err, test.ShouldBeNil)
 
-	// Small delay to ensure cleanup completes
-	time.Sleep(10 * time.Millisecond)
+	// Wait for cleanup to complete
+	videoFilesAfter, concatFilesAfter := waitForCleanup(t, videoFilesBefore, concatFilesBefore)
 
 	// Verify both video output file and concat.txt are cleaned up
-	videoFilesAfter := countVideoStoreOutputFiles(t)
-	concatFilesAfter := countConcatTxtFiles(t)
 
 	test.That(t, videoFilesAfter, test.ShouldEqual, videoFilesBefore)
 	test.That(t, concatFilesAfter, test.ShouldEqual, concatFilesBefore)
@@ -549,12 +563,10 @@ func TestFetchCleanupOnConcatError(t *testing.T) {
 	_, err := vs.Fetch(ctx, req)
 	test.That(t, err, test.ShouldNotBeNil)
 
-	// Small delay to ensure cleanup completes
-	time.Sleep(10 * time.Millisecond)
+	// Wait for cleanup to complete
+	videoFilesAfter, concatFilesAfter := waitForCleanup(t, videoFilesBefore, concatFilesBefore)
 
 	// Verify both video output file and concat.txt are cleaned up even on concat error
-	videoFilesAfter := countVideoStoreOutputFiles(t)
-	concatFilesAfter := countConcatTxtFiles(t)
 
 	test.That(t, videoFilesAfter, test.ShouldEqual, videoFilesBefore)
 	test.That(t, concatFilesAfter, test.ShouldEqual, concatFilesBefore)
@@ -585,12 +597,10 @@ func TestFetchStreamCleanupOnConcatError(t *testing.T) {
 	})
 	test.That(t, err, test.ShouldNotBeNil)
 
-	// Small delay to ensure cleanup completes
-	time.Sleep(10 * time.Millisecond)
+	// Wait for cleanup to complete
+	videoFilesAfter, concatFilesAfter := waitForCleanup(t, videoFilesBefore, concatFilesBefore)
 
 	// Verify both video output file and concat.txt are cleaned up even on concat error
-	videoFilesAfter := countVideoStoreOutputFiles(t)
-	concatFilesAfter := countConcatTxtFiles(t)
 
 	test.That(t, videoFilesAfter, test.ShouldEqual, videoFilesBefore)
 	test.That(t, concatFilesAfter, test.ShouldEqual, concatFilesBefore)
