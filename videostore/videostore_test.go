@@ -300,6 +300,26 @@ func TestFetchStreamReassemblesVideo(t *testing.T) {
 	test.That(t, ftyp, test.ShouldEqual, "ftyp")
 }
 
+// countFilesMatchingPattern counts files in the temp directory matching the given glob pattern.
+func countFilesMatchingPattern(t *testing.T, pattern string) int {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(os.TempDir(), pattern))
+	test.That(t, err, test.ShouldBeNil)
+	return len(matches)
+}
+
+// countVideoStoreOutputFiles counts video output files matching the test-video-store prefix pattern.
+func countVideoStoreOutputFiles(t *testing.T) int {
+	t.Helper()
+	return countFilesMatchingPattern(t, "test-video-store_*.mp4")
+}
+
+// countConcatTxtFiles counts concat txt files matching the concat_*.txt pattern.
+func countConcatTxtFiles(t *testing.T) int {
+	t.Helper()
+	return countFilesMatchingPattern(t, "concat_*.txt")
+}
+
 func TestFetchStreamTemporaryFileCleanup(t *testing.T) {
 	storagePath := getArtifactStoragePath(t)
 	vs := createTestVideoStore(t, storagePath)
@@ -314,25 +334,126 @@ func TestFetchStreamTemporaryFileCleanup(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Count temp files before
-	tempDir := os.TempDir()
-	entriesBefore, err := os.ReadDir(tempDir)
-	test.That(t, err, test.ShouldBeNil)
-	countBefore := len(entriesBefore)
+	// Count specific temp files before
+	videoFilesBefore := countVideoStoreOutputFiles(t)
+	concatFilesBefore := countConcatTxtFiles(t)
 
-	err = vs.FetchStream(ctx, req, func(_ video.Chunk) error {
+	err := vs.FetchStream(ctx, req, func(_ video.Chunk) error {
 		return nil
 	})
-
 	test.That(t, err, test.ShouldBeNil)
 
-	// Count temp files after - should be the same (cleanup happened)
-	entriesAfter, err := os.ReadDir(tempDir)
-	test.That(t, err, test.ShouldBeNil)
-	countAfter := len(entriesAfter)
+	// Verify both video output file and concat.txt are cleaned up
+	videoFilesAfter := countVideoStoreOutputFiles(t)
+	concatFilesAfter := countConcatTxtFiles(t)
 
-	// Allow for some variance due to other processes
-	test.That(t, countAfter, test.ShouldBeLessThanOrEqualTo, countBefore+1)
+	test.That(t, videoFilesAfter, test.ShouldEqual, videoFilesBefore)
+	test.That(t, concatFilesAfter, test.ShouldEqual, concatFilesBefore)
+}
+
+func TestFetchStreamCleanupOnEmitError(t *testing.T) {
+	storagePath := getArtifactStoragePath(t)
+	vs := createTestVideoStore(t, storagePath)
+
+	from := time.Date(2024, 9, 6, 15, 0, 33, 0, time.UTC)
+	to := time.Date(2024, 9, 6, 15, 0, 50, 0, time.UTC)
+
+	req := &FetchRequest{
+		From: from,
+		To:   to,
+	}
+
+	ctx := context.Background()
+
+	// Count specific temp files before
+	videoFilesBefore := countVideoStoreOutputFiles(t)
+	concatFilesBefore := countConcatTxtFiles(t)
+
+	emitErr := errors.New("emit failed")
+	var chunksReceived int
+	err := vs.FetchStream(ctx, req, func(_ video.Chunk) error {
+		chunksReceived++
+		if chunksReceived >= 1 {
+			return emitErr
+		}
+		return nil
+	})
+	test.That(t, errors.Is(err, emitErr), test.ShouldBeTrue)
+
+	// Verify both video output file and concat.txt are cleaned up even on error
+	videoFilesAfter := countVideoStoreOutputFiles(t)
+	concatFilesAfter := countConcatTxtFiles(t)
+
+	test.That(t, videoFilesAfter, test.ShouldEqual, videoFilesBefore)
+	test.That(t, concatFilesAfter, test.ShouldEqual, concatFilesBefore)
+}
+
+func TestFetchStreamCleanupOnContextCancellation(t *testing.T) {
+	storagePath := getArtifactStoragePath(t)
+	vs := createTestVideoStore(t, storagePath)
+
+	from := time.Date(2024, 9, 6, 15, 0, 33, 0, time.UTC)
+	to := time.Date(2024, 9, 6, 15, 1, 33, 0, time.UTC)
+
+	req := &FetchRequest{
+		From: from,
+		To:   to,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Count specific temp files before
+	videoFilesBefore := countVideoStoreOutputFiles(t)
+	concatFilesBefore := countConcatTxtFiles(t)
+
+	var chunksReceived int
+	err := vs.FetchStream(ctx, req, func(_ video.Chunk) error {
+		chunksReceived++
+		if chunksReceived >= 2 {
+			cancel()
+		}
+		return nil
+	})
+	test.That(t, errors.Is(err, context.Canceled), test.ShouldBeTrue)
+
+	// Verify both video output file and concat.txt are cleaned up even on cancellation
+	videoFilesAfter := countVideoStoreOutputFiles(t)
+	concatFilesAfter := countConcatTxtFiles(t)
+
+	test.That(t, videoFilesAfter, test.ShouldEqual, videoFilesBefore)
+	test.That(t, concatFilesAfter, test.ShouldEqual, concatFilesBefore)
+}
+
+func TestFetchStreamCleanupOnValidationError(t *testing.T) {
+	storagePath := getArtifactStoragePath(t)
+	vs := createTestVideoStore(t, storagePath)
+
+	// Invalid request: from is after to
+	from := time.Date(2024, 9, 6, 16, 0, 0, 0, time.UTC)
+	to := time.Date(2024, 9, 6, 15, 0, 0, 0, time.UTC)
+
+	req := &FetchRequest{
+		From: from,
+		To:   to,
+	}
+
+	ctx := context.Background()
+
+	// Count specific temp files before
+	videoFilesBefore := countVideoStoreOutputFiles(t)
+	concatFilesBefore := countConcatTxtFiles(t)
+
+	err := vs.FetchStream(ctx, req, func(_ video.Chunk) error {
+		return nil
+	})
+	test.That(t, err, test.ShouldNotBeNil)
+
+	// Verify no temp files were left behind (validation fails before file creation)
+	videoFilesAfter := countVideoStoreOutputFiles(t)
+	concatFilesAfter := countConcatTxtFiles(t)
+
+	test.That(t, videoFilesAfter, test.ShouldEqual, videoFilesBefore)
+	test.That(t, concatFilesAfter, test.ShouldEqual, concatFilesBefore)
 }
 
 func TestFetchStreamEmptyChunkHandling(t *testing.T) {
