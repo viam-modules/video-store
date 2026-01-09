@@ -355,12 +355,6 @@ func (ix *Indexer) processFileForIndex(ctx context.Context, fileName string, fil
 		}
 
 		if fileAge < gracePeriod {
-			ix.logger.Debugw("unreadable file is recent, skipping for now",
-				"file", fileName,
-				"age", fileAge,
-				"recency_grace_period", gracePeriod,
-				"error", err,
-			)
 			return nil
 		}
 
