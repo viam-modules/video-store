@@ -348,12 +348,6 @@ func (ix *Indexer) processFileForIndex(ctx context.Context, fileName string, fil
 		// File is unreadable. Check if it's old enough to safely delete.
 		// Recent files might still be written by the segmenter, so we use a grace period
 		// based on segment duration to avoid deleting files that are actively being written.
-		fileInfo, statErr := os.Stat(fullFilePath)
-		if statErr != nil {
-			ix.logger.Infow("failed to stat unreadable file", "file", fileName, "error", statErr)
-			return nil
-		}
-
 		fileAge := time.Since(startTime)
 		gracePeriod := time.Duration(ix.segmentDurationSeconds*unreadableFileGracePeriodMult) * time.Second
 		if gracePeriod < minUnreadableFileGracePeriod {
@@ -373,7 +367,7 @@ func (ix *Indexer) processFileForIndex(ctx context.Context, fileName string, fil
 		ix.logger.Warnw("deleting old unreadable file",
 			"file", fileName,
 			"age", fileAge,
-			"size_bytes", fileInfo.Size(),
+			"size_bytes", fileSize,
 			"error", err,
 		)
 
