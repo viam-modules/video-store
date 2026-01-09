@@ -69,7 +69,7 @@ func setupTestFilesOnDisk(t *testing.T, storagePath string, testFiles []testFile
 // startTestIndexer creates, starts, and provides a cleanup function for an Indexer.
 func startTestIndexer(t *testing.T, storagePath string, storageMaxGB int) (*indexer.Indexer, func()) {
 	t.Helper()
-	idx := indexer.NewIndexer(storagePath, storageMaxGB, logging.NewTestLogger(t))
+	idx := indexer.NewIndexer(storagePath, storageMaxGB, 30, logging.NewTestLogger(t))
 	err := idx.Start(context.Background())
 	test.That(t, err, test.ShouldBeNil)
 
@@ -460,4 +460,48 @@ func TestDeletions(t *testing.T) {
 
 	t.Logf("Cleanup successful. Final file count: %d, Final storage: %.3f GB",
 		finalVideoRanges.VideoCount, float64(finalVideoRanges.StorageUsedBytes)/vsutils.Gigabyte)
+}
+
+func TestUnreadableFileCleanup(t *testing.T) {
+	storagePath := t.TempDir()
+	// Using a very small segment duration to speed up the test
+	segmentDur := 1
+	idx := indexer.NewIndexer(storagePath, 1, segmentDur, logging.NewTestLogger(t))
+	err := idx.Start(context.Background())
+	test.That(t, err, test.ShouldBeNil)
+	defer idx.Close()
+
+	// Create an "unreadable" file (just a dummy text file with .mp4 extension)
+	// Use a timestamp in the future to ensure it's "new"
+	unreadableFileName := fmt.Sprintf("%d.mp4", time.Now().Add(1*time.Hour).Unix())
+	unreadablePath := filepath.Join(storagePath, unreadableFileName)
+	err = os.WriteFile(unreadablePath, []byte("garbage data"), 0o644)
+	test.That(t, err, test.ShouldBeNil)
+
+	// 1. Initially it should be skipped because it's within the grace period (at least 10 mins)
+	// Wait a bit to let the indexer tick
+	time.Sleep(2 * time.Second)
+	_, err = os.Stat(unreadablePath)
+	test.That(t, err, test.ShouldBeNil) // Should still exist
+
+	// 2. Rename the file to be 1 hour in the past
+	oldTime := time.Now().Add(-1 * time.Hour)
+	oldFileName := fmt.Sprintf("%d.mp4", oldTime.Unix())
+	oldPath := filepath.Join(storagePath, oldFileName)
+	err = os.Rename(unreadablePath, oldPath)
+	test.That(t, err, test.ShouldBeNil)
+
+	// 3. Wait for the indexer to tick and delete the file
+	timeout := time.After(5 * time.Second)
+	tick := time.Tick(500 * time.Millisecond)
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("timed out waiting for unreadable file to be deleted")
+		case <-tick:
+			if _, err := os.Stat(oldPath); os.IsNotExist(err) {
+				return // Success
+			}
+		}
+	}
 }

@@ -226,7 +226,7 @@ func NewFramePollingVideoStore(ctx context.Context, config Config, logger loggin
 		vs.renameWorker.Add(renamer.processSegments)
 	}
 
-	vs.indexer = indexer.NewIndexer(config.Storage.StoragePath, config.Storage.SizeGB, logger)
+	vs.indexer = indexer.NewIndexer(config.Storage.StoragePath, config.Storage.SizeGB, segmentSeconds, logger)
 	if err := vs.indexer.Start(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start indexer: %w", err)
 	}
@@ -272,7 +272,7 @@ func NewReadOnlyVideoStore(ctx context.Context, config Config, logger logging.Lo
 		return nil, err
 	}
 
-	indexer := indexer.NewIndexer(config.Storage.StoragePath, config.Storage.SizeGB, logger)
+	indexer := indexer.NewIndexer(config.Storage.StoragePath, config.Storage.SizeGB, segmentSeconds, logger)
 	if err := indexer.Start(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start indexer: %w", err)
 	}
@@ -334,7 +334,7 @@ func NewRTPVideoStore(ctx context.Context, config Config, logger logging.Logger)
 		return nil, err
 	}
 
-	indexer := indexer.NewIndexer(config.Storage.StoragePath, config.Storage.SizeGB, logger)
+	indexer := indexer.NewIndexer(config.Storage.StoragePath, config.Storage.SizeGB, segmentSeconds, logger)
 	if err := indexer.Start(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start indexer: %w", err)
 	}

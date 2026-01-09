@@ -20,12 +20,14 @@ import (
 )
 
 const (
-	dbFileName      = "index.sqlite.db"
-	dbFileMode      = 0o750
-	filesTableName  = "files"
-	videoFileSuffix = ".mp4"
-	refreshInterval = 1 * time.Second
-	slopDuration    = 5 * time.Second
+	dbFileName                    = "index.sqlite.db"
+	dbFileMode                    = 0o750
+	filesTableName                = "files"
+	videoFileSuffix               = ".mp4"
+	refreshInterval               = 1 * time.Second
+	slopDuration                  = 5 * time.Second
+	unreadableFileGracePeriodMult = 5
+	minUnreadableFileGracePeriod  = 30 * time.Minute
 )
 
 // diskFileEntry holds information about a file on disk being considered for indexing,
@@ -37,10 +39,12 @@ type diskFileEntry struct {
 
 // Indexer manages metadata for video files stored on disk.
 type Indexer struct {
-	logger       logging.Logger
-	storagePath  string
-	storageMaxGB int
-	dbPath       string
+	logger                 logging.Logger
+	storagePath            string
+	storageMaxGB           int
+	segmentDurationSeconds int
+	dbPath                 string
+
 	// dbMu protects the db pointer, not the db itself.
 	dbMu sync.RWMutex
 	db   *sql.DB
@@ -60,13 +64,14 @@ type fileMetadata struct {
 }
 
 // NewIndexer creates a new indexer instance.
-func NewIndexer(storagePath string, storageMaxGB int, logger logging.Logger) *Indexer {
+func NewIndexer(storagePath string, storageMaxGB, segmentDurationSeconds int, logger logging.Logger) *Indexer {
 	idx := &Indexer{
-		logger:       logger,
-		storagePath:  storagePath,
-		storageMaxGB: storageMaxGB,
-		dbPath:       filepath.Join(storagePath, dbFileName),
-		workers:      utils.NewBackgroundStoppableWorkers(),
+		logger:                 logger,
+		storagePath:            storagePath,
+		storageMaxGB:           storageMaxGB,
+		segmentDurationSeconds: segmentDurationSeconds,
+		dbPath:                 filepath.Join(storagePath, dbFileName),
+		workers:                utils.NewBackgroundStoppableWorkers(),
 	}
 	return idx
 }
@@ -200,11 +205,11 @@ func (ix *Indexer) refreshIndexAndStorage(ctx context.Context) error {
 
 	start := time.Now()
 
-	// 1. Index new files
-	if err := ix.indexNewFiles(ctx); err != nil {
+	// 1. Process unindexed files
+	if err := ix.processUnindexedFiles(ctx); err != nil {
 		return err
 	}
-	ix.logger.Debugf("TIMING: indexNewFiles took %v", time.Since(start))
+	ix.logger.Debugf("TIMING: processUnindexedFiles took %v", time.Since(start))
 
 	// 2. Mark files to delete based on storage limits
 	cleanupDBStart := time.Now()
@@ -224,8 +229,9 @@ func (ix *Indexer) refreshIndexAndStorage(ctx context.Context) error {
 	return nil
 }
 
-// indexNewFiles indexes new video files on disk. Assumes the dbMu is read-locked.
-func (ix *Indexer) indexNewFiles(ctx context.Context) error {
+// processUnindexedFiles indexes video files on disk. Assumes the dbMu is read-locked.
+// It adds all new valid video files, and deletes corrupt/invalid video files from the storage dir.
+func (ix *Indexer) processUnindexedFiles(ctx context.Context) error {
 	indexedFiles, err := ix.getIndexedFiles(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get indexed files: %w", err)
@@ -246,7 +252,7 @@ func (ix *Indexer) indexNewFiles(ctx context.Context) error {
 			continue
 		}
 
-		err := ix.addFileToIndex(ctx, fileName, entry.info.Size())
+		err := ix.processFileForIndex(ctx, fileName, entry.info.Size())
 		if err != nil {
 			if isDBReadOnlyError(err) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return err
@@ -327,8 +333,9 @@ func (ix *Indexer) getDiskFilesSorted(ctx context.Context) ([]diskFileEntry, err
 	return sortableFiles, nil
 }
 
-// addFileToIndex is a helper function that indexes a new video file in the db. Assumes the dbMu is read-locked.
-func (ix *Indexer) addFileToIndex(ctx context.Context, fileName string, fileSize int64) error {
+// processFileForIndex is a helper function that processes an untracked video file in the db. Assumes the dbMu is read-locked.
+// It adds new valid video files, and deletes corrupt/invalid video files from the storage dir.
+func (ix *Indexer) processFileForIndex(ctx context.Context, fileName string, fileSize int64) error {
 	startTime, err := vsutils.ExtractDateTimeFromFilename(fileName)
 	if err != nil {
 		ix.logger.Warnw("failed to extract timestamp from filename, skipping", "file", fileName, "error", err)
@@ -338,7 +345,50 @@ func (ix *Indexer) addFileToIndex(ctx context.Context, fileName string, fileSize
 	fullFilePath := filepath.Join(ix.storagePath, fileName)
 	info, err := vsutils.GetVideoInfo(fullFilePath)
 	if err != nil {
-		ix.logger.Debugw("failed to get video info, unreadable file will not be indexed", "file", fileName, "error", err)
+		// File is unreadable. Check if it's old enough to safely delete.
+		// Recent files might still be written by the segmenter, so we use a grace period
+		// based on segment duration to avoid deleting files that are actively being written.
+		fileInfo, statErr := os.Stat(fullFilePath)
+		if statErr != nil {
+			ix.logger.Infow("failed to stat unreadable file", "file", fileName, "error", statErr)
+			return nil
+		}
+
+		fileAge := time.Since(startTime)
+		gracePeriod := time.Duration(ix.segmentDurationSeconds*unreadableFileGracePeriodMult) * time.Second
+		if gracePeriod < minUnreadableFileGracePeriod {
+			gracePeriod = minUnreadableFileGracePeriod
+		}
+
+		if fileAge < gracePeriod {
+			ix.logger.Debugw("unreadable file is recent, skipping for now",
+				"file", fileName,
+				"age", fileAge,
+				"recency_grace_period", gracePeriod,
+				"error", err,
+			)
+			return nil
+		}
+
+		ix.logger.Warnw("deleting old unreadable file",
+			"file", fileName,
+			"age", fileAge,
+			"size_bytes", fileInfo.Size(),
+			"error", err,
+		)
+
+		if delErr := os.Remove(fullFilePath); delErr != nil {
+			ix.logger.Errorw("failed to delete unreadable file",
+				"file", fileName,
+				"error", delErr,
+			)
+		} else {
+			ix.logger.Infow("deleted old unreadable file",
+				"file", fileName,
+				"age", fileAge,
+			)
+		}
+
 		return nil
 	}
 	durationMs := info.Duration.Milliseconds()
@@ -392,20 +442,26 @@ func (ix *Indexer) handleMissingDiskFiles(ctx context.Context, indexedFiles map[
 func (ix *Indexer) cleanupDB(ctx context.Context) error {
 	maxStorageSizeBytes := int64(ix.storageMaxGB) * vsutils.Gigabyte
 
-	files, err := ix.getFilesAscTime(ctx)
+	currentSizeBytes, err := vsutils.GetDirectorySize(ix.storagePath)
 	if err != nil {
-		return fmt.Errorf("failed to get files for cleanup: %w", err)
-	}
-
-	var currentSizeBytes int64
-	for _, file := range files {
-		currentSizeBytes += file.SizeBytes
+		return fmt.Errorf("failed to get directory size: %w", err)
 	}
 
 	if currentSizeBytes < maxStorageSizeBytes {
 		return nil
 	}
+
 	bytesToDelete := currentSizeBytes - maxStorageSizeBytes
+	ix.logger.Debugw("storage over limit, marking files for deletion",
+		"current_bytes", currentSizeBytes,
+		"max_bytes", maxStorageSizeBytes,
+		"bytes_to_delete", bytesToDelete,
+	)
+
+	files, err := ix.getFilesAscTime(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get files for cleanup: %w", err)
+	}
 
 	var filesToMarkDeleted []string
 	var bytesMarkedForDeletion int64
@@ -419,7 +475,13 @@ func (ix *Indexer) cleanupDB(ctx context.Context) error {
 			break
 		}
 	}
+
 	if len(filesToMarkDeleted) == 0 {
+		ix.logger.Warnw("storage over limit but no indexed files to delete",
+			"current_bytes", currentSizeBytes,
+			"max_bytes", maxStorageSizeBytes,
+			"indexed_file_count", len(files),
+		)
 		return nil
 	}
 
@@ -427,6 +489,11 @@ func (ix *Indexer) cleanupDB(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to mark files as deleted in DB: %w", err)
 	}
+
+	ix.logger.Debugw("marked files for deletion",
+		"file_count", len(filesToMarkDeleted),
+		"bytes_to_free", bytesMarkedForDeletion,
+	)
 
 	return nil
 }
