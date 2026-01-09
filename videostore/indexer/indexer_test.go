@@ -464,7 +464,6 @@ func TestDeletions(t *testing.T) {
 
 func TestUnreadableFileCleanup(t *testing.T) {
 	storagePath := t.TempDir()
-	// Using a very small segment duration to speed up the test
 	segmentDur := 1
 	idx := indexer.NewIndexer(storagePath, 1, segmentDur, logging.NewTestLogger(t))
 	err := idx.Start(context.Background())
@@ -472,13 +471,12 @@ func TestUnreadableFileCleanup(t *testing.T) {
 	defer idx.Close()
 
 	// Create an "unreadable" file (just a dummy text file with .mp4 extension)
-	// Use a timestamp in the future to ensure it's "new"
-	unreadableFileName := fmt.Sprintf("%d.mp4", time.Now().Add(1*time.Hour).Unix())
+	unreadableFileName := fmt.Sprintf("%d.mp4", time.Now().Unix())
 	unreadablePath := filepath.Join(storagePath, unreadableFileName)
 	err = os.WriteFile(unreadablePath, []byte("garbage data"), 0o644)
 	test.That(t, err, test.ShouldBeNil)
 
-	// 1. Initially it should be skipped because it's within the grace period (at least 10 mins)
+	// 1. Initially it should be skipped because it's within the grace period
 	// Wait a bit to let the indexer tick
 	time.Sleep(2 * time.Second)
 	_, err = os.Stat(unreadablePath)
