@@ -1,10 +1,3 @@
-// This file implements optional "direct upload" behavior for videostore Save outputs.
-//
-// When enabled, videostore writes Save outputs to a staging directory (not a datamanager watched path),
-// then uploads the file asynchronously to Viam App using the DataSync FileUpload streaming RPC.
-//
-// The upload runs with a small bounded retry loop with exponential backoff and can optionally delete the staged file
-// after successful upload.
 package videostore
 
 import (
@@ -25,8 +18,18 @@ import (
 	"go.viam.com/utils/rpc"
 )
 
-const directUploadChunkSize = 64 * 1024
+const (
+	directUploadChunkSize = 64 * 1024
+	maxMetadataTagLength  = 128
+)
 
+// directUploader implements optional "direct upload" behavior for videostore Save outputs.
+//
+// When enabled, videostore writes Save outputs to a staging directory (not a datamanager watched path),
+// then uploads the file asynchronously to Viam App using the DataSync FileUpload streaming RPC.
+//
+// The upload runs with a small bounded retry loop with exponential backoff and can optionally delete the staged file
+// after successful upload.
 type directUploader struct {
 	logger logging.Logger
 	cfg    *DirectUploadConfig
@@ -44,7 +47,7 @@ type directUploader struct {
 // newDirectUploader initializes a DataSync FileUpload client that authenticates via env-based API key credentials.
 func newDirectUploader(cfg *DirectUploadConfig, logger logging.Logger) (*directUploader, error) {
 	if cfg == nil || !cfg.Enabled {
-		return nil, nil
+		return nil, nil //nolint:nilnil // nil is valid when direct upload is disabled
 	}
 
 	apiKey := os.Getenv(utils.APIKeyEnvVar)
@@ -194,7 +197,7 @@ func (u *directUploader) uploadFile(
 	if err != nil {
 		return "", err
 	}
-	return resp.GetFileId(), nil
+	return resp.GetBinaryDataId(), nil
 }
 
 // maybeEnqueueDirectUpload schedules an asynchronous upload job for the given file path if direct upload is enabled.
@@ -212,7 +215,7 @@ func (vs *videostore) maybeEnqueueDirectUpload(filePath string, r *SaveRequest) 
 		tags := buildDirectUploadTags(vs.config.DirectUpload.DefaultTags, reqTags, metadata)
 		datasets := dedupeStrings(append(append([]string(nil), vs.config.DirectUpload.DatasetIDs...), reqDatasets...))
 
-		fileID, err := uploadWithRetry(
+		binaryDataID, err := uploadWithRetry(
 			ctx,
 			vs.directUploader,
 			filePath,
@@ -226,7 +229,7 @@ func (vs *videostore) maybeEnqueueDirectUpload(filePath string, r *SaveRequest) 
 			return
 		}
 
-		vs.logger.Debugw("direct upload succeeded", "file", filePath, "file_id", fileID)
+		vs.logger.Debugw("direct upload succeeded", "file", filePath, "binary_data_id", binaryDataID)
 		if vs.config.DirectUpload.DeleteAfterUpload == nil || *vs.config.DirectUpload.DeleteAfterUpload {
 			if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 				vs.logger.Warnw("failed deleting staged file after upload", "file", filePath, "error", err)
@@ -247,13 +250,13 @@ func uploadWithRetry(
 	var lastErr error
 	delay := initialDelay
 	attempts := maxRetries + 1 // include initial attempt
-	for i := 0; i < attempts; i++ {
+	for i := range attempts {
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}
-		fileID, err := u.uploadFile(ctx, filePath, tags, datasetIDs)
+		binaryDataID, err := u.uploadFile(ctx, filePath, tags, datasetIDs)
 		if err == nil {
-			return fileID, nil
+			return binaryDataID, nil
 		}
 		lastErr = err
 		if i == attempts-1 {
@@ -274,7 +277,7 @@ func uploadWithRetry(
 	return "", lastErr
 }
 
-func buildDirectUploadTags(defaultTags []string, requestTags []string, metadata string) []string {
+func buildDirectUploadTags(defaultTags, requestTags []string, metadata string) []string {
 	tags := append([]string(nil), defaultTags...)
 	tags = append(tags, requestTags...)
 
@@ -284,8 +287,8 @@ func buildDirectUploadTags(defaultTags []string, requestTags []string, metadata 
 		meta := sanitizeTagComponent(metadata)
 		if meta != "" {
 			tag := "videostore-metadata-" + meta
-			if len(tag) > 128 {
-				tag = tag[:128]
+			if len(tag) > maxMetadataTagLength {
+				tag = tag[:maxMetadataTagLength]
 			}
 			tags = append(tags, tag)
 		}

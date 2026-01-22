@@ -106,6 +106,7 @@ type DirectUploadConfig struct {
 	InitialRetryDelayMillis int
 }
 
+// Validate returns an error if the DirectUploadConfig is invalid.
 func (c *DirectUploadConfig) Validate() error {
 	if c.MaxRetries < 0 {
 		return errors.New("direct upload max_retries can't be negative")
