@@ -67,6 +67,8 @@ type videostore struct {
 
 	renameWorker *utils.StoppableWorkers
 	indexer      *indexer.Indexer
+
+	directUploader *directUploader
 }
 
 // VideoStore stores video and provides APIs to request the stored video.
@@ -115,6 +117,12 @@ type SaveRequest struct {
 	To       time.Time
 	Metadata string
 	Async    bool
+	// Tags are applied to the uploaded file when direct upload is enabled.
+	// Only relevant when direct upload is enabled.
+	Tags []string
+	// DatasetIDs are applied to the uploaded file when direct upload is enabled.
+	// Only relevant when direct upload is enabled.
+	DatasetIDs []string
 }
 
 // SaveResponse is the response to the Save method.
@@ -183,6 +191,17 @@ func NewFramePollingVideoStore(ctx context.Context, config Config, logger loggin
 	}
 	if err := vsutils.CreateDir(vs.config.Storage.UploadPath); err != nil {
 		return nil, err
+	}
+
+	if config.DirectUpload != nil && config.DirectUpload.Enabled {
+		if err := vsutils.CreateDir(config.DirectUpload.StagingDir); err != nil {
+			return nil, err
+		}
+		uploader, err := newDirectUploader(config.DirectUpload, logger)
+		if err != nil {
+			return nil, err
+		}
+		vs.directUploader = uploader
 	}
 	var directStoragePath string
 	var renamer *renamer
@@ -263,6 +282,18 @@ func NewReadOnlyVideoStore(ctx context.Context, config Config, logger logging.Lo
 		return nil, err
 	}
 
+	var uploader *directUploader
+	if config.DirectUpload != nil && config.DirectUpload.Enabled {
+		if err := vsutils.CreateDir(config.DirectUpload.StagingDir); err != nil {
+			return nil, err
+		}
+		var err error
+		uploader, err = newDirectUploader(config.DirectUpload, logger)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	concater, err := newConcater(
 		config.Storage.StoragePath,
 		config.Storage.UploadPath,
@@ -278,12 +309,13 @@ func NewReadOnlyVideoStore(ctx context.Context, config Config, logger logging.Lo
 	}
 
 	vs := &videostore{
-		typ:      config.Type,
-		concater: concater,
-		indexer:  indexer,
-		logger:   logger,
-		config:   config,
-		workers:  utils.NewBackgroundStoppableWorkers(),
+		typ:            config.Type,
+		concater:       concater,
+		indexer:        indexer,
+		logger:         logger,
+		config:         config,
+		workers:        utils.NewBackgroundStoppableWorkers(),
+		directUploader: uploader,
 	}
 
 	return vs, nil
@@ -303,6 +335,18 @@ func NewRTPVideoStore(ctx context.Context, config Config, logger logging.Logger)
 	}
 	if err := vsutils.CreateDir(config.Storage.UploadPath); err != nil {
 		return nil, err
+	}
+
+	var uploader *directUploader
+	if config.DirectUpload != nil && config.DirectUpload.Enabled {
+		if err := vsutils.CreateDir(config.DirectUpload.StagingDir); err != nil {
+			return nil, err
+		}
+		var err error
+		uploader, err = newDirectUploader(config.DirectUpload, logger)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var directStoragePath string
@@ -340,14 +384,15 @@ func NewRTPVideoStore(ctx context.Context, config Config, logger logging.Logger)
 	}
 
 	vs := &videostore{
-		typ:          config.Type,
-		concater:     concater,
-		rawSegmenter: rawSegmenter,
-		indexer:      indexer,
-		logger:       logger,
-		config:       config,
-		workers:      utils.NewBackgroundStoppableWorkers(),
-		renameWorker: utils.NewBackgroundStoppableWorkers(),
+		typ:            config.Type,
+		concater:       concater,
+		rawSegmenter:   rawSegmenter,
+		indexer:        indexer,
+		logger:         logger,
+		config:         config,
+		workers:        utils.NewBackgroundStoppableWorkers(),
+		renameWorker:   utils.NewBackgroundStoppableWorkers(),
+		directUploader: uploader,
 	}
 	vs.workers.Add(vs.fallbackDeleter)
 
@@ -480,17 +525,21 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 		return nil, err
 	}
 	vs.logger.Debug("save command received and validated")
+	outputDir := vs.config.Storage.UploadPath
+	if vs.config.DirectUpload != nil && vs.config.DirectUpload.Enabled {
+		outputDir = vs.config.DirectUpload.StagingDir
+	}
 	uploadFilePath := vsutils.GenerateOutputFilePath(
 		vs.config.Storage.OutputFileNamePrefix,
 		r.From,
 		r.Metadata,
-		vs.config.Storage.UploadPath,
+		outputDir,
 	)
 	uploadFileName := filepath.Base(uploadFilePath)
 	if r.Async {
 		vs.logger.Debug("running save command asynchronously")
 		vs.workers.Add(func(ctx context.Context) {
-			vs.asyncSave(ctx, r.From, r.To, uploadFilePath)
+			vs.asyncSave(ctx, r, uploadFilePath)
 		})
 		return &SaveResponse{Filename: uploadFileName}, nil
 	}
@@ -499,6 +548,8 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 		vs.logger.Error("failed to concat files ", err)
 		return nil, err
 	}
+
+	vs.maybeEnqueueDirectUpload(uploadFilePath, r)
 	return &SaveResponse{Filename: uploadFileName}, nil
 }
 
@@ -664,7 +715,7 @@ func (vs *videostore) cleanupStorage(ctx context.Context) error {
 // It waits for the segment duration before running to ensure the last segment
 // is written to storage before concatenation.
 // TODO: (seanp) Optimize this to immediately run as soon as the current segment is completed.
-func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path string) {
+func (vs *videostore) asyncSave(ctx context.Context, r *SaveRequest, path string) {
 	segmentDur := time.Duration(segmentSeconds) * time.Second
 	totalTimeout := time.Duration(asyncTimeoutSeconds)*time.Second + segmentDur
 	ctx, cancel := context.WithTimeout(ctx, totalTimeout)
@@ -674,10 +725,12 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 	select {
 	case <-timer.C:
 		vs.logger.Debugf("executing concat for %s", path)
-		err := vs.concater.Concat(from, to, path)
+		err := vs.concater.Concat(r.From, r.To, path)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)
+			return
 		}
+		vs.maybeEnqueueDirectUpload(path, r)
 		return
 	case <-ctx.Done():
 		vs.logger.Error("asyncSave operation cancelled or timed out")
@@ -705,6 +758,10 @@ func (vs *videostore) Close() {
 	if vs.renameWorker != nil {
 		// Stop will cause renamer to flush out all remaining files
 		vs.renameWorker.Stop()
+	}
+
+	if vs.directUploader != nil {
+		vs.directUploader.Close()
 	}
 }
 

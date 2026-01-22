@@ -11,6 +11,32 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
+func parseStringSlice(command map[string]interface{}, key string) ([]string, error) {
+	raw, ok := command[key]
+	if !ok || raw == nil {
+		return nil, nil
+	}
+
+	switch v := raw.(type) {
+	case []string:
+		return v, nil
+	case []interface{}:
+		// When DoCommand payloads originate from JSON, decoding into map[string]interface{} yields []interface{}.
+		// Supporting that here makes the module robust to typical client usage.
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			s, ok := item.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s must be a list of strings", key)
+			}
+			out = append(out, s)
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("%s must be a list of strings", key)
+	}
+}
+
 // parseTimeRange parses the from/to timestamps from a command.
 func parseTimeRange(command map[string]interface{}) (from, to time.Time, err error) {
 	fromStr, ok := command["from"].(string)
@@ -46,11 +72,23 @@ func ToSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, err
 	if !ok {
 		async = false
 	}
+
+	tags, err := parseStringSlice(command, "tags")
+	if err != nil {
+		return nil, err
+	}
+	datasetIDs, err := parseStringSlice(command, "dataset_ids")
+	if err != nil {
+		return nil, err
+	}
+
 	return &videostore.SaveRequest{
-		From:     from,
-		To:       to,
-		Metadata: metadata,
-		Async:    async,
+		From:       from,
+		To:         to,
+		Metadata:   metadata,
+		Async:      async,
+		Tags:       tags,
+		DatasetIDs: datasetIDs,
 	}, nil
 }
 

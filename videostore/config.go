@@ -41,11 +41,12 @@ func (t SourceType) String() string {
 
 // Config configures a videostore.
 type Config struct {
-	Name        string
-	Type        SourceType
-	Storage     StorageConfig
-	Encoder     EncoderConfig
-	FramePoller FramePollerConfig
+	Name         string
+	Type         SourceType
+	Storage      StorageConfig
+	Encoder      EncoderConfig
+	FramePoller  FramePollerConfig
+	DirectUpload *DirectUploadConfig
 }
 
 // Validate returns an error if the Config is invalid.
@@ -72,6 +73,46 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.DirectUpload != nil && c.DirectUpload.Enabled {
+		if err := c.DirectUpload.Validate(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// DirectUploadConfig configures optional direct uploads of saved video files to Viam App.
+// When enabled, Save outputs should be written to StagingDir (not the datamanager sync paths),
+// then uploaded asynchronously using the DataSync FileUpload API.
+type DirectUploadConfig struct {
+	Enabled bool
+	// BaseURL is the API base URL. Defaults to https://app.viam.com.
+	BaseURL string
+	// StagingDir is the directory to write clips before uploading. Must not be a datamanager sync path.
+	// Defaults to <storage_path>/direct-upload-staging.
+	StagingDir string
+	// DeleteAfterUpload controls whether to delete the staged file after a successful upload.
+	// Defaults to true.
+	DeleteAfterUpload *bool
+	// DefaultTags are always applied to uploads. Optional.
+	DefaultTags []string
+	// DatasetIDs are always applied to uploads. Optional.
+	DatasetIDs []string
+	// MaxRetries is the number of upload retries after the initial attempt. Defaults to 3.
+	MaxRetries int
+	// InitialRetryDelayMillis is the delay before the first retry. Subsequent retries use exponential backoff.
+	// Defaults to 1000.
+	InitialRetryDelayMillis int
+}
+
+func (c *DirectUploadConfig) Validate() error {
+	if c.MaxRetries < 0 {
+		return errors.New("direct upload max_retries can't be negative")
+	}
+	if c.InitialRetryDelayMillis < 0 {
+		return errors.New("direct upload initial_retry_delay_ms can't be negative")
+	}
 	return nil
 }
 

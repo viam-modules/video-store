@@ -25,14 +25,27 @@ type Video struct {
 	Format  string `json:"format,omitempty"`
 }
 
+// DirectUpload configures optional direct uploads to Viam App using env-based credentials.
+type DirectUpload struct {
+	Enabled                 bool     `json:"enabled,omitempty"`
+	BaseURL                 string   `json:"base_url,omitempty"`
+	StagingDir              string   `json:"staging_dir,omitempty"`
+	DeleteAfterUpload       *bool    `json:"delete_after_upload,omitempty"`
+	DefaultTags             []string `json:"default_tags,omitempty"`
+	DatasetIDs              []string `json:"dataset_ids,omitempty"`
+	MaxRetries              int      `json:"max_retries,omitempty"`
+	InitialRetryDelayMillis int      `json:"initial_retry_delay_ms,omitempty"`
+}
+
 // Config is the configuration for the video storage camera component.
 type Config struct {
-	Camera    string  `json:"camera,omitempty"`
-	Sync      string  `json:"sync"`
-	Storage   Storage `json:"storage"`
-	Video     Video   `json:"video,omitempty"`
-	Framerate int     `json:"framerate,omitempty"`
-	YUYV      bool    `json:"yuyv,omitempty"`
+	Camera       string        `json:"camera,omitempty"`
+	Sync         string        `json:"sync"`
+	Storage      Storage       `json:"storage"`
+	Video        Video         `json:"video,omitempty"`
+	Framerate    int           `json:"framerate,omitempty"`
+	YUYV         bool          `json:"yuyv,omitempty"`
+	DirectUpload *DirectUpload `json:"direct_upload,omitempty"`
 }
 
 // Validate validates the configuration for the video storage camera component.
@@ -92,6 +105,43 @@ func applyStorageDefaults(c Storage, name string) videostore.StorageConfig {
 	}
 }
 
+func applyDirectUploadDefaults(c *DirectUpload, storagePath string) *videostore.DirectUploadConfig {
+	if c == nil || !c.Enabled {
+		return nil
+	}
+
+	deleteAfter := true
+	if c.DeleteAfterUpload != nil {
+		deleteAfter = *c.DeleteAfterUpload
+	}
+
+	stagingDir := c.StagingDir
+	if stagingDir == "" {
+		stagingDir = filepath.Join(storagePath, "direct-upload-staging")
+	}
+
+	maxRetries := c.MaxRetries
+	if maxRetries == 0 {
+		maxRetries = 3
+	}
+
+	initialDelay := c.InitialRetryDelayMillis
+	if initialDelay == 0 {
+		initialDelay = 1000
+	}
+
+	return &videostore.DirectUploadConfig{
+		Enabled:                 true,
+		BaseURL:                 c.BaseURL,
+		StagingDir:              stagingDir,
+		DeleteAfterUpload:       &deleteAfter,
+		DefaultTags:             c.DefaultTags,
+		DatasetIDs:              c.DatasetIDs,
+		MaxRetries:              maxRetries,
+		InitialRetryDelayMillis: initialDelay,
+	}
+}
+
 // ToFrameVideoStoreVideoConfig converts a Config into a videostore.Config.
 func ToFrameVideoStoreVideoConfig(
 	config *Config,
@@ -106,10 +156,11 @@ func ToFrameVideoStoreVideoConfig(
 	storage := applyStorageDefaults(config.Storage, name)
 
 	fvsc := videostore.Config{
-		Name:    name,
-		Type:    videostore.SourceTypeFrame,
-		Encoder: applyVideoEncoderDefaults(config.Video),
-		Storage: storage,
+		Name:         name,
+		Type:         videostore.SourceTypeFrame,
+		Encoder:      applyVideoEncoderDefaults(config.Video),
+		Storage:      storage,
+		DirectUpload: applyDirectUploadDefaults(config.DirectUpload, storage.StoragePath),
 		FramePoller: videostore.FramePollerConfig{
 			Framerate: framerate,
 			YUYV:      config.YUYV,

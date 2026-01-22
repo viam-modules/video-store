@@ -64,6 +64,15 @@ Additionally, make sure to add your configured data manager service to the `depe
 |                 | `size_gb`         | integer | yes  | Total amount of allocated storage in gigabytes. If you reduce the amound of allocated storage while the storage exceeds the allocated amount, the oldest clips get deleted until the storage size is below the configured max. |
 |                 | `storage_path`    | string  | no  | Custom path to use for video storage.                                                             |
 |                 | `upload_path`     | string  | no  | Custom path to use for uploading files. If not under `~/.viam/capture`, you will need to add to `additional_sync_paths` in datamanager service configuration. |
+| `direct_upload` |                   | object  | no  | When enabled, uploads saved clips directly to Viam App using DataSync `FileUpload` (avoids datamanager watched `upload_path`). |
+|                 | `enabled`         | boolean | no  | Enables direct upload. Default false.                                                             |
+|                 | `base_url`        | string  | no  | Viam App base URL. Default `https://app.viam.com`.                                                 |
+|                 | `staging_dir`     | string  | no  | Directory to write clips before uploading. Defaults to `<storage_path>/direct-upload-staging`.     |
+|                 | `delete_after_upload` | boolean | no | Delete staged file after successful upload. Default true.                                          |
+|                 | `default_tags`    | array[string] | no | Tags applied to every upload.                                                                      |
+|                 | `dataset_ids`     | array[string] | no | Dataset IDs applied to every upload.                                                               |
+|                 | `max_retries`     | integer | no  | Number of retries after the initial upload attempt. Default 3.                                     |
+|                 | `initial_retry_delay_ms` | integer | no | Delay before first retry; subsequent retries use exponential backoff. Default 1000.               |
 | `video`         |                   | object  | no  |                                                                                                   |
 |                 | `format`          | string  | no  | Name of video format to use (e.g., mp4).                                                          |
 |                 | `codec`           | string  | no  | Name of video codec to use (e.g., h264).                                                          |
@@ -131,6 +140,12 @@ The save command retreives video from local storage, concatenates and trims unde
 | `to`        | timestamp           | required          | End timestamp.                   |
 | `metadata`  | string              | optional          | Arbitrary metadata string.       |
 | `async`     | boolean             | optional          | Whether the operation is async.  |
+| `tags`      | array[string]       | optional          | Tags to apply to the uploaded file (**direct upload only**). |
+| `dataset_ids` | array[string]     | optional          | Dataset IDs to apply to the uploaded file (**direct upload only**). |
+
+> [!NOTE]
+> The `tags` and `dataset_ids` fields are only used when `direct_upload.enabled` is set in the component config.
+> When direct upload is disabled, the module uses the legacy datamanager `upload_path` behavior and these fields are ignored.
 
 ##### Save Request
 ```json
@@ -138,7 +153,9 @@ The save command retreives video from local storage, concatenates and trims unde
   "command": "save",
   "from": <start_timestamp>,
   "to": <end_timestamp>,
-  "metadata": <arbitrary_metadata_string>
+  "metadata": <arbitrary_metadata_string>,
+  "tags": ["tag1", "tag2"],
+  "dataset_ids": ["dataset-id-1", "dataset-id-2"]
 }
 ```
 
@@ -164,7 +181,9 @@ The async save command performs the same operation as the save command, but does
   "from": <start_timestamp>,
   "to": <end_timestamp>,
   "metadata": <arbitrary_metadata_string>,
-  "async": true
+  "async": true,
+  "tags": ["tag1", "tag2"],
+  "dataset_ids": ["dataset-id-1", "dataset-id-2"]
 }
 ```
 
