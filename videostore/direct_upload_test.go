@@ -33,7 +33,7 @@ func (s *fakeDataSyncServer) FileUpload(stream syncpb.DataSyncService_FileUpload
 			}
 			return err
 		}
-		switch pkt := req.UploadPacket.(type) {
+		switch pkt := req.GetUploadPacket().(type) {
 		case *syncpb.FileUploadRequest_Metadata:
 			s.gotMeta = pkt.Metadata
 		case *syncpb.FileUploadRequest_FileContents:
@@ -63,7 +63,7 @@ func TestDirectUploaderFileUploadSendsMetadataAndChunks(t *testing.T) {
 		logger,
 		rpc.WithDisableMulticastDNS(),
 		rpc.WithAuthHandler(rpc.CredentialsTypeAPIKey, rpc.AuthHandlerFunc(
-			func(ctx context.Context, entity, payload string) (map[string]string, error) {
+			func(_ context.Context, entity, payload string) (map[string]string, error) {
 				return map[string]string{}, nil
 			},
 		)),
