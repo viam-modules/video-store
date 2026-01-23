@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -64,7 +65,7 @@ func newDirectUploader(cfg *DirectUploadConfig, logger logging.Logger) (*directU
 
 	baseURL := cfg.BaseURL
 	if baseURL == "" {
-		baseURL = "https://app.viam.com"
+		baseURL = "https://app.viam.com:443"
 	}
 
 	return &directUploader{
@@ -96,24 +97,29 @@ func (u *directUploader) ensureClient(ctx context.Context) (syncpb.DataSyncServi
 		return u.client, nil
 	}
 
-	baseURL := u.baseURL
-	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
-		return nil, fmt.Errorf("direct upload base_url must start with http:// or https://, got %q", baseURL)
-	}
-	if !strings.HasSuffix(baseURL, ":443") {
-		baseURL += ":443"
-	}
-	parsed, err := url.Parse(baseURL)
+	parsed, err := url.Parse(u.baseURL)
 	if err != nil {
 		return nil, err
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return nil, fmt.Errorf("direct upload base_url must be protocol://host:port, got %q", u.baseURL)
+	}
+	if _, _, err := net.SplitHostPort(parsed.Host); err != nil {
+		return nil, fmt.Errorf("direct upload base_url must include explicit port, got %q", u.baseURL)
 	}
 
 	creds := rpc.Credentials{
 		Type:    rpc.CredentialsTypeAPIKey,
 		Payload: u.apiKey,
 	}
-	dopt := rpc.WithEntityCredentials(u.apiKeyID, creds)
-	conn, err := rpc.DialDirectGRPC(ctx, parsed.Host, u.logger, dopt)
+	dopts := []rpc.DialOption{rpc.WithEntityCredentials(u.apiKeyID, creds)}
+	if parsed.Scheme == "http" { // allow insecure connections for testing/local deployments.
+		dopts = append(dopts, rpc.WithInsecure(), rpc.WithAllowInsecureWithCredentialsDowngrade())
+	} else if parsed.Scheme != "https" {
+		return nil, fmt.Errorf("direct upload base_url scheme must be http or https, got %q", parsed.Scheme)
+	}
+
+	conn, err := rpc.DialDirectGRPC(ctx, parsed.Host, u.logger, dopts...)
 	if err != nil {
 		return nil, err
 	}

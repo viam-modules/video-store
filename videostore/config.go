@@ -87,7 +87,7 @@ func (c *Config) Validate() error {
 // then uploaded asynchronously using the DataSync FileUpload API.
 type DirectUploadConfig struct {
 	Enabled bool
-	// BaseURL is the API base URL. Defaults to https://app.viam.com.
+	// BaseURL is the Viam App gRPC endpoint. Defaults to https://app.viam.com:443.
 	BaseURL string
 	// StagingDir is the directory to write clips before uploading. Must not be a datamanager sync path.
 	// Defaults to <storage_path>/direct-upload-staging.

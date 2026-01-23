@@ -66,7 +66,7 @@ Additionally, make sure to add your configured data manager service to the `depe
 |                 | `upload_path`     | string  | no  | Custom path to use for uploading files. If not under `~/.viam/capture`, you will need to add to `additional_sync_paths` in datamanager service configuration. |
 | `direct_upload` |                   | object  | no  | When enabled, uploads saved clips directly to Viam App using DataSync `FileUpload` (avoids datamanager watched `upload_path`). |
 |                 | `enabled`         | boolean | no  | Enables direct upload. Default false.                                                             |
-|                 | `base_url`        | string  | no  | Viam App base URL. Default `https://app.viam.com`.                                                 |
+|                 | `base_url`        | string  | no  | DataSync gRPC endpoint in the form `protocol://host:port`. Default `https://app.viam.com:443`.     |
 |                 | `staging_dir`     | string  | no  | Directory to write clips before uploading. Defaults to `<storage_path>/direct-upload-staging`.     |
 |                 | `delete_after_upload` | boolean | no | Delete staged file after successful upload. Default true.                                          |
 |                 | `default_tags`    | array[string] | no | Tags applied to every upload.                                                                      |
