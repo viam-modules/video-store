@@ -11,7 +11,7 @@ import (
 
 	syncpb "go.viam.com/api/app/datasync/v1"
 	"go.viam.com/rdk/logging"
-	"go.viam.com/rdk/utils"
+	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/test"
 	"go.viam.com/utils/rpc"
 )
@@ -49,15 +49,25 @@ func TestDirectUploaderFileUploadSendsMetadataAndChunks(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 
 	// Env vars required by newDirectUploader.
-	t.Setenv(utils.APIKeyEnvVar, "fake-api-key")
-	t.Setenv(utils.APIKeyIDEnvVar, "fake-api-key-id")
-	t.Setenv(utils.MachinePartIDEnvVar, "part-123")
+	t.Setenv(rutils.APIKeyEnvVar, "fake-api-key")
+	t.Setenv(rutils.APIKeyIDEnvVar, "fake-api-key-id")
+	t.Setenv(rutils.MachinePartIDEnvVar, "part-123")
 
 	listener, err := net.Listen("tcp", "localhost:0")
 	test.That(t, err, test.ShouldBeNil)
 	t.Cleanup(func() { _ = listener.Close() })
 
-	rpcServer, err := rpc.NewServer(logger, rpc.WithUnauthenticated())
+	// The direct uploader dials with API-key credentials, which uses proto.rpc.v1.AuthService.
+	// So we must configure the server with an API-key auth handler (and entity data loader).
+	rpcServer, err := rpc.NewServer(
+		logger,
+		rpc.WithDisableMulticastDNS(),
+		rpc.WithAuthHandler(rpc.CredentialsTypeAPIKey, rpc.AuthHandlerFunc(
+			func(ctx context.Context, entity, payload string) (map[string]string, error) {
+				return map[string]string{}, nil
+			},
+		)),
+	)
 	test.That(t, err, test.ShouldBeNil)
 	t.Cleanup(func() { rpcServer.Stop() })
 
