@@ -63,7 +63,7 @@ func TestDirectUploaderFileUploadSendsMetadataAndChunks(t *testing.T) {
 		logger,
 		rpc.WithDisableMulticastDNS(),
 		rpc.WithAuthHandler(rpc.CredentialsTypeAPIKey, rpc.AuthHandlerFunc(
-			func(_ context.Context, entity, payload string) (map[string]string, error) {
+			func(_ context.Context, _, _ string) (map[string]string, error) {
 				return map[string]string{}, nil
 			},
 		)),
