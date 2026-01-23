@@ -42,7 +42,7 @@ func (s *fakeDataSyncServer) FileUpload(stream syncpb.DataSyncService_FileUpload
 			}
 		}
 	}
-	return stream.SendAndClose(&syncpb.FileUploadResponse{FileId: "file-123"})
+	return stream.SendAndClose(&syncpb.FileUploadResponse{BinaryDataId: "file-123"})
 }
 
 func TestDirectUploaderFileUploadSendsMetadataAndChunks(t *testing.T) {
