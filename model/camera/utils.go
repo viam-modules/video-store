@@ -46,11 +46,31 @@ func ToSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, err
 	if !ok {
 		async = false
 	}
+	// Parse tags array (optional)
+	var tags []string
+	if tagsIface, ok := command["tags"]; ok {
+		switch t := tagsIface.(type) {
+		case []interface{}:
+			tags = make([]string, 0, len(t))
+			for i, v := range t {
+				if str, ok := v.(string); ok {
+					tags = append(tags, str)
+				} else {
+					return nil, fmt.Errorf("tag at index %d is not a string", i)
+				}
+			}
+		case []string:
+			tags = t
+		default:
+			return nil, errors.New("tags must be an array of strings")
+		}
+	}
 	return &videostore.SaveRequest{
 		From:     from,
 		To:       to,
 		Metadata: metadata,
 		Async:    async,
+		Tags:     tags,
 	}, nil
 }
 

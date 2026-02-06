@@ -276,3 +276,49 @@ func TestExtractDateTimeFromFilename(t *testing.T) {
 		})
 	}
 }
+
+func TestConstructTagPath(t *testing.T) {
+	t.Run("nil tags", func(t *testing.T) {
+		result := ConstructTagPath(nil)
+		test.That(t, result, test.ShouldEqual, "")
+	})
+
+	t.Run("empty tags", func(t *testing.T) {
+		result := ConstructTagPath([]string{})
+		test.That(t, result, test.ShouldEqual, "")
+	})
+
+	t.Run("three tags", func(t *testing.T) {
+		result := ConstructTagPath([]string{"location", "quality", "sensor"})
+		expected := "tag=location/tag=quality/tag=sensor"
+		test.That(t, result, test.ShouldEqual, expected)
+	})
+}
+
+func TestGenerateOutputFilePath(t *testing.T) {
+	timestamp := time.Date(2024, 9, 6, 15, 0, 33, 0, time.UTC)
+
+	t.Run("no tags, no metadata", func(t *testing.T) {
+		result := GenerateOutputFilePath("video-store", timestamp, "", "/upload", nil)
+		expected := "/upload/video-store_2024-09-06_15-00-33.mp4"
+		test.That(t, result, test.ShouldEqual, expected)
+	})
+
+	t.Run("no tags, with metadata", func(t *testing.T) {
+		result := GenerateOutputFilePath("video-store", timestamp, "test-metadata", "/upload", nil)
+		expected := "/upload/video-store_2024-09-06_15-00-33_test-metadata.mp4"
+		test.That(t, result, test.ShouldEqual, expected)
+	})
+
+	t.Run("empty tags array", func(t *testing.T) {
+		result := GenerateOutputFilePath("video-store", timestamp, "", "/upload", []string{})
+		expected := "/upload/video-store_2024-09-06_15-00-33.mp4"
+		test.That(t, result, test.ShouldEqual, expected)
+	})
+
+	t.Run("three tags with metadata", func(t *testing.T) {
+		result := GenerateOutputFilePath("video-store", timestamp, "test-metadata", "/upload", []string{"location", "quality", "sensor"})
+		expected := "/upload/tag=location/tag=quality/tag=sensor/video-store_2024-09-06_15-00-33_test-metadata.mp4"
+		test.That(t, result, test.ShouldEqual, expected)
+	})
+}

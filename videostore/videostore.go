@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -115,6 +116,7 @@ type SaveRequest struct {
 	To       time.Time
 	Metadata string
 	Async    bool
+	Tags     []string // list of tags for data_manager
 }
 
 // SaveResponse is the response to the Save method.
@@ -129,6 +131,17 @@ func (r *SaveRequest) Validate() error {
 	}
 	if r.To.After(time.Now()) {
 		return errors.New("'to' timestamp is in the future")
+	}
+	// Validate tags
+	for i, tag := range r.Tags {
+		if tag == "" {
+			return fmt.Errorf("tag at index %d is empty", i)
+		}
+		// Check for invalid characters that could cause filesystem issues
+		invalidChars := `/\:*?"<>|.`
+		if idx := strings.IndexAny(tag, invalidChars); idx != -1 {
+			return fmt.Errorf("tag at index %d contains invalid character '%c'", i, tag[idx])
+		}
 	}
 	return nil
 }
@@ -375,7 +388,8 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		vs.config.Storage.OutputFileNamePrefix,
 		r.From,
 		"",
-		tempPath)
+		tempPath,
+		nil)
 
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
@@ -414,7 +428,8 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		vs.config.Storage.OutputFileNamePrefix,
 		r.From,
 		"",
-		tempPath)
+		tempPath,
+		nil)
 
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
@@ -485,6 +500,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 		r.From,
 		r.Metadata,
 		vs.config.Storage.UploadPath,
+		r.Tags,
 	)
 	uploadFileName := filepath.Base(uploadFilePath)
 	if r.Async {
