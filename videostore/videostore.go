@@ -36,6 +36,8 @@ const (
 	retryIntervalSeconds = 1         // seconds
 	asyncTimeoutSeconds  = 60        // seconds
 	streamingChunkSize   = 1024 * 64 // bytes
+
+	uploadDirPermissions = 0o750 // directory permissions for upload paths
 )
 
 var (
@@ -512,7 +514,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	}
 
 	// Create tag subdirectories if needed
-	if err := os.MkdirAll(filepath.Dir(uploadFilePath), 0o750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(uploadFilePath), uploadDirPermissions); err != nil {
 		vs.logger.Error("failed to create upload directory ", err)
 		return nil, err
 	}
@@ -697,7 +699,7 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 	case <-timer.C:
 		vs.logger.Debugf("executing concat for %s", path)
 		// Create tag subdirectories if needed
-		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), uploadDirPermissions); err != nil {
 			vs.logger.Error("failed to create upload directory ", err)
 			return
 		}
