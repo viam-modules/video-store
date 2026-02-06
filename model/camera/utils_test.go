@@ -2,7 +2,6 @@ package camera
 
 import (
 	"testing"
-	"time"
 
 	"github.com/viam-modules/video-store/videostore"
 	vsutils "github.com/viam-modules/video-store/videostore/utils"
