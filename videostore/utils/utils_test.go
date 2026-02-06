@@ -296,7 +296,7 @@ func TestConstructTagPath(t *testing.T) {
 }
 
 func TestGenerateOutputFilePath(t *testing.T) {
-	timestamp := time.Date(2024, 9, 6, 15, 0, 33, 0, time.UTC)
+	timestamp := time.Date(2024, 9, 6, 15, 0, 33, 0, time.Local)
 
 	t.Run("no tags, no metadata", func(t *testing.T) {
 		result := GenerateOutputFilePath("video-store", timestamp, "", "/upload", nil)
