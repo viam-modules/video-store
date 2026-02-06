@@ -512,7 +512,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	}
 
 	// Create tag subdirectories if needed
-	if err := os.MkdirAll(filepath.Dir(uploadFilePath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(uploadFilePath), 0o750); err != nil {
 		vs.logger.Error("failed to create upload directory ", err)
 		return nil, err
 	}
@@ -697,7 +697,7 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 	case <-timer.C:
 		vs.logger.Debugf("executing concat for %s", path)
 		// Create tag subdirectories if needed
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 			vs.logger.Error("failed to create upload directory ", err)
 			return
 		}

@@ -353,7 +353,7 @@ func ConstructTagPath(tags []string) string {
 	}
 	parts := make([]string, len(tags))
 	for i, tag := range tags {
-		parts[i] = fmt.Sprintf("tag=%s", tag)
+		parts[i] = "tag=" + tag
 	}
 	return filepath.Join(parts...)
 }
