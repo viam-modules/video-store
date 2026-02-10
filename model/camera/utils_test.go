@@ -73,7 +73,7 @@ func TestToSaveCommand(t *testing.T) {
 
 		req, err := ToSaveCommand(command)
 		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "tag at index 1 is not a string")
+		test.That(t, err.Error(), test.ShouldEqual, "tag at index 1 is not a string")
 		test.That(t, req, test.ShouldBeNil)
 	})
 
@@ -86,7 +86,7 @@ func TestToSaveCommand(t *testing.T) {
 
 		req, err := ToSaveCommand(command)
 		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "tags must be an array of strings")
+		test.That(t, err.Error(), test.ShouldEqual, "tags must be an array of strings")
 		test.That(t, req, test.ShouldBeNil)
 	})
 
@@ -97,7 +97,7 @@ func TestToSaveCommand(t *testing.T) {
 
 		req, err := ToSaveCommand(command)
 		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "from timestamp not found")
+		test.That(t, err.Error(), test.ShouldEqual, "from timestamp not found")
 		test.That(t, req, test.ShouldBeNil)
 	})
 
@@ -108,7 +108,7 @@ func TestToSaveCommand(t *testing.T) {
 
 		req, err := ToSaveCommand(command)
 		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "to timestamp not found")
+		test.That(t, err.Error(), test.ShouldEqual, "to timestamp not found")
 		test.That(t, req, test.ShouldBeNil)
 	})
 }
@@ -173,7 +173,7 @@ func TestParseTimeRange(t *testing.T) {
 
 		_, _, err := parseTimeRange(command)
 		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "from timestamp not found")
+		test.That(t, err.Error(), test.ShouldEqual, "from timestamp not found")
 	})
 
 	t.Run("missing to", func(t *testing.T) {
@@ -183,6 +183,6 @@ func TestParseTimeRange(t *testing.T) {
 
 		_, _, err := parseTimeRange(command)
 		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "to timestamp not found")
+		test.That(t, err.Error(), test.ShouldEqual, "to timestamp not found")
 	})
 }
