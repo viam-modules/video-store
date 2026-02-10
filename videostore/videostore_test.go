@@ -840,7 +840,7 @@ func TestSaveRequestValidate(t *testing.T) {
 		}
 		err := req.Validate()
 		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "invalid character '.'")
+		test.That(t, err.Error(), test.ShouldEqual, "tag at index 0 is invalid")
 	})
 
 	t.Run("from after to", func(t *testing.T) {

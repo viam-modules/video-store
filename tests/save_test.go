@@ -406,6 +406,6 @@ func TestSaveDoCommand(t *testing.T) {
 
 		_, err = vs.DoCommand(timeoutCtx, saveCmd)
 		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "invalid character")
+		test.That(t, err.Error(), test.ShouldContainSubstring, "is invalid")
 	})
 }

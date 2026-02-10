@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -139,10 +138,9 @@ func (r *SaveRequest) Validate() error {
 		if tag == "" {
 			return fmt.Errorf("tag at index %d is empty", i)
 		}
-		// Check for invalid characters that could cause filesystem issues
-		invalidChars := `/\:*?"<>|.`
-		if idx := strings.IndexAny(tag, invalidChars); idx != -1 {
-			return fmt.Errorf("tag at index %d contains invalid character '%c'", i, tag[idx])
+		// Ensure tag doesn't contain path separators or directory traversal
+		if tag != filepath.Base(tag) {
+			return fmt.Errorf("tag at index %d is invalid", i)
 		}
 	}
 	return nil
