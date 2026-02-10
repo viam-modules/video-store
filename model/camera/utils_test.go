@@ -64,6 +64,20 @@ func TestToSaveCommand(t *testing.T) {
 		test.That(t, len(req.Tags), test.ShouldEqual, 0)
 	})
 
+	t.Run("valid command with tags but no metadata", func(t *testing.T) {
+		command := map[string]interface{}{
+			"from": "2024-09-06_15-00-33",
+			"to":   "2024-09-06_15-01-33",
+			"tags": []interface{}{"location", "quality"},
+		}
+
+		req, err := ToSaveCommand(command)
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, req, test.ShouldNotBeNil)
+		test.That(t, req.Tags, test.ShouldResemble, []string{"location", "quality"})
+		test.That(t, req.Metadata, test.ShouldEqual, "")
+	})
+
 	t.Run("invalid tags - non-string element", func(t *testing.T) {
 		command := map[string]interface{}{
 			"from": "2024-09-06_15-00-33",
