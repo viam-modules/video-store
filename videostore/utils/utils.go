@@ -346,13 +346,19 @@ func cacheFirstVid(first *VideoInfo, current VideoInfo) {
 }
 
 // ConstructTagPath builds a directory path from tags.
+// Tags are sorted alphabetically for deterministic path generation.
 // Example: ["location", "quality"] -> "tag=location/tag=quality"
 func ConstructTagPath(tags []string) string {
 	if len(tags) == 0 {
 		return ""
 	}
-	parts := make([]string, len(tags))
-	for i, tag := range tags {
+	// Sort tags for deterministic ordering
+	sortedTags := make([]string, len(tags))
+	copy(sortedTags, tags)
+	sort.Strings(sortedTags)
+
+	parts := make([]string, len(sortedTags))
+	for i, tag := range sortedTags {
 		parts[i] = "tag=" + tag
 	}
 	return filepath.Join(parts...)

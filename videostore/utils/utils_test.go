@@ -3,6 +3,7 @@ package vsutils
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -288,9 +289,15 @@ func TestConstructTagPath(t *testing.T) {
 		test.That(t, result, test.ShouldEqual, "")
 	})
 
-	t.Run("three tags", func(t *testing.T) {
+	t.Run("three tags sorted alphabetically", func(t *testing.T) {
 		result := ConstructTagPath([]string{"location", "quality", "sensor"})
-		expected := "tag=location/tag=quality/tag=sensor"
+		expected := filepath.Join("tag=location", "tag=quality", "tag=sensor")
+		test.That(t, result, test.ShouldEqual, expected)
+	})
+
+	t.Run("unsorted tags get sorted", func(t *testing.T) {
+		result := ConstructTagPath([]string{"zebra", "apple", "middle"})
+		expected := filepath.Join("tag=apple", "tag=middle", "tag=zebra")
 		test.That(t, result, test.ShouldEqual, expected)
 	})
 }
@@ -300,25 +307,25 @@ func TestGenerateOutputFilePath(t *testing.T) {
 
 	t.Run("no tags, no metadata", func(t *testing.T) {
 		result := GenerateOutputFilePath("video-store", timestamp, "", "/upload", nil)
-		expected := "/upload/video-store_2024-09-06_15-00-33.mp4"
+		expected := filepath.Join("/upload", "video-store_2024-09-06_15-00-33.mp4")
 		test.That(t, result, test.ShouldEqual, expected)
 	})
 
 	t.Run("no tags, with metadata", func(t *testing.T) {
 		result := GenerateOutputFilePath("video-store", timestamp, "test-metadata", "/upload", nil)
-		expected := "/upload/video-store_2024-09-06_15-00-33_test-metadata.mp4"
+		expected := filepath.Join("/upload", "video-store_2024-09-06_15-00-33_test-metadata.mp4")
 		test.That(t, result, test.ShouldEqual, expected)
 	})
 
 	t.Run("empty tags array", func(t *testing.T) {
 		result := GenerateOutputFilePath("video-store", timestamp, "", "/upload", []string{})
-		expected := "/upload/video-store_2024-09-06_15-00-33.mp4"
+		expected := filepath.Join("/upload", "video-store_2024-09-06_15-00-33.mp4")
 		test.That(t, result, test.ShouldEqual, expected)
 	})
 
 	t.Run("three tags with metadata", func(t *testing.T) {
 		result := GenerateOutputFilePath("video-store", timestamp, "test-metadata", "/upload", []string{"location", "quality", "sensor"})
-		expected := "/upload/tag=location/tag=quality/tag=sensor/video-store_2024-09-06_15-00-33_test-metadata.mp4"
+		expected := filepath.Join("/upload", "tag=location", "tag=quality", "tag=sensor", "video-store_2024-09-06_15-00-33_test-metadata.mp4")
 		test.That(t, result, test.ShouldEqual, expected)
 	})
 }
