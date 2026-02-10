@@ -35,6 +35,8 @@ const (
 	retryIntervalSeconds = 1         // seconds
 	asyncTimeoutSeconds  = 60        // seconds
 	streamingChunkSize   = 1024 * 64 // bytes
+
+	uploadDirPermissions = 0o750 // directory permissions for upload paths
 )
 
 var (
@@ -115,6 +117,7 @@ type SaveRequest struct {
 	To       time.Time
 	Metadata string
 	Async    bool
+	Tags     []string // list of tags for data_manager
 }
 
 // SaveResponse is the response to the Save method.
@@ -129,6 +132,16 @@ func (r *SaveRequest) Validate() error {
 	}
 	if r.To.After(time.Now()) {
 		return errors.New("'to' timestamp is in the future")
+	}
+	// Validate tags
+	for i, tag := range r.Tags {
+		if tag == "" {
+			return fmt.Errorf("tag at index %d is empty", i)
+		}
+		// Ensure tag doesn't contain path separators or directory traversal
+		if tag != filepath.Base(tag) {
+			return fmt.Errorf("tag at index %d is invalid", i)
+		}
 	}
 	return nil
 }
@@ -375,7 +388,8 @@ func (vs *videostore) Fetch(_ context.Context, r *FetchRequest) (*FetchResponse,
 		vs.config.Storage.OutputFileNamePrefix,
 		r.From,
 		"",
-		tempPath)
+		tempPath,
+		nil)
 
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
@@ -414,7 +428,8 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		vs.config.Storage.OutputFileNamePrefix,
 		r.From,
 		"",
-		tempPath)
+		tempPath,
+		nil)
 
 	// Always attempt to remove the concat file after the operation.
 	// This handles error cases in Concat where it fails in the middle
@@ -485,6 +500,7 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 		r.From,
 		r.Metadata,
 		vs.config.Storage.UploadPath,
+		r.Tags,
 	)
 	uploadFileName := filepath.Base(uploadFilePath)
 	if r.Async {
@@ -493,6 +509,12 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 			vs.asyncSave(ctx, r.From, r.To, uploadFilePath)
 		})
 		return &SaveResponse{Filename: uploadFileName}, nil
+	}
+
+	// Create tag subdirectories if needed
+	if err := os.MkdirAll(filepath.Dir(uploadFilePath), uploadDirPermissions); err != nil {
+		vs.logger.Error("failed to create upload directory ", err)
+		return nil, err
 	}
 
 	if err := vs.concater.Concat(r.From, r.To, uploadFilePath); err != nil {
@@ -674,6 +696,11 @@ func (vs *videostore) asyncSave(ctx context.Context, from, to time.Time, path st
 	select {
 	case <-timer.C:
 		vs.logger.Debugf("executing concat for %s", path)
+		// Create tag subdirectories if needed
+		if err := os.MkdirAll(filepath.Dir(path), uploadDirPermissions); err != nil {
+			vs.logger.Error("failed to create upload directory ", err)
+			return
+		}
 		err := vs.concater.Concat(from, to, path)
 		if err != nil {
 			vs.logger.Error("failed to concat files ", err)

@@ -345,9 +345,28 @@ func cacheFirstVid(first *VideoInfo, current VideoInfo) {
 	}
 }
 
+// ConstructTagPath builds a directory path from tags.
+// Tags are sorted alphabetically for deterministic path generation.
+// Example: ["location", "quality"] -> "tag=location/tag=quality"
+func ConstructTagPath(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	// Sort tags for deterministic ordering
+	sortedTags := make([]string, len(tags))
+	copy(sortedTags, tags)
+	sort.Strings(sortedTags)
+
+	parts := make([]string, len(sortedTags))
+	for i, tag := range sortedTags {
+		parts[i] = "tag=" + tag
+	}
+	return filepath.Join(parts...)
+}
+
 // GenerateOutputFilePath generates the output filename for the video file.
 // The filename timestamp is formatted in local time.
-func GenerateOutputFilePath(prefix string, timestamp time.Time, metadata, dir string) string {
+func GenerateOutputFilePath(prefix string, timestamp time.Time, metadata, dir string, tags []string) string {
 	// Format timestamp in local time for user-friendly filenames
 	//nolint:gosmopolitan // datetime format timestamps must be parsed into local time for outputs.
 	// We do not rely on localtime strftime for actual segments. They are stored in Unix UTC time.
@@ -361,6 +380,11 @@ func GenerateOutputFilePath(prefix string, timestamp time.Time, metadata, dir st
 		filename = fmt.Sprintf("%s_%s", filename, metadata)
 	}
 
+	// Construct the full path with tag subdirectories
+	tagPath := ConstructTagPath(tags)
+	if tagPath != "" {
+		return filepath.Join(dir, tagPath, filename+".mp4")
+	}
 	return filepath.Join(dir, filename+".mp4")
 }
 

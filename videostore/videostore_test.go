@@ -767,3 +767,91 @@ func TestFetchStreamContainerFormat(t *testing.T) {
 		})
 	}
 }
+
+// TestSaveRequestValidate tests the SaveRequest.Validate method with tags.
+func TestSaveRequestValidate(t *testing.T) {
+	t.Run("valid request without tags", func(t *testing.T) {
+		req := &SaveRequest{
+			From:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			To:       time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC),
+			Metadata: "test",
+			Async:    false,
+		}
+		err := req.Validate()
+		test.That(t, err, test.ShouldBeNil)
+	})
+
+	t.Run("valid request with tags", func(t *testing.T) {
+		req := &SaveRequest{
+			From:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			To:       time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC),
+			Metadata: "test",
+			Async:    false,
+			Tags:     []string{"location", "quality"},
+		}
+		err := req.Validate()
+		test.That(t, err, test.ShouldBeNil)
+	})
+
+	t.Run("empty tags array", func(t *testing.T) {
+		req := &SaveRequest{
+			From:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			To:       time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC),
+			Metadata: "test",
+			Async:    false,
+			Tags:     []string{},
+		}
+		err := req.Validate()
+		test.That(t, err, test.ShouldBeNil)
+	})
+
+	t.Run("nil tags", func(t *testing.T) {
+		req := &SaveRequest{
+			From:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			To:       time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC),
+			Metadata: "test",
+			Async:    false,
+			Tags:     nil,
+		}
+		err := req.Validate()
+		test.That(t, err, test.ShouldBeNil)
+	})
+
+	t.Run("empty string in tags", func(t *testing.T) {
+		req := &SaveRequest{
+			From:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			To:       time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC),
+			Metadata: "test",
+			Async:    false,
+			Tags:     []string{"location", "", "quality"},
+		}
+		err := req.Validate()
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "tag at index 1 is empty")
+	})
+
+	t.Run("directory traversal in tag", func(t *testing.T) {
+		req := &SaveRequest{
+			From:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			To:       time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC),
+			Metadata: "test",
+			Async:    false,
+			Tags:     []string{"../etc"},
+		}
+		err := req.Validate()
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldEqual, "tag at index 0 is invalid")
+	})
+
+	t.Run("from after to", func(t *testing.T) {
+		req := &SaveRequest{
+			From:     time.Date(2024, 1, 1, 2, 0, 0, 0, time.UTC),
+			To:       time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC),
+			Metadata: "test",
+			Async:    false,
+		}
+		err := req.Validate()
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "after")
+	})
+}

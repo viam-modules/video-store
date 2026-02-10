@@ -348,4 +348,64 @@ func TestSaveDoCommand(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		testVideoPlayback(t, concatPath)
 	})
+
+	t.Run("Test Save DoCommand with tags", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config1)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		vs, err := camera.FromProvider(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
+
+		saveCmd := map[string]interface{}{
+			"command":  "save",
+			"from":     validFromTimestamp,
+			"to":       validToTimestamp,
+			"metadata": "test-metadata",
+			"tags":     []string{"location", "quality"},
+		}
+
+		res, err := vs.DoCommand(timeoutCtx, saveCmd)
+		test.That(t, err, test.ShouldBeNil)
+		filename, ok := res["filename"].(string)
+		test.That(t, ok, test.ShouldBeTrue)
+
+		fromTime, err := time.Parse(vsutils.TimeFormat, validFromTimestamp)
+		test.That(t, err, test.ShouldBeNil)
+		expectedFilename := fmt.Sprintf("%s_%s_%s.mp4",
+			videoStoreComponentName,
+			fromTime.Format(vsutils.TimeFormat),
+			"test-metadata")
+		test.That(t, filename, test.ShouldEqual, expectedFilename)
+
+		// Verify file is in the nested tag subdirectories
+		filePath := filepath.Join(testUploadPath, "tag=location", "tag=quality", filename)
+		_, err = os.Stat(filePath)
+		test.That(t, err, test.ShouldBeNil)
+		testVideoPlayback(t, filePath)
+		testVideoDuration(t, filePath, 60)
+	})
+
+	t.Run("Test Save DoCommand with invalid tag", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		r, err := setupViamServer(timeoutCtx, config1)
+		test.That(t, err, test.ShouldBeNil)
+		defer r.Close(timeoutCtx)
+		vs, err := camera.FromProvider(r, videoStoreComponentName)
+		test.That(t, err, test.ShouldBeNil)
+
+		saveCmd := map[string]interface{}{
+			"command":  "save",
+			"from":     validFromTimestamp,
+			"to":       validToTimestamp,
+			"metadata": "test-metadata",
+			"tags":     []string{"location/path"},
+		}
+
+		_, err = vs.DoCommand(timeoutCtx, saveCmd)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "is invalid")
+	})
 }
