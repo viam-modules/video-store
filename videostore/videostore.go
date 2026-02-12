@@ -524,6 +524,12 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 	return &SaveResponse{Filename: uploadFileName}, nil
 }
 
+// clearLatestFrame sets the latest frame atomic to a nil byte slice.
+// Useful to remove stale frames when underlying cam is unhealthy.
+func (vs *videostore) clearLatestFrame() {
+	vs.latestFrame.Store([]byte(nil))
+}
+
 func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerConfig,
 ) {
 	frameInterval := time.Second / time.Duration(framePoller.Framerate)
@@ -541,6 +547,7 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 					framePoller.Camera.Name(),
 					err,
 				)
+				vs.clearLatestFrame()
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
@@ -550,6 +557,7 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 					"no images received from camera %s",
 					framePoller.Camera.Name(),
 				)
+				vs.clearLatestFrame()
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			} else if len(namedImages) > 1 {
@@ -558,6 +566,7 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 					len(namedImages),
 					framePoller.Camera.Name(),
 				)
+				vs.clearLatestFrame()
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
@@ -566,11 +575,13 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 			data, err := namedImage.Bytes(ctx)
 			if err != nil {
 				vs.logger.Warnf("failed to get bytes from image: %v", err)
+				vs.clearLatestFrame()
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
 			if actualMimeType, _ := rutils.CheckLazyMIMEType(namedImage.MimeType()); actualMimeType != rutils.MimeTypeJPEG {
 				vs.logger.Warnf("expected image mime type %s got %s: ", rutils.MimeTypeJPEG, actualMimeType)
+				vs.clearLatestFrame()
 				continue
 			}
 			vs.latestFrame.Store(data)
