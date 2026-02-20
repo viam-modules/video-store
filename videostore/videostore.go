@@ -466,9 +466,15 @@ func (vs *videostore) FetchStream(ctx context.Context, r *FetchRequest, emit fun
 		// for that open file descriptor. We don't need to manage it ourselves.
 		n, readErr := file.Read(buf)
 		if n > 0 {
+			// Copy before emitting: buf is reused each iteration, so passing
+			// buf[:n] directly would let the next file.Read overwrite the
+			// backing array before an async consumer (e.g. gRPC server
+			// goroutine) finishes reading the bytes.
+			chunk := make([]byte, n)
+			copy(chunk, buf[:n])
 			if emitErr := emit(
 				video.Chunk{
-					Data:      buf[:n],
+					Data:      chunk,
 					Container: r.Container.String(),
 				}); emitErr != nil {
 				return emitErr
