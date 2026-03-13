@@ -527,7 +527,9 @@ func (vs *videostore) Save(_ context.Context, r *SaveRequest) (*SaveResponse, er
 // clearLatestFrame sets the latest frame atomic to a nil byte slice.
 // Useful to remove stale frames when underlying cam is unhealthy.
 func (vs *videostore) clearLatestFrame() {
-	vs.latestFrame.Store([]byte(nil))
+	if frame := vs.latestFrame.Load(); frame != nil {
+		vs.latestFrame.Store([]byte(nil))
+	}
 }
 
 func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerConfig,
