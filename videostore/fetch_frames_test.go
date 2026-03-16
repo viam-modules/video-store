@@ -234,11 +234,13 @@ func TestFetchFrames(t *testing.T) {
 		})
 
 		// Poll until a valid frame is stored
+		var storedFrameBytes []byte
 		timeout := time.After(5 * time.Second)
 		for {
 			frame := vs.latestFrame.Load()
 			frameBytes, ok := frame.([]byte)
 			if ok && len(frameBytes) > 0 {
+				storedFrameBytes = frameBytes
 				break
 			}
 			select {
@@ -248,6 +250,8 @@ func TestFetchFrames(t *testing.T) {
 				time.Sleep(50 * time.Millisecond)
 			}
 		}
+		test.That(t, storedFrameBytes, test.ShouldNotBeNil)
+		test.That(t, len(storedFrameBytes), test.ShouldBeGreaterThan, 0)
 
 		// Switch camera to return depth image
 		depthImage, err := camera.NamedImageFromBytes([]byte("fake depth data"), "depth", "image/vnd.viam.dep")
@@ -257,11 +261,13 @@ func TestFetchFrames(t *testing.T) {
 		mockCam.mu.Unlock()
 
 		// Poll until the stale frame is cleared
+		var clearedFrameBytes []byte
 		timeout = time.After(5 * time.Second)
 		for {
 			frame := vs.latestFrame.Load()
 			frameBytes, ok := frame.([]byte)
 			if ok && frameBytes == nil {
+				clearedFrameBytes = frameBytes
 				break
 			}
 			select {
@@ -271,6 +277,222 @@ func TestFetchFrames(t *testing.T) {
 				time.Sleep(50 * time.Millisecond)
 			}
 		}
+		test.That(t, clearedFrameBytes, test.ShouldBeNil)
+	})
+
+	t.Run("Clears stale frame when 0 images returned", func(t *testing.T) {
+		jpegImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
+		test.That(t, err, test.ShouldBeNil)
+
+		mockCam := &mockCamera{
+			name: resource.NewName(camera.API, "test-camera"),
+			imagesToReturn: []camera.NamedImage{
+				jpegImage,
+			},
+		}
+
+		vs := &videostore{
+			config:      Config{},
+			logger:      logger,
+			latestFrame: &atomic.Value{},
+		}
+		vs.latestFrame.Store([]byte{})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		go vs.fetchFrames(ctx, FramePollerConfig{
+			Framerate: 30,
+			Camera:    mockCam,
+		})
+
+		// Poll until a valid frame is stored
+		var storedFrameBytes []byte
+		timeout := time.After(5 * time.Second)
+		for {
+			frame := vs.latestFrame.Load()
+			frameBytes, ok := frame.([]byte)
+			if ok && len(frameBytes) > 0 {
+				storedFrameBytes = frameBytes
+				break
+			}
+			select {
+			case <-timeout:
+				t.Fatal("timed out waiting for valid frame to be stored")
+			default:
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+		test.That(t, storedFrameBytes, test.ShouldNotBeNil)
+		test.That(t, len(storedFrameBytes), test.ShouldBeGreaterThan, 0)
+
+		// Switch camera to return 0 images
+		mockCam.mu.Lock()
+		mockCam.imagesToReturn = []camera.NamedImage{}
+		mockCam.mu.Unlock()
+
+		// Poll until the stale frame is cleared
+		var clearedFrameBytes []byte
+		timeout = time.After(5 * time.Second)
+		for {
+			frame := vs.latestFrame.Load()
+			frameBytes, ok := frame.([]byte)
+			if ok && frameBytes == nil {
+				clearedFrameBytes = frameBytes
+				break
+			}
+			select {
+			case <-timeout:
+				t.Fatal("timed out waiting for stale frame to be cleared")
+			default:
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+		test.That(t, clearedFrameBytes, test.ShouldBeNil)
+	})
+
+	t.Run("Clears stale frame when more than 1 image returned", func(t *testing.T) {
+		jpegImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
+		test.That(t, err, test.ShouldBeNil)
+
+		mockCam := &mockCamera{
+			name: resource.NewName(camera.API, "test-camera"),
+			imagesToReturn: []camera.NamedImage{
+				jpegImage,
+			},
+		}
+
+		vs := &videostore{
+			config:      Config{},
+			logger:      logger,
+			latestFrame: &atomic.Value{},
+		}
+		vs.latestFrame.Store([]byte{})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		go vs.fetchFrames(ctx, FramePollerConfig{
+			Framerate: 30,
+			Camera:    mockCam,
+		})
+
+		// Poll until a valid frame is stored
+		var storedFrameBytes []byte
+		timeout := time.After(5 * time.Second)
+		for {
+			frame := vs.latestFrame.Load()
+			frameBytes, ok := frame.([]byte)
+			if ok && len(frameBytes) > 0 {
+				storedFrameBytes = frameBytes
+				break
+			}
+			select {
+			case <-timeout:
+				t.Fatal("timed out waiting for valid frame to be stored")
+			default:
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+		test.That(t, storedFrameBytes, test.ShouldNotBeNil)
+		test.That(t, len(storedFrameBytes), test.ShouldBeGreaterThan, 0)
+
+		// Switch camera to return 2 images
+		secondImage, err := camera.NamedImageFromBytes(jpegData, "depth", rutils.MimeTypeJPEG)
+		test.That(t, err, test.ShouldBeNil)
+		mockCam.mu.Lock()
+		mockCam.imagesToReturn = []camera.NamedImage{jpegImage, secondImage}
+		mockCam.mu.Unlock()
+
+		// Poll until the stale frame is cleared
+		var clearedFrameBytes []byte
+		timeout = time.After(5 * time.Second)
+		for {
+			frame := vs.latestFrame.Load()
+			frameBytes, ok := frame.([]byte)
+			if ok && frameBytes == nil {
+				clearedFrameBytes = frameBytes
+				break
+			}
+			select {
+			case <-timeout:
+				t.Fatal("timed out waiting for stale frame to be cleared")
+			default:
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+		test.That(t, clearedFrameBytes, test.ShouldBeNil)
+	})
+
+	t.Run("Clears stale frame when Images() returns error", func(t *testing.T) {
+		jpegImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
+		test.That(t, err, test.ShouldBeNil)
+
+		mockCam := &mockCamera{
+			name: resource.NewName(camera.API, "test-camera"),
+			imagesToReturn: []camera.NamedImage{
+				jpegImage,
+			},
+		}
+
+		vs := &videostore{
+			config:      Config{},
+			logger:      logger,
+			latestFrame: &atomic.Value{},
+		}
+		vs.latestFrame.Store([]byte{})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		go vs.fetchFrames(ctx, FramePollerConfig{
+			Framerate: 30,
+			Camera:    mockCam,
+		})
+
+		// Poll until a valid frame is stored
+		var storedFrameBytes []byte
+		timeout := time.After(5 * time.Second)
+		for {
+			frame := vs.latestFrame.Load()
+			frameBytes, ok := frame.([]byte)
+			if ok && len(frameBytes) > 0 {
+				storedFrameBytes = frameBytes
+				break
+			}
+			select {
+			case <-timeout:
+				t.Fatal("timed out waiting for valid frame to be stored")
+			default:
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+		test.That(t, storedFrameBytes, test.ShouldNotBeNil)
+		test.That(t, len(storedFrameBytes), test.ShouldBeGreaterThan, 0)
+
+		// Switch camera to return an error
+		mockCam.mu.Lock()
+		mockCam.returnError = errors.New("camera unavailable")
+		mockCam.mu.Unlock()
+
+		// Poll until the stale frame is cleared
+		var clearedFrameBytes []byte
+		timeout = time.After(5 * time.Second)
+		for {
+			frame := vs.latestFrame.Load()
+			frameBytes, ok := frame.([]byte)
+			if ok && frameBytes == nil {
+				clearedFrameBytes = frameBytes
+				break
+			}
+			select {
+			case <-timeout:
+				t.Fatal("timed out waiting for stale frame to be cleared")
+			default:
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+		test.That(t, clearedFrameBytes, test.ShouldBeNil)
 	})
 
 	t.Run("Continues on Images error", func(t *testing.T) {
