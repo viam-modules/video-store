@@ -495,6 +495,56 @@ func TestFetchFrames(t *testing.T) {
 		test.That(t, clearedFrameBytes, test.ShouldBeNil)
 	})
 
+	t.Run("Clears stale frame when Bytes() errors", func(t *testing.T) {
+		// Build a NamedImage that will error on Bytes(): use an unsupported mime type
+		// so that rimage.EncodeImage hits its default error case.
+		badImg := image.NewNRGBA(image.Rect(0, 0, 1, 1))
+		badNamedImage, err := camera.NamedImageFromImage(badImg, "color", "image/bogus")
+		test.That(t, err, test.ShouldBeNil)
+
+		mockCam := &mockCamera{
+			name:           resource.NewName(camera.API, "test-camera"),
+			imagesToReturn: []camera.NamedImage{badNamedImage},
+		}
+
+		vs := &videostore{
+			config:      Config{},
+			logger:      logger,
+			latestFrame: &atomic.Value{},
+		}
+		// Pre-seed a stale frame to verify it gets cleared.
+		vs.latestFrame.Store([]byte("stale"))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		go vs.fetchFrames(ctx, FramePollerConfig{
+			Framerate: 30,
+			Camera:    mockCam,
+		})
+
+		// Poll until the stale frame is cleared.
+		timeout := time.After(5 * time.Second)
+		for {
+			frame := vs.latestFrame.Load()
+			frameBytes, ok := frame.([]byte)
+			if ok && frameBytes == nil {
+				break
+			}
+			select {
+			case <-timeout:
+				t.Fatal("timed out waiting for stale frame to be cleared after Bytes() error")
+			default:
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+
+		frame := vs.latestFrame.Load()
+		frameBytes, ok := frame.([]byte)
+		test.That(t, ok, test.ShouldBeTrue)
+		test.That(t, frameBytes, test.ShouldBeNil)
+	})
+
 	t.Run("Continues on Images error", func(t *testing.T) {
 		mockCam := &mockCamera{
 			name:        resource.NewName(camera.API, "test-camera"),
