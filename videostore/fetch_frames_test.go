@@ -254,7 +254,7 @@ func TestFetchFrames(t *testing.T) {
 		test.That(t, len(storedFrameBytes), test.ShouldBeGreaterThan, 0)
 
 		// Switch camera to return depth image
-		depthImage, err := camera.NamedImageFromBytes([]byte("fake depth data"), "depth", "image/vnd.viam.dep")
+		depthImage, err := camera.NamedImageFromBytes([]byte("fake depth data"), "depth", rutils.MimeTypeRawDepth)
 		test.That(t, err, test.ShouldBeNil)
 		mockCam.mu.Lock()
 		mockCam.imagesToReturn = []camera.NamedImage{depthImage}
