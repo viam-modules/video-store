@@ -17,8 +17,10 @@ func main() {
 }
 
 func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
+	// Use "warning" even in debug mode because FFmpeg's debug/info output goes to stderr,
+	// which the module manager captures as error-level logs, flooding the log stream.
 	if logger.GetLevel() == logging.DEBUG {
-		vsutils.SetLibAVLogLevel("debug")
+		vsutils.SetLibAVLogLevel("warning")
 	} else {
 		vsutils.SetLibAVLogLevel("fatal")
 	}
