@@ -26,7 +26,7 @@ jobs:
           - platform: linux/amd64
             runs-on: ubuntu-latest
           - platform: linux/arm64
-            runs-on: buildjet-8vcpu-ubuntu-2204-arm
+            runs-on: github-linux-arm64-8core
           - platform: darwin/arm64
             runs-on: macos-latest
 
