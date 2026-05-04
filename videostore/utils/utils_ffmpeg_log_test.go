@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"syscall"
 	"testing"
 
 	"go.viam.com/test"
+	"golang.org/x/sys/unix"
 )
 
 // captureFFmpegStreams redirects OS-level fd 1 (stdout) and fd 2 (stderr),
@@ -17,11 +17,11 @@ import (
 func captureFFmpegStreams(t *testing.T, fn func()) (stdout, stderr string) {
 	t.Helper()
 
-	origOut, err := syscall.Dup(syscall.Stdout)
+	origOut, err := unix.Dup(unix.Stdout)
 	if err != nil {
 		t.Fatalf("dup stdout: %v", err)
 	}
-	origErr, err := syscall.Dup(syscall.Stderr)
+	origErr, err := unix.Dup(unix.Stderr)
 	if err != nil {
 		t.Fatalf("dup stderr: %v", err)
 	}
@@ -35,10 +35,10 @@ func captureFFmpegStreams(t *testing.T, fn func()) (stdout, stderr string) {
 		t.Fatalf("pipe stderr: %v", err)
 	}
 
-	if err := syscall.Dup2(int(wOut.Fd()), syscall.Stdout); err != nil {
+	if err := unix.Dup2(int(wOut.Fd()), unix.Stdout); err != nil {
 		t.Fatalf("dup2 stdout: %v", err)
 	}
-	if err := syscall.Dup2(int(wErr.Fd()), syscall.Stderr); err != nil {
+	if err := unix.Dup2(int(wErr.Fd()), unix.Stderr); err != nil {
 		t.Fatalf("dup2 stderr: %v", err)
 	}
 
@@ -46,14 +46,14 @@ func captureFFmpegStreams(t *testing.T, fn func()) (stdout, stderr string) {
 
 	// Restore original fds BEFORE reading. Dup2 replaces fd 1/2 which closes their
 	// connection to the pipe write end, allowing io.Copy below to see EOF.
-	if err := syscall.Dup2(origOut, syscall.Stdout); err != nil {
+	if err := unix.Dup2(origOut, unix.Stdout); err != nil {
 		t.Fatalf("restore stdout: %v", err)
 	}
-	if err := syscall.Dup2(origErr, syscall.Stderr); err != nil {
+	if err := unix.Dup2(origErr, unix.Stderr); err != nil {
 		t.Fatalf("restore stderr: %v", err)
 	}
-	syscall.Close(origOut) //nolint:errcheck
-	syscall.Close(origErr) //nolint:errcheck
+	unix.Close(origOut) //nolint:errcheck
+	unix.Close(origErr) //nolint:errcheck
 	wOut.Close()
 	wErr.Close()
 
