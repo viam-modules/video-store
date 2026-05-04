@@ -44,8 +44,9 @@ func captureFFmpegStreams(t *testing.T, fn func()) (stdout, stderr string) {
 
 	fn()
 
-	// Restore original fds BEFORE reading. Dup2 replaces fd 1/2 which closes their
-	// connection to the pipe write end, allowing io.Copy below to see EOF.
+	// Restore original fds first. Dup2 onto fd 1/2 closes their current reference
+	// to the pipe write end; closing wOut/wErr drops the Go-side reference. Once
+	// all write ends are closed io.Copy below will see EOF.
 	if err := unix.Dup2(origOut, unix.Stdout); err != nil {
 		t.Fatalf("restore stdout: %v", err)
 	}
