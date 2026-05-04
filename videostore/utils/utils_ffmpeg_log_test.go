@@ -18,41 +18,29 @@ func captureFFmpegStreams(t *testing.T, fn func()) (stdout, stderr string) {
 	t.Helper()
 
 	origOut, err := unix.Dup(unix.Stdout)
-	if err != nil {
-		t.Fatalf("dup stdout: %v", err)
-	}
+	test.That(t, err, test.ShouldBeNil)
 	origErr, err := unix.Dup(unix.Stderr)
-	if err != nil {
-		t.Fatalf("dup stderr: %v", err)
-	}
+	test.That(t, err, test.ShouldBeNil)
 
 	rOut, wOut, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe stdout: %v", err)
-	}
+	test.That(t, err, test.ShouldBeNil)
 	rErr, wErr, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe stderr: %v", err)
-	}
+	test.That(t, err, test.ShouldBeNil)
 
-	if err := unix.Dup2(int(wOut.Fd()), unix.Stdout); err != nil {
-		t.Fatalf("dup2 stdout: %v", err)
-	}
-	if err := unix.Dup2(int(wErr.Fd()), unix.Stderr); err != nil {
-		t.Fatalf("dup2 stderr: %v", err)
-	}
+	err = unix.Dup2(int(wOut.Fd()), unix.Stdout)
+	test.That(t, err, test.ShouldBeNil)
+	err = unix.Dup2(int(wErr.Fd()), unix.Stderr)
+	test.That(t, err, test.ShouldBeNil)
 
 	fn()
 
 	// Restore original fds first. Dup2 onto fd 1/2 closes their current reference
 	// to the pipe write end; closing wOut/wErr drops the Go-side reference. Once
 	// all write ends are closed io.Copy below will see EOF.
-	if err := unix.Dup2(origOut, unix.Stdout); err != nil {
-		t.Fatalf("restore stdout: %v", err)
-	}
-	if err := unix.Dup2(origErr, unix.Stderr); err != nil {
-		t.Fatalf("restore stderr: %v", err)
-	}
+	err = unix.Dup2(origOut, unix.Stdout)
+	test.That(t, err, test.ShouldBeNil)
+	err = unix.Dup2(origErr, unix.Stderr)
+	test.That(t, err, test.ShouldBeNil)
 	unix.Close(origOut) //nolint:errcheck
 	unix.Close(origErr) //nolint:errcheck
 	wOut.Close()
@@ -96,7 +84,7 @@ func TestFFmpegLogRouting(t *testing.T) {
 				})
 				test.That(t, stderr, test.ShouldContainSubstring, tc.wantLabel)
 				test.That(t, stderr, test.ShouldContainSubstring, "test routing message")
-				test.That(t, stdout, test.ShouldNotContainSubstring, tc.wantLabel)
+				test.That(t, stdout, test.ShouldBeEmpty)
 			})
 		}
 	})
@@ -118,7 +106,7 @@ func TestFFmpegLogRouting(t *testing.T) {
 				})
 				test.That(t, stdout, test.ShouldContainSubstring, tc.wantLabel)
 				test.That(t, stdout, test.ShouldContainSubstring, "test routing message")
-				test.That(t, stderr, test.ShouldNotContainSubstring, tc.wantLabel)
+				test.That(t, stderr, test.ShouldBeEmpty)
 			})
 		}
 	})
