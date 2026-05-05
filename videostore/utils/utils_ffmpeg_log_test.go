@@ -64,23 +64,23 @@ func captureFFmpegStreams(t *testing.T, fn func()) (stdout, stderr string) {
 func TestFFmpegLogRouting(t *testing.T) {
 	SetFFmpegLogCallback()
 
-	origLevel := GetAVLogLevel()
-	defer SetAVLogLevel(origLevel)
+	origLevel := getAVLogLevel()
+	defer setAVLogLevel(origLevel)
 
 	t.Run("warnings and above route to stderr", func(t *testing.T) {
 		cases := []struct {
 			level     int
 			wantLabel string
 		}{
-			{AVLogFatal, "[FFmpeg Fatal]"},
-			{AVLogError, "[FFmpeg Error]"},
-			{AVLogWarning, "[FFmpeg Warn]"},
+			{avLogFatal, "[FFmpeg Fatal]"},
+			{avLogError, "[FFmpeg Error]"},
+			{avLogWarning, "[FFmpeg Warn]"},
 		}
-		SetAVLogLevel(AVLogDebug)
+		setAVLogLevel(avLogDebug)
 		for _, tc := range cases {
 			t.Run(tc.wantLabel, func(t *testing.T) {
 				stdout, stderr := captureFFmpegStreams(t, func() {
-					EmitAVLog(tc.level, "test routing message")
+					emitAVLog(tc.level, "test routing message")
 				})
 				test.That(t, stderr, test.ShouldContainSubstring, tc.wantLabel)
 				test.That(t, stderr, test.ShouldContainSubstring, "test routing message")
@@ -94,15 +94,15 @@ func TestFFmpegLogRouting(t *testing.T) {
 			level     int
 			wantLabel string
 		}{
-			{AVLogInfo, "[FFmpeg Info]"},
-			{AVLogVerbose, "[FFmpeg Verbose]"},
-			{AVLogDebug, "[FFmpeg Debug]"},
+			{avLogInfo, "[FFmpeg Info]"},
+			{avLogVerbose, "[FFmpeg Verbose]"},
+			{avLogDebug, "[FFmpeg Debug]"},
 		}
-		SetAVLogLevel(AVLogDebug)
+		setAVLogLevel(avLogDebug)
 		for _, tc := range cases {
 			t.Run(tc.wantLabel, func(t *testing.T) {
 				stdout, stderr := captureFFmpegStreams(t, func() {
-					EmitAVLog(tc.level, "test routing message")
+					emitAVLog(tc.level, "test routing message")
 				})
 				test.That(t, stdout, test.ShouldContainSubstring, tc.wantLabel)
 				test.That(t, stdout, test.ShouldContainSubstring, "test routing message")
@@ -112,9 +112,9 @@ func TestFFmpegLogRouting(t *testing.T) {
 	})
 
 	t.Run("messages below log level are suppressed", func(t *testing.T) {
-		SetAVLogLevel(AVLogWarning)
+		setAVLogLevel(avLogWarning)
 		stdout, stderr := captureFFmpegStreams(t, func() {
-			EmitAVLog(AVLogInfo, "suppressed message")
+			emitAVLog(avLogInfo, "suppressed message")
 		})
 		test.That(t, stdout, test.ShouldBeEmpty)
 		test.That(t, stderr, test.ShouldBeEmpty)
