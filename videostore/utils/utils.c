@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <string.h>
 
+// Matches FFmpeg's internal LINE_SZ in libavutil/log.c (not exposed in public headers).
+#define VIDEO_STORE_LOG_LINE_SZ 1024
+
 int video_store_get_video_info(video_store_video_info *info, // OUT
                                const char *filename          // IN
 ) {
@@ -83,12 +86,15 @@ int video_store_get_video_info(video_store_video_info *info, // OUT
 }
 
 void video_store_custom_av_log_callback(void *ptr, int level, const char *fmt, va_list vargs) {
+    // av_log_default_callback is not called here intentionally: it always writes to stderr
+    // and provides repetition suppression ("Last message repeated N times"). We drop that
+    // suppression in exchange for routing logs to the correct stream by level.
     if (level > av_log_get_level()) {
         return;
     }
     int print_prefix = 1;
-    char line[2048];
-    av_log_format_line(ptr, level, fmt, vargs, line, sizeof(line), &print_prefix);
+    char line[VIDEO_STORE_LOG_LINE_SZ];
+    av_log_format_line(ptr, level, fmt, vargs, line, VIDEO_STORE_LOG_LINE_SZ, &print_prefix);
     const char *level_str;
     if (level <= AV_LOG_FATAL) {
         level_str = "Fatal";
