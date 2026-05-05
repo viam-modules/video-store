@@ -86,9 +86,6 @@ int video_store_get_video_info(video_store_video_info *info, // OUT
 }
 
 void video_store_custom_av_log_callback(void *ptr, int level, const char *fmt, va_list vargs) {
-    // av_log_default_callback is not called here intentionally: it always writes to stderr
-    // and provides repetition suppression ("Last message repeated N times"). We drop that
-    // suppression in exchange for routing logs to the correct stream by level.
     if (level > av_log_get_level()) {
         return;
     }
