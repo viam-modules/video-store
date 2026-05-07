@@ -14,6 +14,7 @@ import (
 
 	"github.com/viam-modules/video-store/videostore/indexer"
 	vsutils "github.com/viam-modules/video-store/videostore/utils"
+	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/video"
@@ -538,6 +539,30 @@ func (vs *videostore) clearLatestFrame() {
 	}
 }
 
+// pickImage selects the image to feed into the encoder from a non-empty
+// Images() response. If sourceName is empty the response must contain exactly
+// one image; otherwise the image with a matching SourceName wins.
+//
+// filterSourceNames passed to camera.Images() is a hint to the upstream
+// camera; not every implementation honors it. Matching by SourceName here
+// keeps a camera that ignores the filter (and returns all its sources) from
+// silently feeding the wrong stream into the video store.
+func pickImage(images []camera.NamedImage, sourceName string) (camera.NamedImage, error) {
+	if sourceName == "" {
+		if len(images) > 1 {
+			return camera.NamedImage{}, fmt.Errorf(
+				"received %d images; set source_name in the config to select one", len(images))
+		}
+		return images[0], nil
+	}
+	for _, ni := range images {
+		if ni.SourceName == sourceName {
+			return ni, nil
+		}
+	}
+	return camera.NamedImage{}, fmt.Errorf("no image with source_name %q", sourceName)
+}
+
 func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerConfig,
 ) {
 	frameInterval := time.Second / time.Duration(framePoller.Framerate)
@@ -548,7 +573,11 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			namedImages, _, err := framePoller.Camera.Images(ctx, nil, nil)
+			var filter []string
+			if framePoller.SourceName != "" {
+				filter = []string{framePoller.SourceName}
+			}
+			namedImages, _, err := framePoller.Camera.Images(ctx, filter, nil)
 			if err != nil {
 				vs.logger.Warnf(
 					"failed to get images from camera %s: %v",
@@ -568,18 +597,15 @@ func (vs *videostore) fetchFrames(ctx context.Context, framePoller FramePollerCo
 				vs.clearLatestFrame()
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
-			} else if len(namedImages) > 1 {
-				vs.logger.Errorf(
-					"received %d images from camera %s. Multiple image sources is not supported.",
-					len(namedImages),
-					framePoller.Camera.Name(),
-				)
+			}
+
+			namedImage, err := pickImage(namedImages, framePoller.SourceName)
+			if err != nil {
+				vs.logger.Errorf("camera %s: %v", framePoller.Camera.Name(), err)
 				vs.clearLatestFrame()
 				time.Sleep(retryIntervalSeconds * time.Second)
 				continue
 			}
-
-			namedImage := namedImages[0]
 			data, err := namedImage.Bytes(ctx)
 			if err != nil {
 				vs.logger.Warnf("failed to get bytes from image: %v", err)

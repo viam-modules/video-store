@@ -133,9 +133,11 @@ func (c EncoderConfig) Validate() error {
 
 // FramePollerConfig is the config for the frame poller.
 type FramePollerConfig struct {
-	Camera    camera.Camera
-	Framerate int
-	YUYV      bool
+	Camera camera.Camera
+	// SourceName picks a named image source; empty expects a single-source camera.
+	SourceName string
+	Framerate  int
+	YUYV       bool
 }
 
 // Validate returns an error if the	FramePollerConfig is invalid.
