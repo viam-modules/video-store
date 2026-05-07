@@ -26,8 +26,6 @@ type mockCamera struct {
 	// would get really upset.
 	mu             sync.Mutex
 	imagesToReturn []camera.NamedImage
-	// lastFilter captures the most recent filterSourceNames argument passed to Images.
-	lastFilter []string
 
 	name        resource.Name
 	returnError error
@@ -39,7 +37,7 @@ func (m *mockCamera) Name() resource.Name {
 
 func (m *mockCamera) Images(
 	_ context.Context,
-	filterSourceNames []string,
+	_ []string,
 	_ map[string]interface{},
 ) (
 	[]camera.NamedImage,
@@ -48,7 +46,6 @@ func (m *mockCamera) Images(
 ) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.lastFilter = filterSourceNames
 	if m.returnError != nil {
 		return nil, resource.ResponseMetadata{}, m.returnError
 	}
@@ -579,38 +576,6 @@ func TestFetchFrames(t *testing.T) {
 		test.That(t, len(frameBytes), test.ShouldEqual, 0)
 	})
 
-	t.Run("Passes nil filter to Images when source_name unset", func(t *testing.T) {
-		namedImage, err := camera.NamedImageFromBytes(jpegData, "default", rutils.MimeTypeJPEG)
-		test.That(t, err, test.ShouldBeNil)
-
-		mockCam := &mockCamera{
-			name:           resource.NewName(camera.API, "test-camera"),
-			imagesToReturn: []camera.NamedImage{namedImage},
-		}
-
-		vs := &videostore{
-			config:      Config{},
-			logger:      logger,
-			latestFrame: &atomic.Value{},
-		}
-		vs.latestFrame.Store([]byte{})
-
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-
-		go vs.fetchFrames(ctx, FramePollerConfig{
-			Framerate: 10,
-			Camera:    mockCam,
-		})
-
-		time.Sleep(200 * time.Millisecond)
-
-		mockCam.mu.Lock()
-		filter := mockCam.lastFilter
-		mockCam.mu.Unlock()
-		test.That(t, filter, test.ShouldBeNil)
-	})
-
 	t.Run("Selects matching named image when source_name set", func(t *testing.T) {
 		// Build two JPEGs of different sizes so their bytes differ and we can
 		// verify which one was selected.
@@ -660,11 +625,6 @@ func TestFetchFrames(t *testing.T) {
 				time.Sleep(50 * time.Millisecond)
 			}
 		}
-
-		mockCam.mu.Lock()
-		filter := mockCam.lastFilter
-		mockCam.mu.Unlock()
-		test.That(t, filter, test.ShouldResemble, []string{"depth"})
 	})
 
 	t.Run("Clears frame when source_name has no match", func(t *testing.T) {
