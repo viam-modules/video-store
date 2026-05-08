@@ -15,6 +15,7 @@ require (
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.3.1
 	golang.org/x/mobile v0.0.0-20240112133503-c713f31d574b
+	golang.org/x/sys v0.37.0
 	golang.org/x/tools v0.36.0
 	gotest.tools/gotestsum v1.12.2
 )
@@ -214,7 +215,6 @@ require (
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.12.0 // indirect

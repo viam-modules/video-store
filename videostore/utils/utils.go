@@ -26,7 +26,8 @@ import (
 )
 
 // SetLibAVLogLevel sets the libav log level.
-// this is global for the entire OS process.
+// WARNING: this is global for the entire OS process. Any other library or component
+// using FFmpeg in the same process will inherit this log level.
 // valid inputs are "info", "warn", "error", "debug"
 // https://www.ffmpeg.org/doxygen/2.5/group__lavu__log__constants.html
 func SetLibAVLogLevel(level string) {
@@ -123,6 +124,9 @@ func ffmpegLogLevel(loglevel C.int) {
 }
 
 // SetFFmpegLogCallback sets the custom log callback for ffmpeg.
+// WARNING: this is global for the entire OS process. Any other library or component
+// using FFmpeg in the same process will inherit this callback.
+// Routes warnings and above to stderr, info/verbose/debug to stdout.
 func SetFFmpegLogCallback() {
 	C.video_store_set_custom_av_log_callback()
 }

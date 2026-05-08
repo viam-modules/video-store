@@ -1,7 +1,11 @@
 #include "utils.h"
 #include <libavutil/log.h>
 #include <libavcodec/avcodec.h>
+#include <stdio.h>
 #include <string.h>
+
+// Matches FFmpeg's internal LINE_SZ in libavutil/log.c (not exposed in public headers).
+#define VIDEO_STORE_LOG_LINE_SZ 1024
 
 int video_store_get_video_info(video_store_video_info *info, // OUT
                                const char *filename          // IN
@@ -82,10 +86,35 @@ int video_store_get_video_info(video_store_video_info *info, // OUT
 }
 
 void video_store_custom_av_log_callback(void *ptr, int level, const char *fmt, va_list vargs) {
-    // Default callback will handle log level filtering
-    av_log_default_callback(ptr, level, fmt, vargs);
-    // Default callback only prints to stderr
-    fflush(stderr);
+    if (level > av_log_get_level()) {
+        return;
+    }
+    int print_prefix = 1;
+    char line[VIDEO_STORE_LOG_LINE_SZ];
+    av_log_format_line(ptr, level, fmt, vargs, line, VIDEO_STORE_LOG_LINE_SZ, &print_prefix);
+    const char *level_str;
+    if (level <= AV_LOG_FATAL) {
+        level_str = "Fatal";
+    } else if (level <= AV_LOG_ERROR) {
+        level_str = "Error";
+    } else if (level <= AV_LOG_WARNING) {
+        level_str = "Warn";
+    } else if (level <= AV_LOG_INFO) {
+        level_str = "Info";
+    } else if (level <= AV_LOG_VERBOSE) {
+        level_str = "Verbose";
+    } else {
+        level_str = "Debug";
+    }
+    // RDK captures stderr as error-level logs, so only write warnings and above there.
+    // Info/verbose/debug go to stdout to avoid misleading error noise in production.
+    if (level <= AV_LOG_WARNING) {
+        fprintf(stderr, "[FFmpeg %s] %s", level_str, line);
+        fflush(stderr);
+    } else {
+        fprintf(stdout, "[FFmpeg %s] %s", level_str, line);
+        fflush(stdout);
+    }
 }
 
 void video_store_set_custom_av_log_callback() {
