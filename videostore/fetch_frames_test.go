@@ -132,7 +132,7 @@ func TestFetchFrames(t *testing.T) {
 		test.That(t, len(frameBytes), test.ShouldEqual, 0)
 	})
 
-	t.Run("Fails with multiple images", func(t *testing.T) {
+	t.Run("Fails with multiple images when source_name unset", func(t *testing.T) {
 		colorImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
 		test.That(t, err, test.ShouldBeNil)
 		depthImage, err := camera.NamedImageFromBytes(jpegData, "depth", rutils.MimeTypeJPEG)
@@ -574,5 +574,131 @@ func TestFetchFrames(t *testing.T) {
 		frameBytes, ok := frame.([]byte)
 		test.That(t, ok, test.ShouldBeTrue)
 		test.That(t, len(frameBytes), test.ShouldEqual, 0)
+	})
+
+	t.Run("Selects matching named image when source_name set", func(t *testing.T) {
+		// Build two JPEGs of different sizes so their bytes differ and we can
+		// verify which one was selected.
+		colorBuf := new(bytes.Buffer)
+		test.That(t, jpeg.Encode(colorBuf, image.NewRGBA(image.Rect(0, 0, 320, 240)), nil), test.ShouldBeNil)
+		depthBuf := new(bytes.Buffer)
+		test.That(t, jpeg.Encode(depthBuf, image.NewRGBA(image.Rect(0, 0, 640, 480)), nil), test.ShouldBeNil)
+		test.That(t, bytes.Equal(colorBuf.Bytes(), depthBuf.Bytes()), test.ShouldBeFalse)
+
+		colorImage, err := camera.NamedImageFromBytes(colorBuf.Bytes(), "color", rutils.MimeTypeJPEG)
+		test.That(t, err, test.ShouldBeNil)
+		depthImage, err := camera.NamedImageFromBytes(depthBuf.Bytes(), "depth", rutils.MimeTypeJPEG)
+		test.That(t, err, test.ShouldBeNil)
+
+		mockCam := &mockCamera{
+			name:           resource.NewName(camera.API, "test-camera"),
+			imagesToReturn: []camera.NamedImage{colorImage, depthImage},
+		}
+
+		vs := &videostore{
+			config:      Config{},
+			logger:      logger,
+			latestFrame: &atomic.Value{},
+		}
+		vs.latestFrame.Store([]byte{})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		go vs.fetchFrames(ctx, FramePollerConfig{
+			Framerate:  10,
+			Camera:     mockCam,
+			SourceName: "depth",
+		})
+
+		// Poll until a frame matching the depth image is stored.
+		timeout := time.After(2 * time.Second)
+		for {
+			frame := vs.latestFrame.Load()
+			if frameBytes, ok := frame.([]byte); ok && bytes.Equal(frameBytes, depthBuf.Bytes()) {
+				break
+			}
+			select {
+			case <-timeout:
+				t.Fatal("timed out waiting for depth frame to be stored")
+			default:
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+	})
+
+	t.Run("Clears frame when source_name has no match", func(t *testing.T) {
+		// Camera ignores the filter and returns only sources the user did not ask for.
+		colorImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
+		test.That(t, err, test.ShouldBeNil)
+
+		mockCam := &mockCamera{
+			name:           resource.NewName(camera.API, "test-camera"),
+			imagesToReturn: []camera.NamedImage{colorImage},
+		}
+
+		vs := &videostore{
+			config:      Config{},
+			logger:      logger,
+			latestFrame: &atomic.Value{},
+		}
+		vs.latestFrame.Store([]byte("stale"))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		go vs.fetchFrames(ctx, FramePollerConfig{
+			Framerate:  30,
+			Camera:     mockCam,
+			SourceName: "depth",
+		})
+
+		// Poll until the stale frame is cleared.
+		timeout := time.After(5 * time.Second)
+		for {
+			frame := vs.latestFrame.Load()
+			if frameBytes, ok := frame.([]byte); ok && frameBytes == nil {
+				break
+			}
+			select {
+			case <-timeout:
+				t.Fatal("timed out waiting for stale frame to be cleared")
+			default:
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+	})
+}
+
+func TestPickImage(t *testing.T) {
+	mustImg := func(name string) camera.NamedImage {
+		ni, err := camera.NamedImageFromBytes([]byte("data-"+name), name, rutils.MimeTypeJPEG)
+		test.That(t, err, test.ShouldBeNil)
+		return ni
+	}
+
+	t.Run("empty source_name with single image returns it", func(t *testing.T) {
+		only := mustImg("only")
+		got, err := pickImage([]camera.NamedImage{only}, "")
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, got.SourceName, test.ShouldEqual, "only")
+	})
+
+	t.Run("empty source_name with multiple images errors", func(t *testing.T) {
+		_, err := pickImage([]camera.NamedImage{mustImg("a"), mustImg("b")}, "")
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "set source_name")
+	})
+
+	t.Run("source_name selects matching image", func(t *testing.T) {
+		got, err := pickImage([]camera.NamedImage{mustImg("color"), mustImg("depth")}, "depth")
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, got.SourceName, test.ShouldEqual, "depth")
+	})
+
+	t.Run("source_name with no match errors", func(t *testing.T) {
+		_, err := pickImage([]camera.NamedImage{mustImg("color")}, "depth")
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, `"depth"`)
 	})
 }
