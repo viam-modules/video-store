@@ -174,8 +174,8 @@ func (c *component) Close(_ context.Context) error {
 	return nil
 }
 
-func (c *component) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
-	return nil, camera.ImageMetadata{}, errors.New("camera.Image not implemented")
+func (c *component) Status(_ context.Context) (map[string]interface{}, error) {
+	return map[string]interface{}{}, nil
 }
 
 func (c *component) Images(
