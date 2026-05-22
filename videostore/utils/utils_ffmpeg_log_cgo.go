@@ -19,7 +19,14 @@ static void test_set_av_log_level(int level) {
 }
 */
 import "C"
-import "unsafe"
+
+import (
+	"strings"
+	"sync/atomic"
+	"unsafe"
+
+	"go.viam.com/rdk/logging"
+)
 
 // avLog* constants mirror libavutil/log.h integer values.
 // These exist alongside SetLibAVLogLevel (which takes a string) so that
@@ -56,4 +63,33 @@ func getAVLogLevel() int {
 // Intended for use in tests to save and restore the log level around subtests.
 func setAVLogLevel(level int) {
 	C.test_set_av_log_level(C.int(level))
+}
+
+// ffmpegLogger holds the logger that videoStoreGoFFmpegLog routes lines to.
+// av_log_set_callback has no userdata pointer, so the shim has to reach the
+// logger via package state. atomic.Pointer keeps the read path lock-free for
+// the callback, which FFmpeg can fire from any decoder thread.
+var ffmpegLogger atomic.Pointer[logging.Logger]
+
+//export videoStoreGoFFmpegLog
+func videoStoreGoFFmpegLog(level C.int, msg *C.char) {
+	p := ffmpegLogger.Load()
+	if p == nil {
+		return
+	}
+	logger := *p
+	line := strings.TrimRight(C.GoString(msg), "\n")
+	switch {
+	case level <= C.AV_LOG_ERROR:
+		// AV_LOG_PANIC and AV_LOG_FATAL fall in here on purpose: zap's Fatal
+		// would os.Exit and we don't want a recoverable libav fatal to take
+		// down the module.
+		logger.Error(line)
+	case level <= C.AV_LOG_WARNING:
+		logger.Warn(line)
+	case level <= C.AV_LOG_INFO:
+		logger.Info(line)
+	default:
+		logger.Debug(line)
+	}
 }

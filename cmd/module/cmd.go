@@ -22,7 +22,7 @@ func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error 
 	} else {
 		vsutils.SetLibAVLogLevel("fatal")
 	}
-	vsutils.SetFFmpegLogCallback()
+	vsutils.SetFFmpegLogCallback(logger)
 
 	module, err := module.NewModuleFromArgs(ctx)
 	if err != nil {
