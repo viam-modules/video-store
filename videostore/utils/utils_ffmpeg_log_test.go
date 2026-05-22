@@ -33,8 +33,7 @@ func TestFFmpegLogRouting(t *testing.T) {
 
 				entries := observed.TakeAll()
 				test.That(t, len(entries), test.ShouldEqual, 1)
-				// ObservedLogs entries carry a zapcore.Level (the observer is a
-				// zap construct, not an rdk abstraction), so convert via AsZap.
+				// observer reports zapcore.Level, convert from logging.Level.
 				test.That(t, entries[0].Level, test.ShouldEqual, tc.wantLevel.AsZap())
 				test.That(t, entries[0].Message, test.ShouldContainSubstring, "test routing message")
 				test.That(t, entries[0].LoggerName, test.ShouldEndWith, "ffmpeg")

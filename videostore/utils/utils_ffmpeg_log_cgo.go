@@ -68,7 +68,8 @@ func setAVLogLevel(level int) {
 // ffmpegLogger holds the logger that videoStoreGoFFmpegLog routes lines to.
 // av_log_set_callback has no userdata pointer, so the shim has to reach the
 // logger via package state. atomic.Pointer keeps the read path lock-free for
-// the callback, which FFmpeg can fire from any decoder thread.
+// the callback, which FFmpeg can fire from any of its threads (demuxer,
+// segmenter, encoder, decoder, filter, etc.).
 var ffmpegLogger atomic.Pointer[logging.Logger]
 
 //export videoStoreGoFFmpegLog
