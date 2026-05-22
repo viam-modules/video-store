@@ -82,8 +82,8 @@ func videoStoreGoFFmpegLog(level C.int, msg *C.char) {
 	line := strings.TrimRight(C.GoString(msg), "\n")
 	switch {
 	case level <= C.AV_LOG_ERROR:
-		// AV_LOG_PANIC and AV_LOG_FATAL fall in here on purpose: zap's Fatal
-		// would os.Exit and we don't want a recoverable libav fatal to take
+		// AV_LOG_PANIC and AV_LOG_FATAL fall in here on purpose: logger.Fatal
+		// calls os.Exit and we don't want a recoverable libav fatal to take
 		// down the module.
 		logger.Error(line)
 	case level <= C.AV_LOG_WARNING:
