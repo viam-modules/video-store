@@ -126,8 +126,10 @@ func ffmpegLogLevel(loglevel C.int) {
 // SetFFmpegLogCallback sets the custom log callback for ffmpeg.
 // WARNING: this is global for the entire OS process. Any other library or component
 // using FFmpeg in the same process will inherit this callback.
-// Routes warnings and above to stderr, info/verbose/debug to stdout.
-func SetFFmpegLogCallback() {
+// All FFmpeg log lines are routed through logger under an "ffmpeg" sublogger.
+func SetFFmpegLogCallback(logger logging.Logger) {
+	sub := logger.Sublogger("ffmpeg")
+	ffmpegLogger.Store(&sub)
 	C.video_store_set_custom_av_log_callback()
 }
 

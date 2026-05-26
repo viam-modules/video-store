@@ -3,6 +3,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"os"
 
 	cam "github.com/viam-modules/video-store/model/camera"
 	vsutils "github.com/viam-modules/video-store/videostore/utils"
@@ -22,9 +24,13 @@ func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error 
 	} else {
 		vsutils.SetLibAVLogLevel("fatal")
 	}
-	vsutils.SetFFmpegLogCallback()
+	vsutils.SetFFmpegLogCallback(logger)
 
-	module, err := module.NewModuleFromArgs(ctx)
+	// NewModule, not NewModuleFromArgs: latter spawns its own moduleLogger, stranding our ffmpeg sublogger on stdout fallback.
+	if len(os.Args) < 2 { //nolint:mnd
+		return errors.New("need socket path as command line argument")
+	}
+	module, err := module.NewModule(ctx, os.Args[1], logger)
 	if err != nil {
 		return err
 	}

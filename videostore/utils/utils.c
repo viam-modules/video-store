@@ -4,6 +4,11 @@
 #include <stdio.h>
 #include <string.h>
 
+// Implemented in Go (//export videoStoreGoFFmpegLog). Routes the formatted line
+// into the module's logging.Logger so FFmpeg output flows through the same sink
+// as the rest of the module.
+extern void videoStoreGoFFmpegLog(int level, const char *msg);
+
 // Matches FFmpeg's internal LINE_SZ in libavutil/log.c (not exposed in public headers).
 #define VIDEO_STORE_LOG_LINE_SZ 1024
 
@@ -92,29 +97,7 @@ void video_store_custom_av_log_callback(void *ptr, int level, const char *fmt, v
     int print_prefix = 1;
     char line[VIDEO_STORE_LOG_LINE_SZ];
     av_log_format_line(ptr, level, fmt, vargs, line, VIDEO_STORE_LOG_LINE_SZ, &print_prefix);
-    const char *level_str;
-    if (level <= AV_LOG_FATAL) {
-        level_str = "Fatal";
-    } else if (level <= AV_LOG_ERROR) {
-        level_str = "Error";
-    } else if (level <= AV_LOG_WARNING) {
-        level_str = "Warn";
-    } else if (level <= AV_LOG_INFO) {
-        level_str = "Info";
-    } else if (level <= AV_LOG_VERBOSE) {
-        level_str = "Verbose";
-    } else {
-        level_str = "Debug";
-    }
-    // RDK captures stderr as error-level logs, so only write warnings and above there.
-    // Info/verbose/debug go to stdout to avoid misleading error noise in production.
-    if (level <= AV_LOG_WARNING) {
-        fprintf(stderr, "[FFmpeg %s] %s", level_str, line);
-        fflush(stderr);
-    } else {
-        fprintf(stdout, "[FFmpeg %s] %s", level_str, line);
-        fflush(stdout);
-    }
+    videoStoreGoFFmpegLog(level, line);
 }
 
 void video_store_set_custom_av_log_callback() {
