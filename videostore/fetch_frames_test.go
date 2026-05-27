@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"go.viam.com/rdk/components/camera"
+	"go.viam.com/rdk/data"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	rutils "go.viam.com/rdk/utils"
@@ -65,7 +66,7 @@ func TestFetchFrames(t *testing.T) {
 	jpegData := createMockJPEGImage()
 
 	t.Run("Success with single image", func(t *testing.T) {
-		namedImage, err := camera.NamedImageFromBytes(jpegData, "default", rutils.MimeTypeJPEG)
+		namedImage, err := camera.NamedImageFromBytes(jpegData, "default", rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 
 		mockCam := &mockCamera{
@@ -133,9 +134,9 @@ func TestFetchFrames(t *testing.T) {
 	})
 
 	t.Run("Fails with multiple images when source_name unset", func(t *testing.T) {
-		colorImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
+		colorImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
-		depthImage, err := camera.NamedImageFromBytes(jpegData, "depth", rutils.MimeTypeJPEG)
+		depthImage, err := camera.NamedImageFromBytes(jpegData, "depth", rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 
 		mockCam := &mockCamera{
@@ -172,7 +173,7 @@ func TestFetchFrames(t *testing.T) {
 	})
 
 	t.Run("Fails with wrong MIME type", func(t *testing.T) {
-		pngImage, err := camera.NamedImageFromBytes([]byte("fake png data"), "color", rutils.MimeTypePNG)
+		pngImage, err := camera.NamedImageFromBytes([]byte("fake png data"), "color", rutils.MimeTypePNG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 
 		mockCam := &mockCamera{
@@ -208,7 +209,7 @@ func TestFetchFrames(t *testing.T) {
 	})
 
 	t.Run("Clears stale frame when camera switches to invalid MIME type", func(t *testing.T) {
-		jpegImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
+		jpegImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 
 		mockCam := &mockCamera{
@@ -254,7 +255,7 @@ func TestFetchFrames(t *testing.T) {
 		test.That(t, len(storedFrameBytes), test.ShouldBeGreaterThan, 0)
 
 		// Switch camera to return depth image
-		depthImage, err := camera.NamedImageFromBytes([]byte("fake depth data"), "depth", rutils.MimeTypeRawDepth)
+		depthImage, err := camera.NamedImageFromBytes([]byte("fake depth data"), "depth", rutils.MimeTypeRawDepth, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 		mockCam.mu.Lock()
 		mockCam.imagesToReturn = []camera.NamedImage{depthImage}
@@ -281,7 +282,7 @@ func TestFetchFrames(t *testing.T) {
 	})
 
 	t.Run("Clears stale frame when 0 images returned", func(t *testing.T) {
-		jpegImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
+		jpegImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 
 		mockCam := &mockCamera{
@@ -352,7 +353,7 @@ func TestFetchFrames(t *testing.T) {
 	})
 
 	t.Run("Clears stale frame when more than 1 image returned", func(t *testing.T) {
-		jpegImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
+		jpegImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 
 		mockCam := &mockCamera{
@@ -398,7 +399,7 @@ func TestFetchFrames(t *testing.T) {
 		test.That(t, len(storedFrameBytes), test.ShouldBeGreaterThan, 0)
 
 		// Switch camera to return 2 images
-		secondImage, err := camera.NamedImageFromBytes(jpegData, "depth", rutils.MimeTypeJPEG)
+		secondImage, err := camera.NamedImageFromBytes(jpegData, "depth", rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 		mockCam.mu.Lock()
 		mockCam.imagesToReturn = []camera.NamedImage{jpegImage, secondImage}
@@ -425,7 +426,7 @@ func TestFetchFrames(t *testing.T) {
 	})
 
 	t.Run("Clears stale frame when Images() returns error", func(t *testing.T) {
-		jpegImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
+		jpegImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 
 		mockCam := &mockCamera{
@@ -499,7 +500,7 @@ func TestFetchFrames(t *testing.T) {
 		// Build a NamedImage that will error on Bytes(): use an unsupported mime type
 		// so that rimage.EncodeImage hits its default error case.
 		badImg := image.NewNRGBA(image.Rect(0, 0, 1, 1))
-		badNamedImage, err := camera.NamedImageFromImage(badImg, "color", "image/bogus")
+		badNamedImage, err := camera.NamedImageFromImage(badImg, "color", "image/bogus", data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 
 		mockCam := &mockCamera{
@@ -585,9 +586,9 @@ func TestFetchFrames(t *testing.T) {
 		test.That(t, jpeg.Encode(depthBuf, image.NewRGBA(image.Rect(0, 0, 640, 480)), nil), test.ShouldBeNil)
 		test.That(t, bytes.Equal(colorBuf.Bytes(), depthBuf.Bytes()), test.ShouldBeFalse)
 
-		colorImage, err := camera.NamedImageFromBytes(colorBuf.Bytes(), "color", rutils.MimeTypeJPEG)
+		colorImage, err := camera.NamedImageFromBytes(colorBuf.Bytes(), "color", rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
-		depthImage, err := camera.NamedImageFromBytes(depthBuf.Bytes(), "depth", rutils.MimeTypeJPEG)
+		depthImage, err := camera.NamedImageFromBytes(depthBuf.Bytes(), "depth", rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 
 		mockCam := &mockCamera{
@@ -629,7 +630,7 @@ func TestFetchFrames(t *testing.T) {
 
 	t.Run("Clears frame when source_name has no match", func(t *testing.T) {
 		// Camera ignores the filter and returns only sources the user did not ask for.
-		colorImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG)
+		colorImage, err := camera.NamedImageFromBytes(jpegData, "color", rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 
 		mockCam := &mockCamera{
@@ -672,7 +673,7 @@ func TestFetchFrames(t *testing.T) {
 
 func TestPickImage(t *testing.T) {
 	mustImg := func(name string) camera.NamedImage {
-		ni, err := camera.NamedImageFromBytes([]byte("data-"+name), name, rutils.MimeTypeJPEG)
+		ni, err := camera.NamedImageFromBytes([]byte("data-"+name), name, rutils.MimeTypeJPEG, data.Annotations{})
 		test.That(t, err, test.ShouldBeNil)
 		return ni
 	}
