@@ -19,6 +19,7 @@ func main() {
 }
 
 func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
+	logger.Debug("starting video-store module")
 	if logger.GetLevel() == logging.DEBUG {
 		vsutils.SetLibAVLogLevel("debug")
 	} else {

@@ -11,7 +11,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/rhysd/actionlint v1.7.8
-	go.viam.com/rdk v0.128.0
+	go.viam.com/rdk v0.129.2
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.6.1
 	golang.org/x/mobile v0.0.0-20240112133503-c713f31d574b
@@ -242,7 +242,7 @@ require (
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	go.viam.com/api v0.1.552 // indirect
+	go.viam.com/api v0.1.555 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230525183740-e7c30c78aeb2 // indirect
 	goji.io v2.0.2+incompatible // indirect
