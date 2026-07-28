@@ -1,5 +1,8 @@
 # [`video-store` camera](https://app.viam.com/module/viam/video-store)
 
+> [!WARNING]
+> **This module is DEPRECATED and no longer under active development.** Video storage has moved into the [`viamrtsp` module](https://github.com/viam-modules/viamrtsp): use the [`viam:viamrtsp:video-service`](https://github.com/viam-modules/viamrtsp#configure-the-viamrtspvideo-service-video-service) model instead. This repository remains available as a Go library.
+
 The `video-store` module brings security camera functionality to your smart machine! The module consumes a source [Camera](https://docs.viam.com/components/camera/) and saves the output as video files on disk. You can then upload video slices to the cloud using the [save](#save) command, or request the video bytes directly using the [fetch](#fetch) command.
 
 Navigate to the [**CONFIGURE** tab](https://docs.viam.com/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in [the Viam app](https://app.viam.com/).

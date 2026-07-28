@@ -59,6 +59,10 @@ func newComponent(
 		return nil, err
 	}
 
+	logger.Warn("The viam:video:storage model is DEPRECATED and no longer under active development. " +
+		"Migrate to the viam:viamrtsp:video-service model in the viam:viamrtsp module: " +
+		"https://github.com/viam-modules/viamrtsp#configure-the-viamrtspvideo-service-video-service")
+
 	if err := checkDeps(deps, config, logger); err != nil {
 		return nil, err
 	}
