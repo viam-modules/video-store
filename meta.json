@@ -2,13 +2,13 @@
   "module_id": "viam:video-store",
   "visibility": "public",
   "url": "https://github.com/viam-modules/video-store",
-  "description": "Golang module for video storage and retrieval from a camera",
+  "description": "[DEPRECATED — use the viam:viamrtsp:video-service model in the viam:viamrtsp module] Golang module for video storage and retrieval from a camera",
   "models": [
       {
           "api": "rdk:component:camera",
           "model": "viam:video:storage",
           "markdown_link" : "README.md#configure-your-video-store-component",
-          "short_description" : "A driver for storing video from a camera"
+          "short_description" : "[DEPRECATED] A driver for storing video from a camera — use viam:viamrtsp:video-service instead"
       }
   ],
   "build": {
