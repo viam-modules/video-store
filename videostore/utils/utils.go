@@ -190,15 +190,6 @@ func GetDirectorySize(path string) (int64, error) {
 	return size, err
 }
 
-// GetFileSize returns the size of a file in bytes.
-func GetFileSize(path string) (int64, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return 0, err
-	}
-	return info.Size(), nil
-}
-
 // GetSortedFiles returns a list of files in the provided directory sorted by creation time.
 func GetSortedFiles(path string) ([]FileWithDate, error) {
 	files, err := os.ReadDir(path)
