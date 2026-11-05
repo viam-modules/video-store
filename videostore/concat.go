@@ -109,7 +109,7 @@ func (c *concater) ConcatWithFormat(from, to time.Time, path string, container C
 		// Remove the concat file after the concat operation is complete.
 		if _, err := os.Stat(concatFilePath); err == nil {
 			if err := os.Remove(concatFilePath); err != nil {
-				c.logger.Error("failed to remove concat file %s, err: %s", concatFilePath, err.Error())
+				c.logger.Errorf("failed to remove concat file %s, err: %s", concatFilePath, err.Error())
 			}
 		}
 	}()
