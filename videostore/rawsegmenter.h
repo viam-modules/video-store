@@ -3,6 +3,13 @@
 #include <libavformat/avformat.h>
 typedef struct raw_seg {
   AVFormatContext *outCtx;
+  // Callers pass packets without a duration. The mp4 muxer then gives each
+  // segment's last frame a duration of 0, so every segment reports one frame
+  // too short and concatenating segments drops a frame at each join. Packets
+  // are stamped with the latest inter-frame DTS delta instead.
+  int64_t lastDts;
+  int64_t lastDuration;
+  int hasLastDts;
 } raw_seg;
 
 int video_store_raw_seg_init_h264(struct raw_seg **ppRS,     // OUT

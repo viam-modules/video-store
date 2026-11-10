@@ -108,6 +108,9 @@ int video_store_raw_seg_init(struct raw_seg **ppRS,     // OUT
   }
 
   rs->outCtx = fmtCtx;
+  rs->lastDts = 0;
+  rs->lastDuration = 0;
+  rs->hasLastDts = 0;
   *ppRS = rs;
   ret = VIDEO_STORE_RAW_SEG_RESP_OK;
 
@@ -217,6 +220,12 @@ int video_store_raw_seg_write_packet(struct raw_seg *rs,       // IN
   pkt->size = (int)payloadSize;
   pkt->pts = pts;
   pkt->dts = dts;
+  if (rs->hasLastDts && dts > rs->lastDts) {
+    rs->lastDuration = dts - rs->lastDts;
+  }
+  rs->lastDts = dts;
+  rs->hasLastDts = 1;
+  pkt->duration = rs->lastDuration;
   /* // Set the keyframe flag if this is an IDR frame. This is needed to
    * make sure the */
   /* // muxer knows it is a keyframe and is safe to start a new segment. */
