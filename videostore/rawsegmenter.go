@@ -153,9 +153,10 @@ func (rs *RawSegmenter) Close() error {
 		return nil
 	}
 	ret := C.video_store_raw_seg_close(&rs.cRawSeg)
-	if ret != C.VIDEO_STORE_RAW_SEG_RESP_OK {
-		return fmt.Errorf("failed to close raw segmeneter: %d", ret)
-	}
+	// The C segmenter is freed even when writing the trailer fails, so Close never runs twice on it.
 	rs.cRawSeg = nil
+	if ret != C.VIDEO_STORE_RAW_SEG_RESP_OK {
+		return fmt.Errorf("failed to close raw segmenter: %d: %s", ret, vsutils.FFmpegError(int(ret)))
+	}
 	return nil
 }

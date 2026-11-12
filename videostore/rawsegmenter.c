@@ -261,14 +261,18 @@ int video_store_raw_seg_close(struct raw_seg **ppRS // OUT
            "video_store_raw_seg_close called with null raw_seg_h264 *ppRS\n");
     return VIDEO_STORE_RAW_SEG_RESP_ERROR;
   }
+  // av_write_trailer tears down the muxer even when it fails (e.g. after a
+  // full disk made a segment fail to close or open), so the context must be
+  // freed either way. Writing the trailer again would read the freed muxer
+  // state and segfault.
   int ret = av_write_trailer((*ppRS)->outCtx);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "video_store_raw_seg_close called failed to write trailer\n");
-    return ret;
+           "video_store_raw_seg_close called failed to write trailer: %s\n",
+           av_err2str(ret));
   }
   avformat_free_context((*ppRS)->outCtx);
   free(*ppRS);
   *ppRS = NULL;
-  return VIDEO_STORE_RAW_SEG_RESP_OK;
+  return ret < 0 ? ret : VIDEO_STORE_RAW_SEG_RESP_OK;
 }
