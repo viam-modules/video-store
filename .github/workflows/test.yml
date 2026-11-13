@@ -28,7 +28,7 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runs-on: ubuntu-latest
+            runs-on: ubuntu-24.04 # 26.04 libx264-dev has no libx264.a to link statically
           - platform: linux/arm64
             runs-on: github-linux-arm64-8core
           - platform: darwin/arm64
